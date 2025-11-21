@@ -946,16 +946,40 @@ AI Impact Analysis is built with Python 3.11+. The project follows a modular str
 
 To start contributing to AI Impact Analysis, clone the repository, create a new branch and start working on improvements. When ready commit and push the changes and open a merge request. In summary:
 
-1. `git clone https://github.com/testcara/ai_impact_analysis.git`
-2. `git switch -c <new_branch> master`
-3. Create virtual environment with `python3 -m venv venv && source venv/bin/activate`
-4. Install dependencies with `pip install -r requirements.txt`
-5. Set PYTHONPATH with `export PYTHONPATH=.`
-6. Development improvements
-7. Commit and push changes
+1. Clone the repository: `git clone https://github.com/testcara/ai_impact_analysis.git`
+2. Create a new branch: `git switch -c <new_branch> master`
+3. Set up development environment:
+   ```bash
+   python3 -m venv venv && source venv/bin/activate
+   pip install -e ".[dev]"  # Install with dev dependencies (includes pre-commit, pytest, etc.)
+   export PYTHONPATH=.
+   ```
+4. **Install pre-commit hooks** (recommended):
+   ```bash
+   pre-commit install --hook-type commit-msg --hook-type pre-commit
+   ```
+   This installs:
+   - **Pre-commit hooks**: Run lint checks (tox -e lint) before each commit
+   - **Commit-msg hook**: Automatically adds "Assisted-by" trailers when using AI tools (Claude/Cursor)
+
+5. Make your improvements
+6. Run tests (see [Tests](#tests) section for details):
+   ```bash
+   tox -e unittest --develop  # Fast unit tests
+   tox -e lint                # Code quality checks (automatic via pre-commit)
+   ```
+7. Commit and push changes (pre-commit hooks will run automatically)
 8. Submit a merge request
 
-The `master` branch is protected to avoid any issues with production code.
+**Branch Protection:**
+- The `master` branch is protected with required status checks
+- All pull requests must pass CI tests before merging
+- At least one approval is required
+
+**Continuous Integration:**
+- GitHub Actions automatically runs tests on Python 3.11, 3.12, and 3.13
+- CI runs: unit tests, lint checks (black + flake8), type checking (mypy), and coverage reports
+- See `.github/workflows/ci.yml` for details
 
 ### Project structure
 
