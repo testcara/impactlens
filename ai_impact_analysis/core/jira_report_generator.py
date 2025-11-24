@@ -16,6 +16,7 @@ from ai_impact_analysis.utils.report_utils import (
     format_metric_changes,
     add_metric_change,
 )
+from ai_impact_analysis.utils.core_utils import calculate_days_between
 
 
 class JiraReportGenerator:
@@ -70,9 +71,7 @@ class JiraReportGenerator:
             report_lines.append(f"End: {end_date}")
 
             # Calculate phase days
-            phase_start = datetime.strptime(start_date, "%Y-%m-%d")
-            phase_end = datetime.strptime(end_date, "%Y-%m-%d")
-            phase_days = (phase_end - phase_start).days + 1  # Inclusive
+            phase_days = calculate_days_between(start_date, end_date, inclusive=True)
 
             # Show leave days info
             if leave_days > 0:

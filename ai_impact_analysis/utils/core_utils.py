@@ -5,6 +5,50 @@ import re
 from datetime import datetime
 
 
+def calculate_days_between(start_date, end_date, inclusive=True):
+    """
+    Calculate the number of days between two dates.
+
+    Args:
+        start_date: Start date string (YYYY-MM-DD)
+        end_date: End date string (YYYY-MM-DD)
+        inclusive: If True, includes both start and end dates (adds 1 to result)
+
+    Returns:
+        Number of days or None if calculation fails
+    """
+    if not start_date or not end_date:
+        return None
+
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+        days = (end - start).days
+        if inclusive:
+            days += 1
+        return days if days >= 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def calculate_daily_throughput(start_date, end_date, item_count):
+    """
+    Calculate daily throughput based on date range and item count.
+
+    Args:
+        start_date: Start date string (YYYY-MM-DD)
+        end_date: End date string (YYYY-MM-DD)
+        item_count: Number of items to calculate throughput for
+
+    Returns:
+        Daily throughput (items per day) or None if calculation fails
+    """
+    days = calculate_days_between(start_date, end_date, inclusive=True)
+    if days and days > 0:
+        return item_count / days
+    return None
+
+
 def convert_date_to_jql(date_str):
     """
     Convert YYYY-MM-DD format date to Jira JQL relative time expression.

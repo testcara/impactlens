@@ -6,23 +6,43 @@ Extracted from cli/get_pr_metrics.py
 """
 
 from datetime import datetime
+from ai_impact_analysis.utils.core_utils import calculate_daily_throughput
 
 
 class PRMetricsCalculator:
     """Calculator for GitHub PR metrics and statistics."""
 
-    def calculate_statistics(self, prs_with_metrics):
+    def calculate_statistics(self, prs_with_metrics, start_date=None, end_date=None):
         """
         Calculate aggregated statistics from PR metrics.
 
         Args:
             prs_with_metrics: List of PR dictionaries with metrics
+            start_date: Start date (YYYY-MM-DD) for period
+            end_date: End date (YYYY-MM-DD) for period
 
         Returns:
             Dictionary with aggregated statistics
         """
         if not prs_with_metrics:
-            return {"total_prs": 0, "ai_assisted_prs": 0, "non_ai_prs": 0, "ai_adoption_rate": 0}
+            # Return complete empty statistics structure
+            daily_throughput = calculate_daily_throughput(start_date, end_date, 0)
+            return {
+                "total_prs": 0,
+                "ai_assisted_prs": 0,
+                "non_ai_prs": 0,
+                "ai_adoption_rate": 0,
+                "daily_throughput": daily_throughput,
+                "claude_prs": 0,
+                "cursor_prs": 0,
+                "both_tools_prs": 0,
+                "ai_stats": {},
+                "non_ai_stats": {},
+                "comparison": {
+                    "merge_time_improvement": 0,
+                    "changes_requested_reduction": 0,
+                },
+            }
 
         # Separate AI and non-AI PRs
         ai_prs = [pr for pr in prs_with_metrics if pr["has_ai_assistance"]]
@@ -81,6 +101,9 @@ class PRMetricsCalculator:
                 "avg_files_changed": avg([pr["changed_files"] for pr in non_ai_prs]),
             }
 
+        # Calculate daily throughput if dates provided
+        daily_throughput = calculate_daily_throughput(start_date, end_date, len(prs_with_metrics))
+
         return {
             "total_prs": len(prs_with_metrics),
             "ai_assisted_prs": len(ai_prs),
@@ -88,6 +111,7 @@ class PRMetricsCalculator:
             "ai_adoption_rate": (
                 (len(ai_prs) / len(prs_with_metrics) * 100) if prs_with_metrics else 0
             ),
+            "daily_throughput": daily_throughput,
             # By tool
             "claude_prs": len(claude_prs),
             "cursor_prs": len(cursor_prs),

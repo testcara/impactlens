@@ -13,6 +13,7 @@ from ai_impact_analysis.utils.report_utils import (
     add_metric_change,
     format_metric_changes,
 )
+from ai_impact_analysis.utils.core_utils import calculate_days_between
 
 
 class PRReportGenerator:
@@ -149,9 +150,16 @@ class PRReportGenerator:
         Returns:
             Dictionary suitable for JSON serialization
         """
+        # Calculate span_days for the period
+        span_days = calculate_days_between(start_date, end_date, inclusive=True)
+
         return {
             "analysis_date": datetime.now().isoformat(),
-            "period": {"start_date": start_date, "end_date": end_date},
+            "period": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "span_days": span_days,
+            },
             "repository": {"owner": repo_owner, "name": repo_name},
             "filter": {"author": author},
             "statistics": stats,
@@ -258,6 +266,7 @@ class PRReportGenerator:
             "filename": filename,
             "period": period,
             "total_prs": stats.get("total_prs", 0),
+            "daily_throughput": stats.get("daily_throughput", 0),
             "ai_adoption_rate": stats.get("ai_adoption_rate", 0),
             "ai_assisted_prs": stats.get("ai_assisted_prs", 0),
             "non_ai_prs": stats.get("non_ai_prs", 0),
@@ -325,9 +334,29 @@ class PRReportGenerator:
         header = "Metric\t" + "\t".join(phase_names)
         lines.append(header)
 
+        # Analysis Period (span_days)
+        periods = []
+        for r in reports:
+            span_days = r.get("period", {}).get("span_days")
+            if span_days is not None:
+                periods.append(f"{span_days}d")
+            else:
+                periods.append("N/A")
+        lines.append("Analysis Period\t" + "\t".join(periods))
+
         # Total PRs
         total_prs = [str(r["total_prs"]) for r in reports]
         lines.append("Total PRs Merged (excl. bot-authored)\t" + "\t".join(total_prs))
+
+        # Daily Throughput - read from parsed reports
+        daily_throughputs = []
+        for r in reports:
+            throughput = r.get("daily_throughput")
+            if throughput is not None and throughput > 0:
+                daily_throughputs.append(f"{throughput:.2f}/d")
+            else:
+                daily_throughputs.append("N/A")
+        lines.append("Daily Throughput (PRs/day)\t" + "\t".join(daily_throughputs))
 
         # AI Adoption Rate
         ai_rates = [f"{r['ai_adoption_rate']:.1f}%" for r in reports]

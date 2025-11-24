@@ -188,14 +188,14 @@ Examples:
         traceback.print_exc()
         return 1
 
+    # Calculate statistics using core logic (even if no PRs found)
     if not prs_with_metrics:
         print("\n⚠ No merged PRs found for the specified period")
-        return 0
+        print("📊 Generating report with empty metrics...")
 
-    # Calculate statistics using core logic
     print("\n📊 Calculating statistics...")
     calculator = PRMetricsCalculator()
-    stats = calculator.calculate_statistics(prs_with_metrics)
+    stats = calculator.calculate_statistics(prs_with_metrics, args.start, args.end)
 
     # Generate reports using core logic
     report_gen = PRReportGenerator()
