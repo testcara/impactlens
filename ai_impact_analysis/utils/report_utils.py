@@ -147,6 +147,14 @@ def add_metric_change(metric_changes, name, before, after, unit, is_absolute=Fal
         unit: Unit string (e.g., "d", "h", "%")
         is_absolute: If True, shows absolute change instead of % (for 0 baseline)
     """
+    # Skip if both values are the same (no change)
+    if before == after:
+        return
+
+    # Auto-detect if we should use absolute change (when before is 0 and after is non-zero)
+    if not is_absolute and before == 0 and after != 0:
+        is_absolute = True
+
     if is_absolute:
         # For absolute changes (e.g., going from 0% to X%)
         metric_changes.append(
@@ -154,7 +162,7 @@ def add_metric_change(metric_changes, name, before, after, unit, is_absolute=Fal
                 "name": name,
                 "before": before,
                 "after": after,
-                "change": after,  # Absolute change
+                "change": after - before,  # Absolute change
                 "unit": unit,
                 "is_absolute": True,
             }

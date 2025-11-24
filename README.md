@@ -552,6 +552,20 @@ This section explains what each metric means and how it's calculated.
 
 GitHub PR reports analyze pull request activity and review efficiency. Below are detailed explanations of each metric.
 
+**Analysis Period**
+
+- **What it is**: The time span covered by the analysis period
+- **How it's calculated**: `(End Date - Start Date) + 1` (inclusive of both dates)
+- **Example**: 220d means the analysis covers 220 days
+- **Why it matters**: Provides context for other metrics; longer periods may smooth out variations
+
+**Daily Throughput (PRs/day)**
+
+- **What it is**: Average number of PRs merged per day during the analysis period
+- **How it's calculated**: `Total PRs / Analysis Period (days)`
+- **Example**: 0.12/d means approximately 1 PR every 8 days
+- **Why it matters**: Indicates development velocity; helps compare productivity across different time periods
+
 **Total PRs Merged (excl. bot-authored)**
 
 - **What it is**: Count of all human-authored pull requests that were merged during the analysis period
