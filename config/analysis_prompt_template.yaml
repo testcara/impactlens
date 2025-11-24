@@ -1,0 +1,171 @@
+# AI Report Analysis Prompt Template
+#
+# This template defines the analysis prompt used by Claude Code
+# to analyze GitHub PR and Jira metrics reports.
+#
+# You can customize the sections, questions, and focus areas below.
+
+# General prompt structure
+introduction: |
+  I need you to analyze this engineering metrics report and provide actionable insights.
+
+# Sections to include in the analysis
+sections:
+  key_trends:
+    title: "KEY TRENDS"
+    count: "3-5 key insights"
+    description: "Identify the most significant changes across AI adoption phases"
+    questions:
+      - "IMPORTANT: When comparing productivity across phases, ONLY use Daily Throughput (PRs/day or Issues/day), NEVER compare raw volumes from different time periods!"
+      - "What metrics improved or declined significantly comparing No AI Period (baseline) vs AI-enabled periods?"
+      - "How do metrics evolve across different AI tool combinations/phases?"
+      - "Analyze throughput vs cycle time together: If throughput increased but cycle time also increased, is this actually a problem or a sign of higher parallelism?"
+      - "What patterns stand out across team members in each phase?"
+      - "Are there any surprising trends or counter-intuitive findings?"
+      - "Which metrics show the strongest positive/negative correlation with AI tool usage?"
+
+  bottlenecks_risks:
+    title: "BOTTLENECKS & RISKS"
+    count: "2-3 critical items"
+    description: "Highlight concerning patterns and AI adoption risks"
+    questions:
+      - "What areas could slow down development in each AI adoption phase?"
+      - "What metrics indicate potential problems or negative AI impacts?"
+      - "Are there team members struggling with AI tool adoption?"
+      - "What risks should leadership address immediately?"
+      - "Are there any metrics that got WORSE with AI adoption?"
+
+  recommendations:
+    title: "ACTIONABLE RECOMMENDATIONS"
+    count: "2-3 concrete action items"
+    description: "Provide specific, high-impact recommendations for optimizing AI tool usage"
+    requirements:
+      - "What should the team do differently to maximize AI tool benefits?"
+      - "Should we adjust AI tool combinations or adoption strategies?"
+      - "Are there best practices from high-performing AI adopters to share?"
+      - "Include measurable goals where possible (e.g., 'reduce merge time by X%')"
+      - "Prioritize feasible improvements with clear ROI"
+      - "Be specific about WHO should do WHAT (individuals, teams, or leadership)"
+
+  impact_assessment:
+    github:
+      title: "AI TOOL IMPACT ASSESSMENT"
+      questions:
+        - "CRITICAL: Compare PRODUCTIVITY using Daily Throughput (PRs/day) ONLY - never use raw PR counts from different time periods!"
+        - "Compare 'No AI Period' (baseline) vs. AI-enabled periods - what's the overall impact on PRODUCTIVITY (daily throughput)?"
+        - "Analyze the evolution across AI adoption phases (e.g., Cursor Period → Full AI Period)"
+        - "Which AI tool combination shows the best results? Compare different AI-enabled phases using normalized metrics"
+        - "What's the ROI of AI tools? Focus on: Daily Throughput (productivity), Time to First Review (responsiveness), PR quality metrics"
+        - "If merge time increased but throughput also increased, explain this as a positive (more parallel work, higher productivity) NOT a negative"
+        - "Identify the real bottlenecks: CI/deployment delays, not just merge time in isolation"
+        - "Which team members are leveraging AI most effectively in each phase?"
+        - "Are there diminishing returns or negative patterns as AI usage increases?"
+
+    jira:
+      title: "WORKFLOW EFFICIENCY ANALYSIS"
+      questions:
+        - "CRITICAL: Compare PRODUCTIVITY using Daily Throughput (Issues/day) ONLY - never use raw issue counts from different time periods!"
+        - "How efficiently are issues moving through the workflow?"
+        - "Identify workflow bottlenecks and state transition issues"
+        - "Are there states where issues get stuck?"
+        - "How can we optimize the issue flow?"
+
+# Output format requirements
+output_format:
+  structure: |
+    START with an EXECUTIVE SUMMARY section at the very top (before any numbered sections):
+
+    ## EXECUTIVE SUMMARY
+
+    **Overall AI Impact**: [POSITIVE/NEGATIVE/MIXED] [brief qualifier]
+
+    ✅ **Major Wins**: [2-3 key improvements with specific metrics]
+    ⚠️ **Critical Risks**: [2-3 key concerns]
+    🎯 **Biggest Opportunity**: [Single highest-impact improvement area]
+
+    [1-2 paragraph narrative summary of overall findings]
+
+    ---
+
+    THEN provide the numbered sections as defined above.
+
+    IMPORTANT: DO NOT add a "Summary" or "Conclusion" section at the end!
+    The EXECUTIVE SUMMARY at the top is sufficient. End with the last numbered section.
+
+  formatting_requirements:
+    - "Use SHORT paragraphs (max 2-3 sentences each) for better readability in spreadsheets"
+    - "Break long sentences into multiple shorter sentences"
+    - "Use bullet points and lists instead of long paragraphs when possible"
+    - "Each line should be readable without horizontal scrolling"
+    - "Example of BAD formatting: 'The data reveals a paradox: AI tools dramatically accelerate individual task completion (evident in reduced state times and closure rates), but team-level throughput has declined. This suggests the team is completing fewer but higher-quality issues faster, OR that AI adoption overhead is impacting overall productivity. The sharp increase in \"Waiting\" state time points to coordination and dependency management as the critical constraint that AI has not yet addressed.'"
+    - "Example of GOOD formatting:"
+    - "  The data reveals a paradox:"
+    - "  - AI tools accelerate individual task completion (reduced state times, faster closure)"
+    - "  - But team-level throughput has declined"
+    - "  "
+    - "  Possible explanations:"
+    - "  - Team completing fewer but higher-quality issues"
+    - "  - AI adoption overhead impacting productivity"
+    - "  - 'Waiting' state increase indicates coordination/dependency issues"
+
+  focus_areas:
+    - "Business impact: How does this affect delivery speed and quality?"
+    - "Concrete actions: What specific steps should be taken?"
+    - "Data-driven insights: Back up observations with specific metric changes"
+  tone: "Professional but accessible tone suitable for engineering leadership"
+
+# Optional: Custom focus areas (will be added to all analyses)
+custom_focus: |
+  CRITICAL: DATA ACCURACY REQUIREMENTS
+  - The report uses TSV format with columns: Phase, team, [individual team members]
+  - ALWAYS verify you are reading the correct column for each team member
+  - When citing individual metrics, DOUBLE-CHECK the column position matches the member name
+  - Example: If columns are "Phase team JoaoPedroPP Katka92 ... rakshett rrosatti sahil143"
+    and data is "15.92d 20.48d ... 59.36d 15.82d 8.32d", then:
+    - rakshett = 59.36d (NOT rrosatti)
+    - rrosatti = 15.82d (NOT sahil143)
+    - sahil143 = 8.32d
+
+  CRITICAL: METRIC INTERPRETATION REQUIREMENTS
+
+  1. VOLUME vs THROUGHPUT COMPARISON:
+  - NEVER compare raw volumes across different time periods!
+  - ALWAYS use daily/normalized rates when comparing periods of different lengths
+  - Example of WRONG comparison:
+    * No AI: 146 issues (220 days) vs Full AI: 120 issues (100 days)
+    * WRONG conclusion: "Volume dropped 18%" ❌
+  - Example of CORRECT comparison:
+    * No AI: 146 ÷ 220 = 0.66 issues/day
+    * Full AI: 120 ÷ 100 = 1.20 issues/day
+    * CORRECT conclusion: "Daily throughput increased 82%" ✅
+  - The report already provides "Daily Throughput" metrics - USE THOSE for comparisons!
+
+  2. THROUGHPUT vs CYCLE TIME:
+  - "Daily Throughput" = PRs/Issues completed per day = PRODUCTIVITY (higher is better)
+  - "Avg Time to Merge/Closure" = Days from creation to completion = CYCLE TIME (individual lifecycle)
+  - These metrics can move in OPPOSITE directions and both be positive:
+    * High throughput + longer cycle time = More parallel work, higher WIP
+    * Example: 0.66/d → 1.10/d (+67% throughput) + 13d → 17d merge time
+      → Team is MORE productive (completing more), but individual items take longer
+         (possibly due to more parallel work, CI queues, or deployment windows)
+
+  3. REVIEW METRICS:
+  - "Time to First Review" = Initial review responsiveness (lower is better)
+  - DO NOT confuse "cycle time" with "review speed" - they measure different things!
+  - When throughput increases but cycle time also increases, analyze WHY:
+    * More parallel work in flight?
+    * CI/deployment bottlenecks?
+    * Longer lifecycle but faster actual review?
+    * More iterations/improvements per item?
+
+  IMPORTANT CONTEXT:
+  - Only "No AI Period" represents development WITHOUT any AI tools (baseline)
+  - All other periods use AI tools, just different combinations/levels
+  - Analyze the PROGRESSION of AI tool adoption and its impact
+
+  Pay special attention to:
+  - Baseline comparison: No AI Period vs. any AI-enabled period
+  - Evolution analysis: How metrics change as AI tool combinations evolve
+  - Tool effectiveness: Which specific AI tool combinations work best
+  - Individual adoption patterns: Who adapts well to different AI tools
+  - Diminishing returns: Is more AI always better, or is there an optimal combination?

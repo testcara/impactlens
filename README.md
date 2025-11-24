@@ -6,6 +6,7 @@
   - [Generate Jira reports](#generate-jira-reports)
   - [Manual usage](#manual-usage)
   - [Generate GitHub PR reports](#generate-github-pr-reports)
+  - [AI-Powered Report Analysis](#ai-powered-report-analysis-new)
 - [Understanding Report Metrics](#understanding-report-metrics)
   - [Basic Metrics](#basic-metrics)
   - [State Time Metrics](#state-time-metrics)
@@ -24,10 +25,11 @@
 
 ## Overview
 
-AI Impact Analysis is a comprehensive Python tool to analyze the impact of AI tools on development efficiency through data-driven metrics. It provides two types of analysis:
+AI Impact Analysis is a comprehensive Python tool to analyze the impact of AI tools on development efficiency through data-driven metrics. It provides three types of analysis:
 
 1. **Jira Issue Analysis**: Compare issue closure times, state durations, and workflow metrics across different time periods
 2. **GitHub PR Analysis**: Analyze pull request metrics to measure AI tool impact on code review and merge efficiency
+3. **AI-Powered Report Analysis**: NEW - Automatically analyze your reports using Claude Code to generate insights, identify trends, and provide actionable recommendations
 
 ### Key Features
 
@@ -35,6 +37,7 @@ AI Impact Analysis is a comprehensive Python tool to analyze the impact of AI to
 - **Team & Individual Analysis**: Generate reports for entire teams or individual contributors
 - **Automated Workflows**: One-command report generation with automated phase-by-phase analysis
 - **Comparative Insights**: Compare metrics across multiple time periods (e.g., Before AI, Cursor adoption, Full AI toolkit)
+- **AI-Powered Insights**: NEW - Fully automated analysis using Claude Code CLI (`claude -p`) to generate business-oriented recommendations
 - **Google Sheets Integration**: Automatically upload reports for easy sharing and collaboration
 - **Extensible Design**: Support for multiple AI tools (Claude, Cursor) with detection via Git commit trailers
 
@@ -544,6 +547,133 @@ Reports are saved in `reports/` directory:
 - State re-entry rates (indication of rework)
 - Issue type distribution (Story, Task, Bug, Epic)
 
+### AI-Powered Report Analysis with Claude Code (NEW)
+
+Automatically analyze your TSV reports using Claude Code to generate business-oriented insights and actionable recommendations.
+
+**Quick Start:**
+
+```bash
+# 1. Generate your reports (if not already done)
+python -m ai_impact_analysis.scripts.generate_pr_report
+
+# 2. Analyze with Claude Code helper script
+python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+  --report "reports/github/combined_pr_report_*.tsv"
+```
+
+The script will:
+1. Preprocess the report data and extract key metrics
+2. Load the analysis prompt template from `config/analysis_prompt_template.yaml`
+3. Automatically call Claude Code CLI in non-interactive mode (`claude -p`)
+4. Generate comprehensive analysis and save to `reports/ai_analysis_*.txt`
+
+**What You Get:**
+
+- **Executive Summary** at the top with overall AI impact assessment
+- **Key Trends**: 3-5 insights on metric changes across AI adoption phases
+- **Bottlenecks & Risks**: Critical issues and concerning patterns
+- **Actionable Recommendations**: 2-3 concrete steps with WHO/WHAT/measurable goals
+- **AI Tool Impact Assessment**: ROI evaluation and tool effectiveness (for GitHub reports)
+- **Workflow Efficiency Analysis**: State-by-state bottleneck identification (for Jira reports)
+
+**Why Claude Code?**
+
+- ✅ No additional API keys required (uses your existing access)
+- ✅ High-quality analysis from Claude Sonnet 4.5
+- ✅ Fully automated workflow with `claude -p` non-interactive mode
+- ✅ Customizable analysis via prompt templates (`config/analysis_prompt_template.yaml`)
+- ✅ Direct upload to Google Sheets with one command
+- ✅ No API costs
+
+**Example Output:**
+
+```
+================================================================================
+AI-POWERED METRICS ANALYSIS REPORT
+================================================================================
+
+## EXECUTIVE SUMMARY
+
+**Overall AI Impact**: POSITIVE with areas for improvement
+
+✅ **Major Wins**:
+- Daily throughput increased 67% (0.66/d → 1.10/d)
+- Time to first review decreased 32% (105h → 72h)
+- AI adoption reached 41.8% in Full AI Period
+
+⚠️ **Critical Risks**:
+- Individual merge time variance needs attention
+- Uneven AI tool adoption across team members
+
+🎯 **Biggest Opportunity**:
+- Standardize AI best practices to bring all members to top performer levels
+
+---
+
+## 1. KEY TRENDS
+- AI-assisted PRs show 28% faster review times
+- Throughput improvements plateau after 40% AI adoption
+- Individual performance varies significantly with AI tool usage
+
+## 2. BOTTLENECKS & RISKS
+- Some developers struggling with AI tool adoption (3 members <20% adoption)
+- Merge time increased for complex PRs despite faster reviews
+
+## 3. ACTIONABLE RECOMMENDATIONS
+- Pair low-adopters with high-performers for 2-week mentorship
+- Create AI tool playbook based on top performer patterns
+- Target: Bring all members to ≥40% AI adoption within 6 weeks
+
+## 4. AI TOOL IMPACT ASSESSMENT
+- ROI: 67% productivity gain with minimal quality trade-offs
+- Cursor shows strongest individual impact (85% adoption → 2.5x throughput)
+- Full AI toolkit delivers best team-level results
+```
+
+**Advanced Usage:**
+
+```bash
+# Analyze Jira reports
+python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+  --report "reports/jira/combined_jira_report_*.tsv"
+
+# Upload analysis to Google Sheets
+python -m ai_impact_analysis.scripts.upload_to_sheets \
+  --report reports/ai_analysis_pr_*.txt
+
+# Manual mode (just generate prompt without calling Claude Code)
+python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+  --report "reports/github/combined_pr_report_*.tsv" \
+  --manual
+
+# Custom timeout (default: 300 seconds)
+python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+  --report "reports/github/combined_pr_report_*.tsv" \
+  --timeout 600
+```
+
+**Customizing Analysis:**
+
+Edit `config/analysis_prompt_template.yaml` to customize:
+- Analysis sections and questions
+- Output format and tone
+- Focus areas and requirements
+- Data interpretation guidelines
+
+**Future Plans:**
+
+The current implementation uses Claude Code CLI for fully automated analysis. Future versions will add support for:
+- ✨ **Direct API Integration**:
+  - OpenAI API (GPT-4, GPT-4o, etc.)
+  - Anthropic API (Claude via direct API calls)
+  - Google Gemini API
+- ✨ **OpenAI-Compatible Endpoints**:
+  - Local LLMs (Ollama, LM Studio, etc.)
+  - Any other OpenAI-compatible service
+
+The `ReportPreprocessor` in `ai_impact_analysis/utils/report_preprocessor.py` is designed to be reusable across all future AI model integrations.
+
 ## Understanding Report Metrics
 
 This section explains what each metric means and how it's calculated.
@@ -551,20 +681,6 @@ This section explains what each metric means and how it's calculated.
 ### GitHub PR Report Metrics
 
 GitHub PR reports analyze pull request activity and review efficiency. Below are detailed explanations of each metric.
-
-**Analysis Period**
-
-- **What it is**: The time span covered by the analysis period
-- **How it's calculated**: `(End Date - Start Date) + 1` (inclusive of both dates)
-- **Example**: 220d means the analysis covers 220 days
-- **Why it matters**: Provides context for other metrics; longer periods may smooth out variations
-
-**Daily Throughput (PRs/day)**
-
-- **What it is**: Average number of PRs merged per day during the analysis period
-- **How it's calculated**: `Total PRs / Analysis Period (days)`
-- **Example**: 0.12/d means approximately 1 PR every 8 days
-- **Why it matters**: Indicates development velocity; helps compare productivity across different time periods
 
 **Total PRs Merged (excl. bot-authored)**
 
