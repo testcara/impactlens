@@ -219,8 +219,7 @@ Examples:
             )
             print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
             print()
-            if not args.no_upload:
-                upload_to_google_sheets(output_file)
+            upload_to_google_sheets(output_file, skip_upload=args.no_upload)
         except Exception as e:
             print(f"{Colors.RED}Error combining reports: {e}{Colors.NC}")
             import traceback
@@ -373,13 +372,7 @@ Examples:
     if comparison_file:
         print(f"{Colors.GREEN}✓ Report generated: {comparison_file.name}{Colors.NC}")
         print()
-        if not args.no_upload:
-            upload_to_google_sheets(comparison_file)
-        else:
-            print(
-                f"{Colors.YELLOW}Skipping upload to Google Sheets (--no-upload specified){Colors.NC}"
-            )
-            print()
+        upload_to_google_sheets(comparison_file, skip_upload=args.no_upload)
 
     print(f"{Colors.GREEN}Done!{Colors.NC}")
     return 0
