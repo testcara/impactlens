@@ -48,7 +48,7 @@ from clients.sheets_client import (
     format_sheet,
     get_service_account_email,
 )
-from utils.core_utils import read_tsv_report, normalize_username
+from utils.core_utils import read_tsv_report, normalize_username, read_ai_analysis_report
 
 try:
     from googleapiclient.errors import HttpError
@@ -134,8 +134,13 @@ Note:
         # e.g., "combined_pr_report_20251022_111614" -> "PR Report - Combined"
         # e.g., "combined_jira_report_20251022_111614" -> "Jira Report - Combined"
 
+        # Check if it's an AI analysis report
+        if filename.startswith("ai_analysis_pr"):
+            args.sheet_name = "AI Analysis - PR"
+        elif filename.startswith("ai_analysis_jira"):
+            args.sheet_name = "AI Analysis - Jira"
         # Check if it's a combined PR report
-        if filename.startswith("combined_pr_report"):
+        elif filename.startswith("combined_pr_report"):
             args.sheet_name = "PR Report - Combined"
         # Check if it's a combined Jira report
         elif filename.startswith("combined_jira_report"):
@@ -194,8 +199,18 @@ Note:
     # Read report data
     print("\n📖 Reading report file...")
     try:
-        data = read_tsv_report(args.report)
-        print(f"✓ Read {len(data)} rows")
+        # Detect if this is an AI analysis report (plain text) or TSV report
+        filename = Path(args.report).stem
+        is_ai_analysis = filename.startswith("ai_analysis_")
+
+        if is_ai_analysis:
+            # Read as plain text, convert Markdown to plain text
+            data = read_ai_analysis_report(args.report)
+            print(f"✓ Read {len(data)} rows (AI analysis report)")
+        else:
+            # Read as TSV (existing behavior)
+            data = read_tsv_report(args.report)
+            print(f"✓ Read {len(data)} rows")
     except Exception as e:
         print(f"Error reading report file: {e}")
         sys.exit(1)

@@ -271,3 +271,60 @@ def normalize_username(username):
     # Remove -1, -2, etc. suffix
     username = re.sub(r"-\d+$", "", username)
     return username
+
+
+def convert_markdown_to_plain_text(text):
+    """
+    Convert Markdown formatting to plain text for Google Sheets.
+
+    Args:
+        text: Text with Markdown formatting
+
+    Returns:
+        Plain text with Markdown removed
+    """
+    # Remove bold: **text** -> text
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+
+    # Remove italic: *text* or _text_ -> text
+    text = re.sub(r"\*(.+?)\*", r"\1", text)
+    text = re.sub(r"_(.+?)_", r"\1", text)
+
+    # Remove headers: ### text -> text
+    text = re.sub(r"^#{1,6}\s+", "", text)
+
+    # Remove inline code: `text` -> text
+    text = re.sub(r"`(.+?)`", r"\1", text)
+
+    # Remove links: [text](url) -> text
+    text = re.sub(r"\[(.+?)\]\(.+?\)", r"\1", text)
+
+    return text
+
+
+def read_ai_analysis_report(filepath):
+    """
+    Read AI analysis report (plain text with Markdown) for Google Sheets upload.
+
+    Converts to single-column format with Markdown formatting removed.
+
+    Args:
+        filepath: Path to AI analysis report file
+
+    Returns:
+        List of rows, each row is a list with single cell containing the line text
+    """
+    rows = []
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            # Remove trailing newline
+            line = line.rstrip("\n\r")
+
+            # Convert Markdown to plain text
+            plain_line = convert_markdown_to_plain_text(line)
+
+            # Each line becomes a single-cell row
+            rows.append([plain_line])
+
+    return rows
