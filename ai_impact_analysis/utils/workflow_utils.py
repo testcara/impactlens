@@ -231,21 +231,50 @@ def cleanup_old_reports(reports_dir: Path, identifier: str, report_type: str) ->
     print(f"{Colors.GREEN}  ✓ Removed {removed_count} old report files for {identifier}{Colors.NC}")
 
 
-def upload_to_google_sheets(report_file: Optional[Path]) -> None:
+def upload_to_google_sheets(
+    report_file: Optional[Path], skip_upload: bool = False, show_manual_instructions: bool = True
+) -> bool:
     """
     Upload report to Google Sheets if configured.
 
     Args:
         report_file: Path to report file to upload
+        skip_upload: If True, skip upload and only show manual instructions (default: False)
+        show_manual_instructions: If True, show manual upload instructions when needed (default: True)
+
+    Returns:
+        True if upload succeeded or was skipped, False if upload failed
+
+    Example:
+        # Auto-upload (default behavior)
+        upload_to_google_sheets(report_file)
+
+        # Skip upload with instructions
+        upload_to_google_sheets(report_file, skip_upload=True)
+
+        # Skip upload silently
+        upload_to_google_sheets(report_file, skip_upload=True, show_manual_instructions=False)
     """
     if not report_file or not report_file.exists():
-        return
+        return False
+
+    # Skip upload if requested
+    if skip_upload:
+        if show_manual_instructions:
+            print(f"{Colors.BLUE}⏭️  Skipping upload (--no-upload specified){Colors.NC}")
+            print()
+            print("📤 To upload later:")
+            print(
+                f"  python3 -m ai_impact_analysis.scripts.upload_to_sheets --report {report_file}"
+            )
+            print()
+        return True
 
     credentials = os.getenv("GOOGLE_CREDENTIALS_FILE")
     spreadsheet_id = os.getenv("GOOGLE_SPREADSHEET_ID")
 
     if credentials and spreadsheet_id:
-        print(f"{Colors.YELLOW}Uploading to Google Sheets...{Colors.NC}")
+        print(f"{Colors.YELLOW}📤 Uploading to Google Sheets...{Colors.NC}")
         try:
             subprocess.run(
                 [
@@ -257,18 +286,33 @@ def upload_to_google_sheets(report_file: Optional[Path]) -> None:
                 ],
                 check=True,
             )
+            print(f"{Colors.GREEN}   ✓ Upload successful{Colors.NC}")
             print()
-        except subprocess.CalledProcessError:
-            print(f"{Colors.RED}Error: Google Sheets upload failed{Colors.NC}")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"{Colors.RED}   ⚠ Upload failed: {e}{Colors.NC}")
+            if show_manual_instructions:
+                print("   You can upload manually:")
+                print(
+                    f"   python3 -m ai_impact_analysis.scripts.upload_to_sheets --report {report_file}"
+                )
+            print()
+            return False
     else:
-        print(f"{Colors.BLUE}Google Sheets upload not configured (optional){Colors.NC}")
-        print("You can open this file in Google Sheets manually, or configure automatic upload:")
-        print("  export GOOGLE_CREDENTIALS_FILE=/path/to/credentials.json")
-        print("  export GOOGLE_SPREADSHEET_ID=your_spreadsheet_id")
-        print()
-        print("Or upload manually:")
-        print(f"  python3 -m ai_impact_analysis.scripts.upload_to_sheets --report {report_file}")
-        print()
+        if show_manual_instructions:
+            print(f"{Colors.BLUE}Google Sheets upload not configured (optional){Colors.NC}")
+            print(
+                "You can open this file in Google Sheets manually, or configure automatic upload:"
+            )
+            print("  export GOOGLE_CREDENTIALS_FILE=/path/to/credentials.json")
+            print("  export GOOGLE_SPREADSHEET_ID=your_spreadsheet_id")
+            print()
+            print("Or upload manually:")
+            print(
+                f"  python3 -m ai_impact_analysis.scripts.upload_to_sheets --report {report_file}"
+            )
+            print()
+        return False
 
 
 def find_latest_comparison_report(
