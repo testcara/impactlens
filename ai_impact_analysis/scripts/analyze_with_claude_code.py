@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
 """
-AI Report Analyzer using Claude Code
+AI Report Analyzer using Claude (API or CLI)
 
-Automatically analyzes reports by calling Claude Code CLI in non-interactive mode.
-The analysis is generated, displayed, and saved to file automatically.
+Automatically analyzes reports using either:
+1. Anthropic API (requires ANTHROPIC_API_KEY)
+2. Claude Code CLI (requires claude command installed)
 
 Usage:
-    # Automatic mode (default): calls Claude Code CLI to generate analysis
+    # Option 1: Use Claude Code CLI (default)
     python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
       --report reports/github/combined_pr_report_*.tsv
 
-    # Manual mode: only displays the prompt for manual copy-paste
+    # Option 2: Use Anthropic API with environment variable
+    export ANTHROPIC_API_KEY="sk-ant-..."
     python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
       --report reports/github/combined_pr_report_*.tsv \\
-      --manual
+      --claude-api-mode
 
-    # With custom timeout (default: 300 seconds)
+    # Option 3: Use Anthropic API with explicit key parameter
     python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
       --report reports/github/combined_pr_report_*.tsv \\
-      --timeout 600
+      --claude-api-mode --anthropic-api-key "sk-ant-..."
+
+    # Prompt preview mode: only displays the prompt without calling Claude
+    python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
+      --report reports/github/combined_pr_report_*.tsv \\
+      --prompt-only
 """
 
 import os
@@ -36,6 +43,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from ai_impact_analysis.utils.report_preprocessor import ReportPreprocessor
 from ai_impact_analysis.utils.logger import logger
+from ai_impact_analysis.utils.workflow_utils import upload_to_google_sheets
 
 
 def find_latest_report(report_pattern: str) -> str:
@@ -205,6 +213,72 @@ def create_analysis_prompt(report_path: str, preprocessed_data: dict, template: 
     return "\n".join(prompt_lines)
 
 
+def call_anthropic_api(prompt: str, api_key: str = None, timeout: int = 300) -> str:
+    """
+    Call Anthropic API directly to analyze the prompt.
+
+    Args:
+        prompt: The analysis prompt to send to Claude
+        api_key: Anthropic API key (if None, reads from ANTHROPIC_API_KEY env var)
+        timeout: Timeout in seconds (default: 300 = 5 minutes)
+
+    Returns:
+        Analysis text from Claude API
+
+    Raises:
+        RuntimeError: If API call fails
+        ValueError: If API key not provided
+    """
+    logger.info("🤖 Calling Anthropic API for analysis...")
+    logger.info(f"   Timeout: {timeout}s")
+
+    try:
+        import anthropic
+    except ImportError:
+        raise ImportError(
+            "anthropic library not installed. Install with:\n" "  pip install anthropic>=0.40.0"
+        )
+
+    # Get API key
+    if not api_key:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+
+    if not api_key:
+        raise ValueError(
+            "Anthropic API key not found. Either:\n"
+            "  1. Set ANTHROPIC_API_KEY environment variable, or\n"
+            "  2. Pass --anthropic-api-key parameter"
+        )
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key, timeout=timeout)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",  # Latest Claude model
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        analysis = response.content[0].text.strip()
+
+        if not analysis:
+            raise RuntimeError("Anthropic API returned empty response")
+
+        logger.info("   ✓ Analysis completed successfully")
+        logger.info(f"   Model: {response.model}")
+        logger.info(
+            f"   Tokens: {response.usage.input_tokens} in, {response.usage.output_tokens} out"
+        )
+
+        return analysis
+
+    except anthropic.APIError as e:
+        raise RuntimeError(f"Anthropic API error: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Anthropic API call failed: {e}")
+
+
+>>>>>>> 4ed822c (feat: integrate claude-code cli and claude api to support ai analysis (#3))
 def call_claude_code(prompt: str, timeout: int = 300) -> str:
     """
     Call Claude Code CLI in non-interactive mode to analyze the prompt.
@@ -263,7 +337,12 @@ def call_claude_code(prompt: str, timeout: int = 300) -> str:
         raise RuntimeError(f"Claude Code failed: {error_msg}")
 
 
-def save_analysis(analysis_text: str, report_path: str, output_dir: str = "reports") -> str:
+def save_analysis(
+    analysis_text: str,
+    report_path: str,
+    output_dir: str = "reports",
+    analysis_tool: str = "Claude Code",
+) -> str:
     """Save analysis to file."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -287,7 +366,7 @@ def save_analysis(analysis_text: str, report_path: str, output_dir: str = "repor
     report_lines.append("")
     report_lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     report_lines.append(f"Report Type: {report_type}")
-    report_lines.append(f"Analysis Tool: Claude Code")
+    report_lines.append(f"Analysis Tool: {analysis_tool}")
     report_lines.append(f"Source Report: {Path(report_path).name}")
     report_lines.append("")
     report_lines.append("=" * 80)
@@ -306,29 +385,29 @@ def save_analysis(analysis_text: str, report_path: str, output_dir: str = "repor
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Analyze reports using Claude Code CLI (automatic or manual mode)",
+        description="Analyze reports using Claude (Anthropic API or Claude Code CLI)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Automatic mode: calls Claude Code to generate analysis
+  # Use Claude Code CLI (default)
   python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
     --report "reports/github/combined_pr_report_*.tsv"
 
-  # Manual mode: only shows prompt for copy-paste
+  # Use Anthropic API with environment variable
+  export ANTHROPIC_API_KEY="sk-ant-..."
   python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
     --report "reports/github/combined_pr_report_*.tsv" \\
-    --manual
+    --claude-api-mode
 
-  # With custom prompt template and timeout
-  python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
-    --report "reports/jira/combined_jira_report_*.tsv" \\
-    --prompt-template config/my_custom_prompt.yaml \\
-    --timeout 600
-
-  # Save pre-generated analysis directly
+  # Use Anthropic API with explicit key parameter
   python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
     --report "reports/github/combined_pr_report_*.tsv" \\
-    --save-analysis "Your analysis text here"
+    --claude-api-mode --anthropic-api-key "sk-ant-..."
+
+  # Prompt preview mode: only shows prompt without calling Claude
+  python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
+    --report "reports/github/combined_pr_report_*.tsv" \\
+    --prompt-only
         """,
     )
 
@@ -367,9 +446,27 @@ Examples:
     )
 
     parser.add_argument(
-        "--manual",
+        "--prompt-only",
         action="store_true",
-        help="Manual mode: only generate and display prompt without calling Claude Code",
+        help="Prompt preview mode: only generate and display prompt without calling Claude",
+    )
+
+    parser.add_argument(
+        "--no-upload",
+        action="store_true",
+        help="Skip uploading analysis to Google Sheets (default: auto-upload)",
+    )
+
+    parser.add_argument(
+        "--claude-api-mode",
+        action="store_true",
+        help="Use Anthropic API instead of Claude Code CLI (requires ANTHROPIC_API_KEY)",
+    )
+
+    parser.add_argument(
+        "--anthropic-api-key",
+        type=str,
+        help="Anthropic API key (if not provided, reads from ANTHROPIC_API_KEY env var)",
     )
 
     args = parser.parse_args()
@@ -414,18 +511,16 @@ Examples:
         output_file = save_analysis(args.save_analysis, report_path, args.output_dir)
         logger.info(f"   ✓ Saved to: {output_file}")
         logger.info("")
-        logger.info("📤 To upload to Google Sheets:")
-        logger.info(
-            f"   python -m ai_impact_analysis.scripts.upload_to_sheets --report {output_file}"
-        )
-        logger.info("")
+        # Auto-upload to Google Sheets (unless --no-upload specified)
+        upload_to_google_sheets(Path(output_file), skip_upload=args.no_upload)
+
         return 0
 
-    # Manual mode: just display the prompt
-    if args.manual:
+    # Prompt preview mode: just display the prompt
+    if args.prompt_only:
         logger.info("")
         logger.info("=" * 80)
-        logger.info("🎯 MANUAL MODE: ANALYSIS PROMPT")
+        logger.info("🎯 PROMPT PREVIEW MODE: ANALYSIS PROMPT")
         logger.info("=" * 80)
         logger.info("")
         print(prompt)
@@ -441,16 +536,24 @@ Examples:
         logger.info("")
         return 0
 
-    # Automatic mode: call Claude Code
+    # Automatic mode: call Claude API or Claude Code
     logger.info("")
     logger.info("=" * 80)
-    logger.info("🚀 AUTOMATIC ANALYSIS MODE")
+    if args.claude_api_mode:
+        logger.info("🚀 AUTOMATIC ANALYSIS MODE (Anthropic API)")
+    else:
+        logger.info("🚀 AUTOMATIC ANALYSIS MODE (Claude Code CLI)")
     logger.info("=" * 80)
     logger.info("")
 
     try:
-        # Call Claude Code to analyze
-        analysis = call_claude_code(prompt, timeout=args.timeout)
+        # Call Claude API or Claude Code based on mode
+        if args.claude_api_mode:
+            analysis = call_anthropic_api(
+                prompt, api_key=args.anthropic_api_key, timeout=args.timeout
+            )
+        else:
+            analysis = call_claude_code(prompt, timeout=args.timeout)
 
         logger.info("")
         logger.info("=" * 80)
@@ -462,22 +565,23 @@ Examples:
 
         # Save analysis automatically
         logger.info("💾 Saving analysis to file...")
-        output_file = save_analysis(analysis, report_path, args.output_dir)
+        analysis_tool = (
+            "Anthropic API (Claude Sonnet)" if args.claude_api_mode else "Claude Code CLI"
+        )
+        output_file = save_analysis(analysis, report_path, args.output_dir, analysis_tool)
         logger.info(f"   ✓ Saved to: {output_file}")
         logger.info("")
 
-        # Show upload command
+        # Auto-upload to Google Sheets (unless --no-upload specified)
+        upload_to_google_sheets(Path(output_file), skip_upload=args.no_upload)
+
+        # Summary
         logger.info("=" * 80)
         logger.info("✅ ANALYSIS COMPLETE!")
         logger.info("=" * 80)
         logger.info("")
         logger.info(f"📄 Report: {Path(report_path).name}")
         logger.info(f"💾 Output: {output_file}")
-        logger.info("")
-        logger.info("📤 To upload to Google Sheets:")
-        logger.info(
-            f"   python -m ai_impact_analysis.scripts.upload_to_sheets --report {output_file}"
-        )
         logger.info("")
         logger.info("=" * 80)
 
@@ -491,10 +595,10 @@ Examples:
         logger.error("")
         logger.error(f"Error: {str(e)}")
         logger.error("")
-        logger.error("💡 TIP: Try manual mode instead:")
+        logger.error("💡 TIP: Try prompt preview mode instead:")
         logger.error(f"   python -m ai_impact_analysis.scripts.analyze_with_claude_code \\")
         logger.error(f'     --report "{report_path}" \\')
-        logger.error(f"     --manual")
+        logger.error(f"     --prompt-only")
         logger.error("")
         return 1
 
