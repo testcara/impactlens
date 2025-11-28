@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # Main service for running AI Impact Analysis
+  ai-impact-analysis:
+    build: .
+    image: ai-impact-analysis:latest
+    container_name: ai-impact-analysis
+    volumes:
+      # Mount reports directory to persist generated reports
+      - ./reports:/app/reports
+      # Mount config for easy customization
+      - ./config:/app/config:ro
+      # Mount credentials (if using Google Sheets)
+      - ${GOOGLE_CREDENTIALS_FILE:-/dev/null}:/app/credentials.json:ro
+    environment:
+      # Jira configuration
+      - JIRA_URL=${JIRA_URL}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+      - JIRA_PROJECT_KEY=${JIRA_PROJECT_KEY}
+
+      # GitHub configuration
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
+
+      # Google Sheets configuration (optional)
+      - GOOGLE_CREDENTIALS_FILE=/app/credentials.json
+      - GOOGLE_SPREADSHEET_ID=${GOOGLE_SPREADSHEET_ID}
+
+      # AI Analysis configuration (optional)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+
+      # Python configuration
+      - PYTHONUNBUFFERED=1
+    command: ["ai-impact-analysis", "--help"]
+
+  # Service for complete workflow (Jira + PR)
+  # Note: Claude insights are disabled by default. Use --with-claude-insights to enable.
+  full:
+    extends: ai-impact-analysis
+    container_name: ai-impact-analysis-full
+    command: ["ai-impact-analysis", "full"]
+
+  # Service for Jira full workflow
+  jira-full:
+    extends: ai-impact-analysis
+    container_name: ai-impact-analysis-jira-full
+    command: ["ai-impact-analysis", "jira", "full"]
+
+  # Service for PR full workflow
+  pr-full:
+    extends: ai-impact-analysis
+    container_name: ai-impact-analysis-pr-full
+    command: ["ai-impact-analysis", "pr", "full"]
+
+  # Service for Jira team + all members
+  jira-all:
+    extends: ai-impact-analysis
+    container_name: ai-impact-analysis-jira-all
+    command: ["ai-impact-analysis", "jira", "all"]
+
+  # Service for PR team + all members
+  pr-all:
+    extends: ai-impact-analysis
+    container_name: ai-impact-analysis-pr-all
+    command: ["ai-impact-analysis", "pr", "all"]
+
+  # Service for verification
+  verify:
+    extends: ai-impact-analysis
+    container_name: ai-impact-analysis-verify
+    command: ["ai-impact-analysis", "verify"]
