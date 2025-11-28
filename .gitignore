@@ -69,12 +69,14 @@ logs/
 *.pem
 *.key
 
-# But keep config directory (contains phase configuration)
-!config/
-!config/**
+# Config files (user-specific configurations, not templates)
+config/jira_report_config.yaml
+config/pr_report_config.yaml
 
-# Don't commit github.conf if accidentally created (use env vars instead)
-config/github.conf
+# But keep config templates and directory structure
+!config/
+!config/*.example
+!config/*_template.yaml
 
 # Google Sheets credentials (keep secure!)
 *service-account*.json

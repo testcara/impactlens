@@ -33,7 +33,9 @@ source venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-### 3. Configure Environment Variables
+### 3. Configure Environment and Config Files
+
+**Environment variables:**
 
 ```bash
 # Copy example config
@@ -48,6 +50,20 @@ Add your Jira and GitHub credentials to `.env` file. Required for testing:
 - `GITHUB_TOKEN`, `GITHUB_REPO_OWNER`, `GITHUB_REPO_NAME`
 
 ➡️ **See [Configuration Guide](CONFIGURATION.md#environment-variables) for complete environment variable reference.**
+
+**Report configuration files:**
+
+```bash
+# Copy config templates
+cp config/jira_report_config.yaml.example config/jira_report_config.yaml
+cp config/pr_report_config.yaml.example config/pr_report_config.yaml
+
+# Edit to customize team members, phases, and metrics
+vim config/jira_report_config.yaml
+vim config/pr_report_config.yaml
+```
+
+> **Note:** Config files (`.yaml`) are in `.gitignore` to keep your team-specific settings private. Only templates (`.example`) are committed to the repository.
 
 ### 4. Install Pre-commit Hooks (Recommended)
 
@@ -72,6 +88,27 @@ tox -e unittest --develop
 # Verify CLI is working
 ai-impact-analysis --help
 ```
+
+### 6. Local Docker Build (For Testing Code Changes)
+
+By default, `docker-compose.yml` uses the pre-built image from [Quay.io](https://quay.io/repository/carawang/ai-impact-analysis), which is automatically built from the `master` branch via Build Triggers.
+
+**For local development/testing, use the `local-build` service:**
+
+```bash
+# Build from local Dockerfile
+docker-compose build local-build
+
+# Test your changes
+docker-compose run --rm local-build verify
+docker-compose run --rm local-build full
+
+# Using Podman:
+podman-compose build local-build
+podman-compose run --rm local-build verify
+```
+
+The `local-build` service builds a local image (`localhost/ai-impact-analysis:dev`) from your current code, allowing you to test changes before pushing to the repository.
 
 ## Code Contribution Workflow
 
