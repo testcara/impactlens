@@ -206,13 +206,7 @@ Examples:
             print()
 
             # Upload to Google Sheets if not disabled
-            if not args.no_upload:
-                print(f"{Colors.YELLOW}Uploading to Google Sheets...{Colors.NC}")
-                upload_to_google_sheets(output_file)
-            else:
-                print(
-                    f"{Colors.YELLOW}Skipping upload to Google Sheets (--no-upload specified){Colors.NC}"
-                )
+            upload_to_google_sheets(output_file, skip_upload=args.no_upload)
 
             print()
             print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
@@ -288,13 +282,7 @@ Examples:
     if comparison_file:
         print(f"{Colors.GREEN}✓ Report generated: {comparison_file.name}{Colors.NC}")
         print()
-        if not args.no_upload:
-            upload_to_google_sheets(comparison_file)
-        else:
-            print(
-                f"{Colors.YELLOW}Skipping upload to Google Sheets (--no-upload specified){Colors.NC}"
-            )
-            print()
+        upload_to_google_sheets(comparison_file, skip_upload=args.no_upload)
 
     print(f"{Colors.GREEN}Done!{Colors.NC}")
     return 0

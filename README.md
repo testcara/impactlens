@@ -25,21 +25,21 @@
 
 ## Overview
 
-AI Impact Analysis is a comprehensive Python tool to analyze the impact of AI tools on development efficiency through data-driven metrics. It provides three types of analysis:
+AI Impact Analysis is a comprehensive Python tool to analyze the impact of AI tools on development efficiency through data-driven metrics. It generates two types of statistical reports:
 
-1. **Jira Issue Analysis**: Compare issue closure times, state durations, and workflow metrics across different time periods
-2. **GitHub PR Analysis**: Analyze pull request metrics to measure AI tool impact on code review and merge efficiency
-3. **AI-Powered Report Analysis**: NEW - Automatically analyze your reports using Claude Code to generate insights, identify trends, and provide actionable recommendations
+1. **Jira Issue Reports**: Compare issue closure times, state durations, and workflow metrics across different time periods
+2. **GitHub PR Reports**: Analyze pull request metrics to measure AI tool impact on code review and merge efficiency
+
+Additionally, it provides an optional **AI-Powered Analysis** feature (🧪 Experimental) for on-demand automated analysis of these reports using Claude (API or CLI).
 
 ### Key Features
 
-- **Flexible Configuration**: Define custom analysis phases with configurable date ranges to match your AI adoption timeline
+- **Flexible Configuration**: Define custom analysis phases with configurable date ranges, capacity adjustments, and leave days to match your AI adoption timeline
 - **Team & Individual Analysis**: Generate reports for entire teams or individual contributors
 - **Automated Workflows**: One-command report generation with automated phase-by-phase analysis
 - **Comparative Insights**: Compare metrics across multiple time periods (e.g., Before AI, Cursor adoption, Full AI toolkit)
-- **AI-Powered Insights**: NEW - Fully automated analysis using Claude Code CLI (`claude -p`) to generate business-oriented recommendations
 - **Google Sheets Integration**: Automatically upload reports for easy sharing and collaboration
-- **Extensible Design**: Support for multiple AI tools (Claude, Cursor) with detection via Git commit trailers
+- **AI-Powered Analysis** (🧪 Experimental): Optionally analyze statistical reports with Claude to get deeper insights, trends, and actionable recommendations via simple command
 
 The tool helps teams quantify the impact of AI coding assistants through objective metrics, enabling data-driven decisions about AI tool adoption and usage patterns.
 
@@ -547,26 +547,65 @@ Reports are saved in `reports/` directory:
 - State re-entry rates (indication of rework)
 - Issue type distribution (Story, Task, Bug, Epic)
 
-### AI-Powered Report Analysis with Claude Code (NEW)
+### AI-Powered Report Analysis (🧪 Experimental - On-Demand)
 
-Automatically analyze your TSV reports using Claude Code to generate business-oriented insights and actionable recommendations.
+> **⚠️ EXPERIMENTAL FEATURE - ON-DEMAND EXECUTION**
+>
+> This feature is in **experimental status** and **NOT included in any automated workflows**.
+> - ❌ Never runs automatically
+> - ✅ Must be explicitly triggered by user
+> - 🧪 Subject to changes as we refine the feature
 
-**Quick Start:**
+Use Claude Code to analyze your generated TSV reports and extract business insights.
 
+**Prerequisites:**
+1. Generate reports first (see commands above)
+2. Choose one of the analysis methods below
+
+**Option 1: Use Claude Code CLI**
+
+Install and login to Claude Code:
 ```bash
-# 1. Generate your reports (if not already done)
-python -m ai_impact_analysis.scripts.generate_pr_report
+curl -fsSL https://claude.ai/install.sh | bash
+claude login  # One-time setup
+```
 
-# 2. Analyze with Claude Code helper script
+Then analyze your reports:
+```bash
+# Analyze Jira reports
+python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+  --report "reports/jira/combined_jira_report_*.tsv"
+
+# Analyze PR reports
 python -m ai_impact_analysis.scripts.analyze_with_claude_code \
   --report "reports/github/combined_pr_report_*.tsv"
 ```
 
-The script will:
-1. Preprocess the report data and extract key metrics
-2. Load the analysis prompt template from `config/analysis_prompt_template.yaml`
-3. Automatically call Claude Code CLI in non-interactive mode (`claude -p`)
-4. Generate comprehensive analysis and save to `reports/ai_analysis_*.txt`
+**Option 2: Use Anthropic API (Alternative to Claude Code CLI)**
+
+If you have an Anthropic API key, you can use the API instead of Claude Code CLI:
+
+```bash
+# Set your API key (get from: https://console.anthropic.com/)
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Use API mode with --claude-api-mode flag
+python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+  --report "reports/jira/combined_jira_report_*.tsv" \
+  --claude-api-mode
+
+# Or pass API key directly (overrides ANTHROPIC_API_KEY env var)
+python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+  --report "reports/jira/combined_jira_report_*.tsv" \
+  --claude-api-mode --anthropic-api-key "sk-ant-..."
+```
+
+**What happens during analysis:**
+1. Preprocesses report data and extracts key metrics
+2. Loads analysis prompt template from `config/analysis_prompt_template.yaml`
+3. Calls Claude Code CLI (or Anthropic API if `--claude-api-mode` is specified)
+4. Generates comprehensive analysis and saves to `reports/ai_analysis_*.txt`
+5. Auto-uploads to Google Sheets (can skip with `--no-upload`)
 
 **What You Get:**
 
@@ -576,15 +615,6 @@ The script will:
 - **Actionable Recommendations**: 2-3 concrete steps with WHO/WHAT/measurable goals
 - **AI Tool Impact Assessment**: ROI evaluation and tool effectiveness (for GitHub reports)
 - **Workflow Efficiency Analysis**: State-by-state bottleneck identification (for Jira reports)
-
-**Why Claude Code?**
-
-- ✅ No additional API keys required (uses your existing access)
-- ✅ High-quality analysis from Claude Sonnet 4.5
-- ✅ Fully automated workflow with `claude -p` non-interactive mode
-- ✅ Customizable analysis via prompt templates (`config/analysis_prompt_template.yaml`)
-- ✅ Direct upload to Google Sheets with one command
-- ✅ No API costs
 
 **Example Output:**
 
@@ -635,22 +665,20 @@ AI-POWERED METRICS ANALYSIS REPORT
 
 ```bash
 # Analyze Jira reports
-python -m ai_impact_analysis.scripts.analyze_with_claude_code \
-  --report "reports/jira/combined_jira_report_*.tsv"
-
-# Upload analysis to Google Sheets
-python -m ai_impact_analysis.scripts.upload_to_sheets \
-  --report reports/ai_analysis_pr_*.txt
-
-# Manual mode (just generate prompt without calling Claude Code)
+# Prompt preview mode (display prompt without calling Claude)
 python -m ai_impact_analysis.scripts.analyze_with_claude_code \
   --report "reports/github/combined_pr_report_*.tsv" \
-  --manual
+  --prompt-only
 
 # Custom timeout (default: 300 seconds)
 python -m ai_impact_analysis.scripts.analyze_with_claude_code \
   --report "reports/github/combined_pr_report_*.tsv" \
   --timeout 600
+
+# Skip Google Sheets upload
+python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+  --report "reports/github/combined_pr_report_*.tsv" \
+  --no-upload
 ```
 
 **Customizing Analysis:**
@@ -660,19 +688,6 @@ Edit `config/analysis_prompt_template.yaml` to customize:
 - Output format and tone
 - Focus areas and requirements
 - Data interpretation guidelines
-
-**Future Plans:**
-
-The current implementation uses Claude Code CLI for fully automated analysis. Future versions will add support for:
-- ✨ **Direct API Integration**:
-  - OpenAI API (GPT-4, GPT-4o, etc.)
-  - Anthropic API (Claude via direct API calls)
-  - Google Gemini API
-- ✨ **OpenAI-Compatible Endpoints**:
-  - Local LLMs (Ollama, LM Studio, etc.)
-  - Any other OpenAI-compatible service
-
-The `ReportPreprocessor` in `ai_impact_analysis/utils/report_preprocessor.py` is designed to be reusable across all future AI model integrations.
 
 ## Understanding Report Metrics
 
