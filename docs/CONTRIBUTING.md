@@ -87,28 +87,13 @@ tox -e unittest --develop
 
 # Verify CLI is working
 ai-impact-analysis --help
+
+# Test basic commands
+ai-impact-analysis verify
+ai-impact-analysis jira team
 ```
 
-### 6. Local Docker Build (For Testing Code Changes)
-
-By default, `docker-compose.yml` uses the pre-built image from [Quay.io](https://quay.io/repository/carawang/ai-impact-analysis), which is automatically built from the `master` branch via Build Triggers.
-
-**For local development/testing, use the `local-build` service:**
-
-```bash
-# Build from local Dockerfile
-docker-compose build local-build
-
-# Test your changes
-docker-compose run --rm local-build verify
-docker-compose run --rm local-build full
-
-# Using Podman:
-podman-compose build local-build
-podman-compose run --rm local-build verify
-```
-
-The `local-build` service builds a local image (`localhost/ai-impact-analysis:dev`) from your current code, allowing you to test changes before pushing to the repository.
+> **Note:** Docker images are automatically built from the `master` branch via Quay.io Build Triggers. You only need to test the CLI locally - once you push to master, the Docker image will be built automatically.
 
 ## Code Contribution Workflow
 

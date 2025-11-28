@@ -177,15 +177,20 @@ vim config/pr_report_config.yaml
 
 ### 3. Run
 
+**CLI:**
 ```bash
-# Docker
-docker-compose run --rm ai-impact-analysis verify
-docker-compose run --rm ai-impact-analysis full
-
-# CLI
 ai-impact-analysis verify
 ai-impact-analysis full
 ```
+
+**Docker:**
+```bash
+# Docker commands = "docker-compose run ai-impact-analysis" + CLI command
+docker-compose run ai-impact-analysis verify
+docker-compose run ai-impact-analysis full
+```
+
+> **Tip:** Run `docker-compose up help` to see all available commands and usage examples.
 
 ## Configuration
 
@@ -293,33 +298,38 @@ ai-impact-analysis jira full --config my-custom-config.yaml
 **Verify setup:**
 
 ```bash
-# Docker
-docker-compose run --rm ai-impact-analysis verify
-
-# CLI
 ai-impact-analysis verify
 ```
 
 **Generate reports:**
 
 ```bash
-# Docker - get all reports
-docker-compose run --rm ai-impact-analysis full
-# Docker - get reports for Jira metrics
-docker-compose run --rm ai-impact-analysis jira full
-# Docker - get reports for PR metrics
-docker-compose run --rm ai-impact-analysis pr full
+ai-impact-analysis full                              # ALL reports (Jira + PR)
+ai-impact-analysis jira full                         # Jira: Team + Members + Combined
+ai-impact-analysis pr full                           # PR: Team + Members + Combined
+ai-impact-analysis jira team                         # Jira team report only
+ai-impact-analysis pr team                           # PR team report only
+ai-impact-analysis jira member alice@company.com     # Jira for one member
+ai-impact-analysis pr member alice-github            # PR for one member (GitHub username)
+```
 
-# CLI
-ai-impact-analysis full        # ALL reports (Jira + PR team reports + individual reports + combined reports)
+**Advanced usage with options:**
 
-# If you would like to get reports in steps:
-ai-impact-analysis jira full   # Jira: Team + Members + Combined
-ai-impact-analysis pr full     # PR: Team + Members + Combined
-ai-impact-analysis jira team   # Jira team report
-ai-impact-analysis pr team     # PR team report
-ai-impact-analysis jira member alice@company.com   # Jira for one member
-ai-impact-analysis pr member alice-github          # PR for one member (GitHub username)
+```bash
+ai-impact-analysis full --with-claude-insights --claude-api-mode
+ai-impact-analysis jira full --no-upload
+ai-impact-analysis pr team --incremental
+ai-impact-analysis pr member testcara --incremental --no-upload
+```
+
+**Docker usage:**
+
+```bash
+# Just prefix CLI commands with "docker-compose run ai-impact-analysis"
+docker-compose run ai-impact-analysis verify
+docker-compose run ai-impact-analysis full
+docker-compose run ai-impact-analysis jira full --no-upload
+docker-compose run ai-impact-analysis pr member testcara --incremental
 ```
 
 **Workflow:**
@@ -386,7 +396,7 @@ source .env
 
 #### Automatic with Full Workflow (Recommended)
 
-**CLI with Claude Code CLI (default):**
+**With Claude Code CLI (CLI only):**
 
 ```bash
 # Requires Claude Code CLI installation (see Prerequisites)
@@ -395,22 +405,16 @@ ai-impact-analysis pr full --with-claude-insights
 ai-impact-analysis full --with-claude-insights
 ```
 
-**CLI with Anthropic API:**
+**With Anthropic API (CLI or Docker):**
 
 ```bash
-# Requires ANTHROPIC_API_KEY in .env
+# CLI - Requires ANTHROPIC_API_KEY in .env
+ai-impact-analysis full --with-claude-insights --claude-api-mode
 ai-impact-analysis jira full --with-claude-insights --claude-api-mode
 ai-impact-analysis pr full --with-claude-insights --claude-api-mode
-ai-impact-analysis full --with-claude-insights --claude-api-mode
-```
 
-**Docker (requires Anthropic API):**
-
-```bash
-# Requires ANTHROPIC_API_KEY in .env
-docker-compose run --rm ai-impact-analysis jira full --with-claude-insights --claude-api-mode
-docker-compose run --rm ai-impact-analysis pr full --with-claude-insights --claude-api-mode
-docker-compose run --rm ai-impact-analysis full --with-claude-insights --claude-api-mode
+# Docker - Same commands, just add prefix
+docker-compose run ai-impact-analysis full --with-claude-insights --claude-api-mode
 ```
 
 #### Manual Script Execution (For existing reports)
@@ -426,7 +430,7 @@ python -m ai_impact_analysis.scripts.analyze_with_claude_code \
   --report "reports/github/combined_pr_report_*.tsv"
 ```
 
-**With Anthropic API:**
+**With Anthropic API (CLI or Docker):**
 
 ```bash
 # CLI
@@ -434,8 +438,8 @@ python -m ai_impact_analysis.scripts.analyze_with_claude_code \
   --report "reports/jira/combined_jira_report_*.tsv" \
   --claude-api-mode
 
-# Docker
-docker-compose run --rm ai-impact-analysis \
+# Docker - Same command, just add prefix
+docker-compose run ai-impact-analysis \
   python -m ai_impact_analysis.scripts.analyze_with_claude_code \
   --report "reports/jira/combined_jira_report_*.tsv" \
   --claude-api-mode
