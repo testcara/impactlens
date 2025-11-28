@@ -1153,15 +1153,18 @@ ai-impact-analysis/
 │   │   ├── generate_pr_report.py             # Generate PR reports workflow
 │   │   ├── generate_pr_comparison_report.py  # Compare PR reports
 │   │   ├── upload_to_sheets.py               # Upload reports to Google Sheets
-│   │   └── verify_setup.py                   # Setup verification
+│   │   ├── verify_setup.py                   # Setup verification
+│   │   └── analyze_with_claude_code.py       # AI-powered report analysis (🧪 experimental)
 │   └── utils/           # Utility functions
-│       ├── core_utils.py      # Date conversion, JQL building
-│       ├── logger.py          # Logging configuration
-│       ├── report_utils.py    # Report formatting utilities
-│       └── workflow_utils.py  # Workflow helper functions
+│       ├── core_utils.py         # Date conversion, JQL building
+│       ├── logger.py             # Logging configuration
+│       ├── report_utils.py       # Report formatting utilities
+│       ├── report_preprocessor.py # Report preprocessing for AI analysis
+│       └── workflow_utils.py     # Workflow helper functions
 ├── config/               # Configuration files
-│   ├── jira_report_config.yaml # Jira analysis configuration (phases, team members)
-│   └── pr_report_config.yaml   # GitHub PR analysis configuration (phases, team members)
+│   ├── jira_report_config.yaml        # Jira analysis configuration (phases, team members)
+│   ├── pr_report_config.yaml          # GitHub PR analysis configuration (phases, team members)
+│   └── analysis_prompt_template.yaml  # AI analysis prompt template (🧪 experimental)
 ├── tests/                # Test suite
 │   ├── test_utils.py
 │   ├── test_jira_client.py
@@ -1170,7 +1173,9 @@ ai-impact-analysis/
 │   └── test_github_integration.py # Integration tests (optional)
 ├── reports/              # Generated reports
 │   ├── jira/            # Jira issue reports
-│   └── github/          # GitHub PR reports
+│   ├── github/          # GitHub PR reports
+│   ├── ai_analysis_pr_*.txt   # AI-powered PR analysis reports (🧪 experimental)
+│   └── ai_analysis_jira_*.txt # AI-powered Jira analysis reports (🧪 experimental)
 ├── requirements.txt      # Dependencies
 ├── pyproject.toml        # Project configuration
 └── tox.ini               # Test configuration
