@@ -21,6 +21,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ai_impact_analysis/ ./ai_impact_analysis/
 COPY config/ ./config/
 
+# Create default config files from templates (if they don't exist)
+RUN cp config/jira_report_config.yaml.example config/jira_report_config.yaml && \
+    cp config/pr_report_config.yaml.example config/pr_report_config.yaml
+
 # Install the package in editable mode to enable CLI
 RUN pip install -e .
 
@@ -32,4 +36,4 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Default command shows help
-CMD ["ai-analysis", "--help"]
+CMD ["ai-impact-analysis", "--help"]

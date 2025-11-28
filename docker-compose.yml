@@ -3,8 +3,11 @@ version: '3.8'
 services:
   # Main service for running AI Impact Analysis
   ai-impact-analysis:
-    build: .
-    image: ai-impact-analysis:latest
+    # Pre-built image from Quay.io (auto-built from master branch)
+    image: quay.io/carawang/ai-impact-analysis:latest
+
+    # For local build (development/testing): uncomment the line below
+    # build: .
     container_name: ai-impact-analysis
     volumes:
       # Mount reports directory to persist generated reports
@@ -71,3 +74,10 @@ services:
     extends: ai-impact-analysis
     container_name: ai-impact-analysis-verify
     command: ["ai-impact-analysis", "verify"]
+
+  # Service for local development/testing (builds from local Dockerfile)
+  local-build:
+    extends: ai-impact-analysis
+    build: .
+    image: localhost/ai-impact-analysis:dev
+    container_name: ai-impact-analysis-local

@@ -126,12 +126,17 @@ ai-impact-analysis/
 
 **Docker (Recommended):**
 
-Precondition: `docker` and `docker-compose` have been installed.
+Precondition: `docker` and `docker-compose` (or `podman` and `podman-compose`) have been installed.
 
 ```bash
 git clone https://github.com/testcara/ai_impact_analysis.git
 cd ai_impact_analysis
+
+# Optional: Pull pre-built image (auto-pulled on first run if not present)
+docker-compose pull
 ```
+
+> **Note:** The Docker image is automatically built from the `master` branch and hosted on [Quay.io](https://quay.io/repository/carawang/ai-impact-analysis). You don't need to build locally unless you're developing/testing code changes.
 
 **CLI:**
 
@@ -148,6 +153,7 @@ pip install -e .
 **Environment setup:**
 
 ```bash
+# Copy and edit environment variables
 cp .env.example .env
 vim .env  # Add your Jira/GitHub tokens (see Configuration section)
 
@@ -155,9 +161,19 @@ vim .env  # Add your Jira/GitHub tokens (see Configuration section)
 source .env
 ```
 
-**Report setup:**
+**Report configuration:**
 
-Open `config/jira_report_config.yaml` and `config/pr_report_config.yaml` to specify whose metrics during which phases you would like to collect. See [Configuration](#configuration) section for details.
+```bash
+# Copy config templates
+cp config/jira_report_config.yaml.example config/jira_report_config.yaml
+cp config/pr_report_config.yaml.example config/pr_report_config.yaml
+
+# Edit to customize team members, phases, and metrics
+vim config/jira_report_config.yaml
+vim config/pr_report_config.yaml
+```
+
+> **Note:** Config templates (`.example` files) are provided in the repository. Your local config files will be ignored by git to keep your team-specific settings private.
 
 ### 3. Run
 
