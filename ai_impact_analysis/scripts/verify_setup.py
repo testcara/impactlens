@@ -87,20 +87,45 @@ def check_module_imports() -> bool:
 
 def check_config_files() -> bool:
     """Check if configuration files exist."""
-    config_files = [
-        "config/jira_phases.conf",
-        "config/github_phases.conf",
-        "config/jira_team_members.conf",
-        "config/github_team_members.conf",
+    # Check required config files
+    required_configs = [
+        ("config/jira_report_config.yaml", "config/jira_report_config.yaml.example"),
+        ("config/pr_report_config.yaml", "config/pr_report_config.yaml.example"),
     ]
     all_configured = True
 
-    for config_file in config_files:
-        if Path(config_file).exists():
-            print_status(True, config_file)
+    for config_file, template_file in required_configs:
+        try:
+            if Path(config_file).exists():
+                print_status(True, config_file)
+            else:
+                if Path(template_file).exists():
+                    print_status(
+                        False, f"{config_file} missing (copy from {template_file})", warning=True
+                    )
+                    print(f"  Run: cp {template_file} {config_file}")
+                else:
+                    print_status(False, f"{template_file} template missing", warning=True)
+                all_configured = False
+        except (PermissionError, OSError):
+            # Docker mounted volumes may have permission issues
+            print_status(True, f"{config_file} (mounted, skip check)")
+
+    # Check .env file (user's actual config)
+    try:
+        if Path(".env").exists():
+            print_status(True, ".env (user config)")
         else:
+            if Path(".env.example").exists():
+                print_status(False, ".env not found (copy from .env.example)", warning=True)
+                print("  Run: cp .env.example .env && vim .env")
+            else:
+                print_status(False, ".env.example template missing", warning=True)
             all_configured = False
-            print_status(False, f"{config_file} missing", warning=True)
+    except (PermissionError, OSError):
+        # Docker environment uses env vars, not .env file
+        print_status(True, ".env (using environment variables)")
+
     return all_configured
 
 
@@ -247,36 +272,27 @@ def check_googlesheet_config() -> bool:
         return False
 
 
-def check_scripts() -> bool:
-    """Check if Python CLI scripts work."""
-    scripts = [
-        "ai_impact_analysis.scripts.get_jira_metrics",
-        "ai_impact_analysis.scripts.get_pr_metrics",
-        "ai_impact_analysis.scripts.generate_jira_report",
-        "ai_impact_analysis.scripts.generate_pr_report",
-        "ai_impact_analysis.scripts.generate_jira_comparison_report",
-        "ai_impact_analysis.scripts.generate_pr_comparison_report",
-        "ai_impact_analysis.scripts.upload_to_sheets",
-    ]
-
-    all_scripts_ready = True
-
-    for script in scripts:
-        try:
-            result = subprocess.run(
-                [sys.executable, "-m", script, "--help"],
-                capture_output=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                print_status(True, f"{script.split('.')[-1]}.py")
-            else:
-                all_scripts_ready = False
-                print_status(False, f"{script.split('.')[-1]}.py failed")
-        except Exception:
-            all_scripts_ready = False
-            print_status(False, f"{script.split('.')[-1]}.py failed")
-    return all_scripts_ready
+def check_cli() -> bool:
+    """Check if CLI command is working."""
+    try:
+        result = subprocess.run(
+            ["ai-impact-analysis", "--help"],
+            capture_output=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            print_status(True, "ai-impact-analysis CLI")
+            return True
+        else:
+            print_status(False, "ai-impact-analysis CLI failed")
+            return False
+    except FileNotFoundError:
+        print_status(False, "ai-impact-analysis command not found")
+        print("  Run: pip install -e .")
+        return False
+    except Exception as e:
+        print_status(False, f"CLI check failed: {str(e)[:50]}")
+        return False
 
 
 def print_summary(jira_ready: bool, github_ready: bool, sheets_ready: bool) -> None:
@@ -287,27 +303,27 @@ def print_summary(jira_ready: bool, github_ready: bool, sheets_ready: bool) -> N
 
     if jira_ready:
         print_status(True, "Jira connection verified - ready for analysis")
-        print("  Run: python3 -m ai_impact_analysis.scripts.generate_jira_report -h")
+        print("  Run: ai-impact-analysis jira full")
     else:
         print_status(False, "Jira connection failed or not configured", warning=True)
-        print("  Check: JIRA_URL, JIRA_API_TOKEN, JIRA_PROJECT_KEY")
+        print("  Check: JIRA_URL, JIRA_API_TOKEN, JIRA_PROJECT_KEY in .env")
         print("  Verify: Credentials are valid and project exists")
 
     if github_ready:
         print_status(True, "GitHub connection verified - ready for analysis")
-        print("  Run: python3 -m ai_impact_analysis.scripts.generate_pr_report -h")
+        print("  Run: ai-impact-analysis pr full")
     else:
         print_status(False, "GitHub connection failed or not configured", warning=True)
-        print("  Check: GITHUB_TOKEN, GITHUB_REPO_OWNER, GITHUB_REPO_NAME")
+        print("  Check: GITHUB_TOKEN, GITHUB_REPO_OWNER, GITHUB_REPO_NAME in .env")
         print("  Verify: Token is valid and repository exists")
 
     if sheets_ready:
         print_status(True, "Google Sheets authentication verified - ready for upload")
-        print("  Run: python3 -m ai_impact_analysis.scripts.upload_to_sheets -h")
+        print("  Reports will auto-upload to Google Sheets")
     else:
         print_status(False, "Google Sheets authentication failed or not configured", warning=True)
         print("  Check: GOOGLE_CREDENTIALS_FILE points to valid JSON credentials")
-        print("  Optional: GOOGLE_SPREADSHEET_ID (for updating existing spreadsheets)")
+        print("  Optional: GOOGLE_SPREADSHEET_ID (for auto-upload)")
 
     print()
     print(f"{Colors.BLUE}For detailed setup instructions, see README.md{Colors.NC}")
@@ -340,8 +356,7 @@ def main() -> int:
 
     # Check configuration files
     print_section("Checking configuration files")
-    if not check_config_files():
-        return 1
+    check_config_files()  # Non-critical, just informational
 
     # Check Jira configuration and connection
     print_section("Testing Jira connection")
@@ -355,9 +370,9 @@ def main() -> int:
     print_section("Testing Google Sheets authentication")
     sheets_ready = check_googlesheet_config()
 
-    # Check scripts
-    print_section("Testing script help messages")
-    if not check_scripts():
+    # Check CLI
+    print_section("Testing CLI command")
+    if not check_cli():
         return 1
 
     # Print summary

@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Main Service - AI Impact Analysis
+  # ============================================================================
+  # Usage: docker-compose run ai-impact-analysis <command> [options]
+  #
+  # The CLI is fully accessible - any command that works with the CLI
+  # works here by prefixing with "docker-compose run ai-impact-analysis"
+  #
+  # Examples:
+  #   docker-compose run ai-impact-analysis --help
+  #   docker-compose run ai-impact-analysis verify
+  #   docker-compose run ai-impact-analysis full
+  #   docker-compose run ai-impact-analysis jira full --with-claude-insights
+  #   docker-compose run ai-impact-analysis pr team --no-upload
+  #   docker-compose run ai-impact-analysis pr member testcara --incremental
+  #   docker-compose run ai-impact-analysis jira member user@example.com
+  ai-impact-analysis:
+    # Pre-built image from Quay.io (auto-built from master branch)
+    image: quay.io/carawang/ai-impact-analysis:latest
+
+    # For local build (development/testing): uncomment the lines below
+    # build: .
+    # image: localhost/ai-impact-analysis:dev
+
+    volumes:
+      # Mount reports directory to persist generated reports
+      - ./reports:/app/reports:z
+      # Mount config for easy customization
+      - ./config:/app/config:ro,z
+      # Mount credentials (if using Google Sheets)
+      - ${GOOGLE_CREDENTIALS_FILE:-/dev/null}:/app/credentials.json:ro,z
+    environment:
+      # Jira configuration
+      - JIRA_URL=${JIRA_URL}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+      - JIRA_PROJECT_KEY=${JIRA_PROJECT_KEY}
+
+      # GitHub configuration
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
+
+      # Google Sheets configuration (optional)
+      - GOOGLE_CREDENTIALS_FILE=/app/credentials.json
+      - GOOGLE_SPREADSHEET_ID=${GOOGLE_SPREADSHEET_ID}
+
+      # AI Analysis configuration (optional)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+
+      # Python configuration
+      - PYTHONUNBUFFERED=1
+    entrypoint: ["ai-impact-analysis"]
+    # No default command - you provide the command when running
+
+  # ============================================================================
+  # Help Service
+  # ============================================================================
+  # Display usage help
+  # Usage: docker-compose up help
+  help:
+    image: alpine:latest
+    command: >
+      sh -c "
+      echo '';
+      echo '╔════════════════════════════════════════════════════════════════════════╗';
+      echo '║        AI Impact Analysis - Docker Compose Usage Guide                ║';
+      echo '╚════════════════════════════════════════════════════════════════════════╝';
+      echo '';
+      echo 'USAGE: docker-compose run ai-impact-analysis <command> [options]';
+      echo '';
+      echo 'The full CLI is available! Any command that works with ai-impact-analysis';
+      echo 'CLI works here by prefixing with \"docker-compose run ai-impact-analysis\"';
+      echo '';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo 'QUICK START';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo '';
+      echo '  # Verify configuration';
+      echo '  docker-compose run ai-impact-analysis verify';
+      echo '';
+      echo '  # Complete workflow (Jira + PR)';
+      echo '  docker-compose run ai-impact-analysis full';
+      echo '';
+      echo '  # Show all available commands';
+      echo '  docker-compose run ai-impact-analysis --help';
+      echo '';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo 'JIRA COMMANDS';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo '';
+      echo '  docker-compose run ai-impact-analysis jira full';
+      echo '  docker-compose run ai-impact-analysis jira full --with-claude-insights';
+      echo '  docker-compose run ai-impact-analysis jira team';
+      echo '  docker-compose run ai-impact-analysis jira team --no-upload';
+      echo '  docker-compose run ai-impact-analysis jira member user@example.com';
+      echo '  docker-compose run ai-impact-analysis jira all';
+      echo '';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo 'PR COMMANDS';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo '';
+      echo '  docker-compose run ai-impact-analysis pr full';
+      echo '  docker-compose run ai-impact-analysis pr full --with-claude-insights --incremental';
+      echo '  docker-compose run ai-impact-analysis pr team';
+      echo '  docker-compose run ai-impact-analysis pr team --incremental --no-upload';
+      echo '  docker-compose run ai-impact-analysis pr member testcara';
+      echo '  docker-compose run ai-impact-analysis pr member testcara --no-upload';
+      echo '  docker-compose run ai-impact-analysis pr all';
+      echo '';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo 'COMMON OPTIONS';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo '';
+      echo '  --with-claude-insights    Enable Claude AI insights (requires setup)';
+      echo '  --claude-api-mode         Use Anthropic API instead of Claude Code CLI';
+      echo '  --no-upload               Skip uploading to Google Sheets';
+      echo '  --incremental             Only fetch new/updated PRs (PR commands only)';
+      echo '  --config <path>           Use custom config file (Jira commands only)';
+      echo '';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo 'MORE EXAMPLES';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo '';
+      echo '  # Complete analysis with AI insights';
+      echo '  docker-compose run ai-impact-analysis full --with-claude-insights --claude-api-mode';
+      echo '';
+      echo '  # Jira team analysis without upload';
+      echo '  docker-compose run ai-impact-analysis jira team --no-upload';
+      echo '';
+      echo '  # PR for specific member with incremental fetch';
+      echo '  docker-compose run ai-impact-analysis pr member wlin --incremental';
+      echo '';
+      echo '  # Custom config file';
+      echo '  docker-compose run ai-impact-analysis jira full --config /app/config/custom.yaml';
+      echo '';
+      echo '╚════════════════════════════════════════════════════════════════════════╝';
+      echo '';
+      "

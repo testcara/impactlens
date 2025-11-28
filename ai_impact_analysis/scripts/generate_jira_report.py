@@ -279,8 +279,8 @@ Examples:
 
     if assignee:
         # Individual report: get specific member's values
-        for identifier, details in team_members_details.items():
-            if identifier == assignee or details.get("member") == assignee:
+        for member_id, details in team_members_details.items():
+            if member_id == assignee or details.get("member") == assignee:
                 # Process leave_days
                 leave_days_config = details.get("leave_days", 0)
                 if isinstance(leave_days_config, list):
@@ -303,7 +303,7 @@ Examples:
         leave_days_list = [0.0] * len(phases)
         capacity_list = [0.0] * len(phases)
 
-        for identifier, details in team_members_details.items():
+        for member_id, details in team_members_details.items():
             # Process leave_days
             leave_days_config = details.get("leave_days", 0)
             if isinstance(leave_days_config, list):
@@ -373,6 +373,8 @@ Examples:
         print(f"{Colors.GREEN}✓ Report generated: {comparison_file.name}{Colors.NC}")
         print()
         upload_to_google_sheets(comparison_file, skip_upload=args.no_upload)
+    else:
+        print(f"No comparison file found!")
 
     print(f"{Colors.GREEN}Done!{Colors.NC}")
     return 0
