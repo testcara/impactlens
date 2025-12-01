@@ -18,11 +18,11 @@ from typing import List, Optional
 from ai_impact_analysis.utils.workflow_utils import (
     Colors,
     get_project_root,
-    load_config_file,
     cleanup_old_reports,
     upload_to_google_sheets,
     find_latest_comparison_report,
     load_team_members,
+    load_and_resolve_config,
 )
 from ai_impact_analysis.utils.report_utils import normalize_username
 
@@ -43,6 +43,7 @@ def generate_phase_metrics(
     end_date: str,
     author: Optional[str] = None,
     incremental: bool = False,
+    output_dir: Optional[str] = None,
 ) -> bool:
     """Generate PR metrics for a single phase."""
     args = [
@@ -61,6 +62,9 @@ def generate_phase_metrics(
     if incremental:
         args.append("--incremental")
 
+    if output_dir:
+        args.extend(["--output-dir", str(output_dir)])
+
     try:
         subprocess.run(args, check=True)
         return True
@@ -68,7 +72,9 @@ def generate_phase_metrics(
         return False
 
 
-def generate_comparison_report(author: Optional[str] = None) -> bool:
+def generate_comparison_report(
+    author: Optional[str] = None, output_dir: Optional[str] = None
+) -> bool:
     """Generate comparison report from phase metrics."""
     args = [
         sys.executable,
@@ -79,6 +85,9 @@ def generate_comparison_report(author: Optional[str] = None) -> bool:
     if author:
         args.extend(["--author", author])
 
+    if output_dir:
+        args.extend(["--reports-dir", str(output_dir)])
+
     try:
         subprocess.run(args, check=True)
         return True
@@ -87,7 +96,10 @@ def generate_comparison_report(author: Optional[str] = None) -> bool:
 
 
 def generate_all_members_reports(
-    team_members_file: Path, script_name: str, no_upload: bool = False
+    team_members_file: Path,
+    script_name: str,
+    no_upload: bool = False,
+    config_file: Optional[Path] = None,
 ) -> int:
     """Generate reports for all team members."""
     print_header("Generating reports for all team members")
@@ -101,6 +113,8 @@ def generate_all_members_reports(
     print(f"{Colors.BLUE}>>> Generating Team Overall Report{Colors.NC}")
     print()
     cmd = [sys.executable, "-m", script_name]
+    if config_file:
+        cmd.extend(["--config", str(config_file)])
     if no_upload:
         cmd.append("--no-upload")
     result = subprocess.run(cmd)
@@ -116,6 +130,8 @@ def generate_all_members_reports(
         print(f"{Colors.BLUE}>>> Generating Report for: {member}{Colors.NC}")
         print()
         cmd = [sys.executable, "-m", script_name, member]
+        if config_file:
+            cmd.extend(["--config", str(config_file)])
         if no_upload:
             cmd.append("--no-upload")
         result = subprocess.run(cmd)
@@ -183,12 +199,28 @@ Examples:
         action="store_true",
         help="Skip uploading report to Google Sheets",
     )
+    parser.add_argument(
+        "--config",
+        type=str,
+        help="Path to custom config file (default: config/pr_report_config.yaml)",
+    )
 
     args = parser.parse_args()
 
     project_root = get_project_root()
-    config_file = project_root / "config" / "pr_report_config.yaml"
-    reports_dir = project_root / "reports" / "github"
+    default_config_file = project_root / "config" / "pr_report_config.yaml"
+    custom_config_file = Path(args.config) if args.config else None
+    default_reports_dir = project_root / "reports" / "github"
+
+    # Validate, load config, and resolve output directory
+    result = load_and_resolve_config(
+        custom_config_file, default_config_file, default_reports_dir, "PR config"
+    )
+    if result is None:
+        return 1
+
+    phases, default_author, reports_dir = result
+    config_file = custom_config_file if custom_config_file else default_config_file
 
     # Handle --combine-only flag
     if args.combine_only:
@@ -224,14 +256,8 @@ Examples:
             config_file,  # Use same config file for team members
             "ai_impact_analysis.scripts.generate_pr_report",
             no_upload=args.no_upload,
+            config_file=config_file,
         )
-
-    # Load configuration
-    try:
-        phases, default_author = load_config_file(config_file)
-    except (FileNotFoundError, ValueError) as e:
-        print(f"{Colors.RED}Error loading config: {e}{Colors.NC}")
-        return 1
 
     # Determine author
     author = args.author or default_author or None
@@ -258,7 +284,12 @@ Examples:
         )
 
         success = generate_phase_metrics(
-            phase_name, start_date, end_date, author=author, incremental=args.incremental
+            phase_name,
+            start_date,
+            end_date,
+            author=author,
+            incremental=args.incremental,
+            output_dir=str(reports_dir),
         )
 
         if success:
@@ -272,7 +303,7 @@ Examples:
 
     # Generate comparison report
     print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
-    if not generate_comparison_report(author=author):
+    if not generate_comparison_report(author=author, output_dir=str(reports_dir)):
         print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")
         return 1
     print()

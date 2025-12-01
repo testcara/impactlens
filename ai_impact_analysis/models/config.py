@@ -31,6 +31,7 @@ class AnalysisConfig:
     default_assignee: Optional[str] = None
     project_key: Optional[str] = None
     report_type: str = "jira"  # "jira" or "github"
+    output_dir: Optional[str] = None  # Custom output directory for team isolation
 
     @classmethod
     def from_tuples(
@@ -38,10 +39,16 @@ class AnalysisConfig:
         phases: List[Tuple[str, str, str]],
         default_assignee: Optional[str] = None,
         report_type: str = "jira",
+        output_dir: Optional[str] = None,
     ) -> "AnalysisConfig":
         """Create config from list of phase tuples."""
         phase_objects = [Phase(name=p[0], start_date=p[1], end_date=p[2]) for p in phases]
-        return cls(phases=phase_objects, default_assignee=default_assignee, report_type=report_type)
+        return cls(
+            phases=phase_objects,
+            default_assignee=default_assignee,
+            report_type=report_type,
+            output_dir=output_dir,
+        )
 
 
 @dataclass

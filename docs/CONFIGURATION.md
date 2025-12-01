@@ -1,193 +1,471 @@
 # Configuration Guide
 
-This guide explains how to configure AI Impact Analysis for your team and customize report generation.
+This guide explains how to configure AI Impact Analysis for your team(s) and customize report generation.
 
 ## Table of Contents
 
-- [Configuration Files](#configuration-files)
-- [Jira Report Configuration](#jira-report-configuration)
-- [GitHub PR Configuration](#github-pr-configuration)
-- [Google Sheets Integration](#google-sheets-integration)
-- [Custom Configuration](#custom-configuration)
+- [Quick Start (Single Team)](#quick-start-single-team)
+- [Configuration Options](#configuration-options)
+- [Advanced Configuration](#advanced-configuration)
+  - [Custom Config Files](#custom-config-files)
+  - [Multi-Team Setup (Enterprise)](#multi-team-setup-enterprise)
+  - [Google Sheets Integration](#google-sheets-integration)
 - [Environment Variables](#environment-variables)
+- [Best Practices & Security](#best-practices--security)
+- [Troubleshooting](#troubleshooting)
 
-## Configuration Files
+## Quick Start (Single Team)
 
-The tool uses YAML configuration files for report customization:
+**Default Setup:**
 
-- `config/jira_report_config.yaml` - Jira analysis configuration (phases, assignees, team members)
-- `config/pr_report_config.yaml` - GitHub PR analysis configuration (phases, authors, team members)
-- `config/analysis_prompt_template.yaml` - AI analysis prompt customization (experimental feature)
+By default, the tool uses:
+- Config files: `config/jira_report_config.yaml`, `config/pr_report_config.yaml`
+- Output directories: `reports/jira/`, `reports/github/`
+- Environment: `.env` file
 
-## Jira Report Configuration
+**Steps:**
 
-Edit `config/jira_report_config.yaml` to configure analysis periods, default assignee, and team members:
+1. Copy config templates:
+   ```bash
+   cp config/jira_report_config.yaml.example config/jira_report_config.yaml
+   cp config/pr_report_config.yaml.example config/pr_report_config.yaml
+   ```
 
-```yaml
-# config/jira_report_config.yaml
+2. Edit config files with your team's information (phases, team members)
 
-# Define analysis phases (flexible: 1 to many)
-phases:
-  - name: "No AI Period"
-    start: "2024-10-24"
-    end: "2025-05-30"
-  - name: "Cursor Period"
-    start: "2025-06-02"
-    end: "2025-07-31"
-  - name: "Full AI Period"
-    start: "2025-08-01"
-    end: "2025-11-03"
+3. Set environment variables (see [Environment Variables](#environment-variables))
 
-# Default assignee (optional)
-# - Set to "" for team overall reports (default)
-# - Set to email for individual reports (e.g., "wlin@redhat.com")
-# - Command line argument will override this value
-default_assignee: ""
+4. Run analysis:
+   ```bash
+   ai-impact-analysis full
+   ```
 
-# Team members (optional, for --all-members mode)
-team_members:
-  - member: wlin
-    email: wlin@redhat.com
-    leave_days:
-      - 26 # No AI Period
-      - 20 # Cursor Period
-      - 11.5 # Full AI Period
-    capacity: 0.8
-  - member: sbudhwar
-    email: sbudhwar@redhat.com
-    leave_days: 0
-    capacity: 1.0
-  - member: abhindas
-    email: abhindas@redhat.com
-    leave_days: 0
-    capacity:
-      - 1.0 # No AI Period (full time)
-      - 1.0 # Cursor Period (full time)
-      - 0.0 # Full AI Period (left team)
-```
+That's it! Reports will be generated in `reports/jira/` and `reports/github/`.
 
-### Phase Configuration
+## Configuration Options
 
-- **Add as many phases** as needed for your analysis
-- **Use descriptive names** (e.g., "No AI Period", "Cursor Only", "Claude + Cursor")
-- **Dates must be** in YYYY-MM-DD format
+Both `config/jira_report_config.yaml` and `config/pr_report_config.yaml` support these options:
 
-### Team Members Configuration
+### 1. Phases (Required)
 
-- `member`: Jira username
-- `email`: Email address for filtering
-- `leave_days`: Leave days for each phase
-  - Can be a single number (applies to all phases): `leave_days: 0`
-  - Or a list (one value per phase): `leave_days: [26, 20, 11.5]`
-- `capacity`: Work capacity (0.0 to 1.0, where 1.0 = full time)
-  - Can be a single number (applies to all phases): `capacity: 0.8`
-  - Or a list (one value per phase): `capacity: [1.0, 1.0, 0.0]`
-  - Use 0.0 to indicate member left team in that phase
-
-### Assignee Configuration
-
-- Leave `default_assignee: ""` for team reports
-- Set `default_assignee: "wlin@redhat.com"` to always generate reports for specific person
-- Command line argument overrides config: `ai-impact-analysis jira member other@redhat.com`
-
-### Understanding Leave Days and Capacity
-
-These metrics help calculate more accurate throughput by accounting for time off and work capacity:
-
-**Leave Days**: Days the team member was on leave during the phase
-
-- Displayed in single reports and comparison reports
-- Can be specified per phase (list) or as single value
-- For team reports: sum of all members' leave days
-
-**Capacity**: Work capacity as percentage of full-time (0.0 to 1.0)
-
-- `1.0` = Full time (100%)
-- `0.8` = 80% time (e.g., 4 days/week)
-- `0.5` = Half time
-- `0.0` = Not on team (member left)
-- For team reports: sum of all members' capacity (total FTE)
-
-**Data Span**: Always calculated as Phase end date - Phase start date + 1
-
-```bash
-# Example: Phase from 2024-01-01 to 2024-01-31
-# Data Span = 31 days (includes both start and end dates)
-```
-
-### How Metrics Use Leave Days and Capacity
-
-Reports include **four Daily Throughput metrics** to provide comprehensive analysis:
-
-1. **Daily Throughput (skip leave days)** = Total Issues / (Analysis Period - Leave Days)
-
-   - Accounts for vacation time
-
-2. **Daily Throughput (based on capacity)** = Total Issues / (Analysis Period × Capacity)
-
-   - Accounts for part-time work
-
-3. **Daily Throughput (considering leave days + capacity)** = Total Issues / ((Analysis Period - Leave Days) × Capacity)
-
-   - Most accurate: accounts for both vacation and capacity
-
-4. **Daily Throughput** = Total Issues / Analysis Period
-   - Baseline metric for comparison
-
-## GitHub PR Configuration
-
-Edit `config/pr_report_config.yaml` to configure analysis periods and team members:
+Define analysis periods for comparison (e.g., before/after AI adoption):
 
 ```yaml
-# config/pr_report_config.yaml
-
 phases:
-  - name: "No AI Period"
-    start: "2024-10-24"
-    end: "2025-05-30"
-  - name: "Cursor Period"
-    start: "2025-06-02"
-    end: "2025-07-31"
-  - name: "Full AI Period"
-    start: "2025-08-01"
-    end: "2025-11-03"
-
-# Default author (optional)
-# - Set to "" for team overall reports (default)
-# - Set to GitHub username for individual reports (e.g., "wlin")
-default_author: ""
-
-# Team members (optional, for --all-members mode)
-team_members:
-  - name: testcara
-  - name: wlin
-  - name: sahil143
+  - name: "Before AI"
+    start: "2024-01-01"
+    end: "2024-06-30"
+  - name: "With AI Tools"
+    start: "2024-07-01"
+    end: "2024-12-31"
 ```
 
-### AI Detection in Commits
+**Notes:**
+- Add as many phases as needed
+- Use descriptive names (e.g., "No AI Period", "Cursor Only", "Claude + Cursor")
+- Dates must be in YYYY-MM-DD format
 
-The tool detects AI assistance from Git commit trailers. Add these to your commit messages:
+### 2. Team Members (Optional)
+
+For individual reports when using `--all-members` mode:
+
+**Jira config:**
+```yaml
+team_members:
+  - member: alice
+    email: alice@company.com
+    leave_days: 10      # or [10, 5] per phase
+    capacity: 1.0       # 1.0 = full time, or [1.0, 0.5] per phase
+  - member: bob
+    email: bob@company.com
+    leave_days: [5, 8]  # Different per phase
+    capacity: [1.0, 0.0] # Left team in phase 2
+```
+
+**PR config:**
+```yaml
+team_members:
+  - name: alice-github
+  - name: bob-github
+```
+
+**Leave Days & Capacity Metrics:**
+
+- **Leave Days**: Days the member was on leave during the phase
+  - Can be single number (applies to all phases): `leave_days: 0`
+  - Or list (one per phase): `leave_days: [26, 20, 11.5]`
+
+- **Capacity**: Work capacity (0.0 to 1.0, where 1.0 = full time)
+  - `1.0` = Full time (100%)
+  - `0.8` = 80% time (e.g., 4 days/week)
+  - `0.5` = Half time
+  - `0.0` = Not on team (member left)
+  - Can be single number or list per phase
+
+Reports include **four Daily Throughput metrics** for comprehensive analysis:
+1. Daily Throughput (skip leave days) = Total Issues / (Period - Leave Days)
+2. Daily Throughput (based on capacity) = Total Issues / (Period × Capacity)
+3. Daily Throughput (leave days + capacity) = Total Issues / ((Period - Leave Days) × Capacity)
+4. Daily Throughput = Total Issues / Period (baseline)
+
+### 3. Default Assignee/Author (Optional)
+
+Control default report scope:
+
+**Jira config:**
+```yaml
+default_assignee: ""  # "" = team reports (default)
+                     # "email@company.com" = individual reports
+```
+
+**PR config:**
+```yaml
+default_author: ""    # "" = team reports (default)
+                     # "username" = individual reports
+```
+
+Command line arguments override this setting.
+
+### 4. Output Directory (Optional, for multi-team)
+
+Customize where reports are saved:
+
+```yaml
+# Jira config
+output_dir: "reports/jira"              # Default
+output_dir: "reports/team-a/jira"       # Team-specific
+
+# PR config
+output_dir: "reports/github"            # Default
+output_dir: "reports/team-a/github"     # Team-specific
+```
+
+If not specified, uses default directories.
+
+### 5. AI Detection in Commits (PR reports)
+
+The tool detects AI assistance from Git commit trailers:
 
 ```bash
-# For Claude assistance
+# Claude assistance
 git commit -m "Fix authentication bug
 
 Assisted-by: Claude <noreply@anthropic.com>"
 
-# For Cursor assistance
+# Cursor assistance
 git commit -m "Implement new feature
 
 Assisted-by: Cursor"
-
-# Both tools (multiple commits in PR)
-# Some commits with Claude, some with Cursor
 ```
 
-## Google Sheets Integration
+Configure authorized emails in `AI_authorized_emails.txt` for AI analysis features.
+
+## Advanced Configuration
+
+### Custom Config Files
+
+Create custom YAML files to override default settings. Only include values you want to change:
+
+**Example: my-config.yaml**
+```yaml
+# Override only phases (keep default team members)
+phases:
+  - name: "Q1 2024"
+    start: "2024-01-01"
+    end: "2024-03-31"
+  - name: "Q2 2024"
+    start: "2024-04-01"
+    end: "2024-06-30"
+```
+
+**Usage:**
+
+All commands support `--config` parameter:
+
+```bash
+# Full workflow
+ai-impact-analysis jira full --config my-config.yaml
+ai-impact-analysis pr full --config my-config.yaml
+
+# Individual commands
+ai-impact-analysis jira team --config my-config.yaml
+ai-impact-analysis jira member alice@company.com --config my-config.yaml
+ai-impact-analysis jira members --config my-config.yaml
+ai-impact-analysis jira all --config my-config.yaml
+ai-impact-analysis jira combine --config my-config.yaml
+
+ai-impact-analysis pr team --config my-config.yaml
+ai-impact-analysis pr member alice --config my-config.yaml
+ai-impact-analysis pr members --config my-config.yaml
+ai-impact-analysis pr all --config my-config.yaml
+ai-impact-analysis pr combine --config my-config.yaml
+```
+
+**How merging works:**
+- Values in custom config override defaults from `config/jira_report_config.yaml` or `config/pr_report_config.yaml`
+- Missing values in custom config are taken from default config
+
+### Multi-Team Setup (Enterprise)
+
+For organizations managing multiple teams, isolate configs and reports using separate directories.
+
+**Naming Flexibility:**
+
+Throughout this guide we use `team-a`, `team-b` as examples. You can use **any naming scheme**:
+- By team: `frontend`, `backend`, `mobile`, `platform`
+- By product: `product-x`, `product-y`
+- By location: `us-team`, `eu-team`
+- By individual: `alice`, `bob`
+
+The tool is **completely flexible** - the examples use `team-a` for clarity.
+
+#### Directory Structure
+
+```
+ai-analysis/
+├── config/
+│   ├── team-a/
+│   │   ├── jira_report_config.yaml
+│   │   └── pr_report_config.yaml
+│   ├── team-b/
+│   │   ├── jira_report_config.yaml
+│   │   └── pr_report_config.yaml
+│   └── team-c/
+│       ├── jira_report_config.yaml
+│       └── pr_report_config.yaml
+├── reports/
+│   ├── team-a/
+│   │   ├── jira/
+│   │   └── github/
+│   ├── team-b/
+│   │   ├── jira/
+│   │   └── github/
+│   └── team-c/
+│       ├── jira/
+│       └── github/
+├── .env.team-a
+├── .env.team-b
+├── .env.team-c
+└── docker-compose.yml
+```
+
+#### Environment Files
+
+Create separate environment files for each team:
+
+**.env.team-a:**
+```bash
+# Jira configuration
+JIRA_URL=https://issues.redhat.com
+JIRA_API_TOKEN=team_a_token_here
+JIRA_PROJECT_KEY=TEAM_A_PROJECT
+
+# GitHub configuration
+GITHUB_TOKEN=ghp_team_a_token
+GITHUB_REPO_OWNER=org-name
+GITHUB_REPO_NAME=team-a-repo
+
+# Google Sheets (optional)
+GOOGLE_CREDENTIALS_FILE=/path/to/team-a-credentials.json
+GOOGLE_SPREADSHEET_ID=team_a_sheet_id
+
+# AI Analysis (optional)
+ANTHROPIC_API_KEY=sk-ant-team-a-key
+```
+
+**.env.team-b:**
+```bash
+# Similar structure with Team B specific values
+JIRA_URL=https://issues.redhat.com
+JIRA_API_TOKEN=team_b_token_here
+JIRA_PROJECT_KEY=TEAM_B_PROJECT
+# ... etc
+```
+
+#### Configuration Files
+
+**config/team-a/jira_report_config.yaml:**
+```yaml
+# Custom output directory for team isolation
+output_dir: "reports/team-a/jira"
+
+phases:
+  - name: "Before AI"
+    start: "2024-01-01"
+    end: "2024-06-30"
+  - name: "With AI Tools"
+    start: "2024-07-01"
+    end: "2024-12-31"
+
+default_assignee: ""
+
+team_members:
+  - member: alice
+    email: alice@company.com
+    leave_days: 10
+    capacity: 1.0
+  - member: bob
+    email: bob@company.com
+    leave_days: 5
+    capacity: 0.8
+```
+
+**config/team-a/pr_report_config.yaml:**
+```yaml
+# Custom output directory for team isolation
+output_dir: "reports/team-a/github"
+
+phases:
+  - name: "Before AI"
+    start: "2024-01-01"
+    end: "2024-06-30"
+  - name: "With AI Tools"
+    start: "2024-07-01"
+    end: "2024-12-31"
+
+default_author: ""
+
+team_members:
+  - name: alice-github
+  - name: bob-github
+```
+
+#### Usage
+
+**CLI Usage:**
+
+```bash
+# Recommended: Directory config (auto-finds both jira & pr configs)
+source .env.team-a
+ai-impact-analysis full --config config/team-a
+
+# Alternative: Specific files
+source .env.team-a
+ai-impact-analysis jira full --config config/team-a/jira_report_config.yaml
+ai-impact-analysis pr full --config config/team-a/pr_report_config.yaml
+
+# All other commands also support --config (see "Custom Config Files" section for full list)
+```
+
+**Docker Usage:**
+
+**Important:** The `--env-file` flag must be placed **before** `run`.
+
+```bash
+# Recommended: Directory config
+docker-compose --env-file .env.team-a run ai-impact-analysis \
+  full --config /app/config/team-a
+
+# Alternative: Specific files
+docker-compose --env-file .env.team-a run ai-impact-analysis \
+  jira full --config /app/config/team-a/jira_report_config.yaml
+
+docker-compose --env-file .env.team-a run ai-impact-analysis \
+  pr full --config /app/config/team-a/pr_report_config.yaml
+
+# All other commands also support --config (see "Custom Config Files" section for full list)
+```
+
+**Config Parameter Behavior:**
+- **Directory** (e.g., `config/team-a`): Auto-finds `jira_report_config.yaml` and `pr_report_config.yaml`
+- **Specific file** (e.g., `config/team-a/jira_report_config.yaml`): Uses that specific file
+
+#### Output Structure
+
+Each team's reports are isolated:
+
+```
+reports/
+├── team-a/
+│   ├── jira/
+│   │   ├── jira_report_general_*.txt
+│   │   ├── comparison_report_general_*.tsv
+│   │   └── combined_jira_report_*.tsv
+│   └── github/
+│       ├── pr_report_general_*.txt
+│       ├── pr_comparison_general_*.tsv
+│       └── combined_pr_report_*.tsv
+└── team-b/
+    ├── jira/
+    └── github/
+```
+
+#### Automation Scripts
+
+Create wrapper scripts for convenience:
+
+**scripts/run-team-analysis.sh:**
+```bash
+#!/bin/bash
+# Usage: ./scripts/run-team-analysis.sh team-a full
+
+TEAM=$1
+MODE=$2  # full, jira, or pr
+
+if [ -z "$TEAM" ] || [ -z "$MODE" ]; then
+    echo "Usage: $0 <team-name> <full|jira|pr>"
+    exit 1
+fi
+
+ENV_FILE=".env.$TEAM"
+CONFIG_DIR="config/$TEAM"
+
+if [ ! -f "$ENV_FILE" ]; then
+    echo "Error: Environment file $ENV_FILE not found"
+    exit 1
+fi
+
+if [ ! -d "$CONFIG_DIR" ]; then
+    echo "Error: Config directory $CONFIG_DIR not found"
+    exit 1
+fi
+
+echo "Running $MODE analysis for $TEAM..."
+docker-compose --env-file "$ENV_FILE" run ai-impact-analysis \
+  $MODE --config "/app/$CONFIG_DIR"
+```
+
+**Usage:**
+```bash
+chmod +x scripts/run-team-analysis.sh
+
+# Run full workflow for Team A
+./scripts/run-team-analysis.sh team-a full
+
+# Run only Jira analysis for Team B
+./scripts/run-team-analysis.sh team-b jira
+```
+
+#### Migration from Single Team
+
+If migrating from single-team setup:
+
+1. **Backup existing reports:**
+   ```bash
+   cp -r reports reports.backup
+   ```
+
+2. **Create team-specific structure:**
+   ```bash
+   mkdir -p config/team-default
+   cp config/*.yaml config/team-default/
+   ```
+
+3. **Update config with output_dir:**
+   ```yaml
+   output_dir: "reports/team-default/jira"
+   ```
+
+4. **Test new structure:**
+   ```bash
+   docker-compose run ai-impact-analysis verify
+   ```
+
+### Google Sheets Integration
 
 Reports can be **automatically uploaded** to Google Sheets if configured.
 
-### Setup (one-time)
+#### Setup (one-time)
 
 ```bash
 # 1. Install Google Sheets dependencies
@@ -199,22 +477,18 @@ pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-pyt
 #    - Download JSON key file
 #    - Note the Service Account email (client_email in JSON)
 
-# 3. Create Google Spreadsheet (recommended)
+# 3. Create Google Spreadsheet
 #    - Go to https://sheets.google.com and create new spreadsheet
-#    - Name it like: "AI Analysis - wlin"
+#    - Name it like: "AI Analysis - Team A"
 #    - Click "Share" and add Service Account email with Editor permission
 #    - Copy Spreadsheet ID from URL: https://docs.google.com/spreadsheets/d/[SPREADSHEET_ID]/edit
 
-# 4. Configure environment variables for automatic upload
+# 4. Configure environment variables
 export GOOGLE_CREDENTIALS_FILE="/path/to/service-account-key.json"
 export GOOGLE_SPREADSHEET_ID="1ABCdefGHI..."
-
-# Add to ~/.bashrc for persistence
-echo 'export GOOGLE_CREDENTIALS_FILE="/path/to/service-account-key.json"' >> ~/.bashrc
-echo 'export GOOGLE_SPREADSHEET_ID="1ABCdefGHI..."' >> ~/.bashrc
 ```
 
-### Usage
+#### Usage
 
 ```bash
 # Automatic upload (if environment variables configured)
@@ -224,69 +498,14 @@ ai-impact-analysis pr full      # Generates & auto-uploads PR reports
 # Skip upload with --no-upload flag
 ai-impact-analysis jira full --no-upload
 ai-impact-analysis pr full --no-upload
-
-# Manual upload of existing reports (advanced)
-python3 -m ai_impact_analysis.scripts.upload_to_sheets --report reports/comparison_report_wlin_*.tsv
-python3 -m ai_impact_analysis.scripts.upload_to_sheets --report reports/github/pr_comparison_wlin_*.tsv
 ```
 
-### Features
+#### Features
 
-- Each upload creates a new tab with timestamp (e.g., "wlin Report - 2025-10-24 14:30")
+- Each upload creates a new tab with timestamp (e.g., "Team A Report - 2024-12-01 14:30")
 - All previous tabs are preserved for historical tracking
 - You can use the same spreadsheet for both Jira and GitHub reports (different tabs)
 - If auto-upload not configured, scripts show manual upload instructions
-
-## Custom Configuration
-
-You can create a custom YAML file to override default settings. Only include the values you want to change:
-
-### Example Custom Config
-
-```yaml
-# my-config.yaml - Example custom config
-
-# Override only phases (keep default team members)
-phases:
-  - name: "Q1 2024"
-    start: "2024-01-01"
-    end: "2024-03-31"
-  - name: "Q2 2024"
-    start: "2024-04-01"
-    end: "2024-06-30"
-
-# Or override only team members (keep default phases)
-team_members:
-  - member: alice
-    email: alice@company.com
-    leave_days: 5
-    capacity: 1.0
-  - member: bob
-    email: bob@company.com
-    leave_days: 0
-    capacity: 0.5
-```
-
-### Using Custom Config
-
-```bash
-# Full report workflows with custom config
-ai-impact-analysis jira full --config my-config.yaml
-ai-impact-analysis pr full --config my-config.yaml
-
-# Specific report types
-ai-impact-analysis jira team --config my-config.yaml
-ai-impact-analysis jira member alice@company.com --config my-config.yaml
-
-# Advanced: For individual phase report (using script directly)
-python3 -m ai_impact_analysis.scripts.get_jira_metrics --start 2024-01-01 --end 2024-03-31 --config my-config.yaml
-```
-
-### How Config Merging Works
-
-- Values in custom config override defaults from `config/jira_report_config.yaml`
-- Missing values in custom config are taken from default config
-- This allows you to change only what you need without duplicating entire config
 
 ## Environment Variables
 
@@ -295,7 +514,7 @@ python3 -m ai_impact_analysis.scripts.get_jira_metrics --start 2024-01-01 --end 
 ```bash
 export JIRA_URL="https://issues.redhat.com"
 export JIRA_API_TOKEN="your_api_token_here"
-export JIRA_PROJECT_KEY="Konflux UI"
+export JIRA_PROJECT_KEY="Your Project Name"
 ```
 
 ### Required for GitHub PR Analysis
@@ -322,6 +541,8 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 ### Making Environment Variables Persistent
 
+**For CLI (single team):**
+
 Add to `~/.bashrc` or `~/.zshrc`:
 
 ```bash
@@ -342,8 +563,79 @@ export GOOGLE_SPREADSHEET_ID="your_sheet_id"
 
 Then reload: `source ~/.bashrc`
 
-### Authorized Emails for AI Detection
+**For multi-team:**
 
-Before running AI analysis commands, update the authorized emails list:
+Use separate `.env.team-name` files and load with:
+- **CLI**: `source .env.team-a` before running commands
+- **Docker**: `docker-compose --env-file .env.team-a run ...`
 
-Edit [`AI_authorized_emails.txt`](../AI_authorized_emails.txt) to include email addresses that should be analyzed for AI assistance.
+## Best Practices & Security
+
+### Security
+
+- ✅ **Keep `.env*` files in `.gitignore`** - Never commit credentials
+- ✅ **Use separate service accounts per team** - Better access control
+- ✅ **Rotate tokens regularly** - Minimize security risks
+- ✅ **Use minimal permissions** - Read-only access where possible
+
+### Organization
+
+- ✅ **Use consistent naming** - `.env.team-name`, `config/team-name/`
+- ✅ **Document team configurations** - Maintain a team registry
+- ✅ **Create template configs** - Easier to onboard new teams
+- ✅ **Centralize common phase definitions** - If teams share analysis periods
+
+### Maintenance
+
+- ✅ **Regular backups of reports** - Preserve historical data
+- ✅ **Version control for configs** - Track configuration changes (exclude `.env` files)
+- ✅ **Test new configurations** - Use `verify` command before full runs
+
+## Troubleshooting
+
+### Common Issues
+
+**1. No config files found:**
+```bash
+# Check if templates exist
+ls -la config/*.example
+
+# Copy templates
+cp config/jira_report_config.yaml.example config/jira_report_config.yaml
+cp config/pr_report_config.yaml.example config/pr_report_config.yaml
+```
+
+**2. Environment variables not loaded (Docker):**
+```bash
+# Verify which env is loaded
+docker-compose --env-file .env.team-a config | grep JIRA_PROJECT_KEY
+
+# Make sure --env-file is BEFORE run
+docker-compose --env-file .env.team-a run ai-impact-analysis verify
+```
+
+**3. Reports in wrong directory:**
+- Check `output_dir` in config file
+- Ensure path uses forward slashes (`reports/team-a/jira` not `reports\team-a\jira`)
+- Verify directory is writable
+
+**4. Config not found (multi-team):**
+```bash
+# CLI - Check if config exists
+ls -la config/team-a/
+
+# Docker - Check inside container
+docker-compose run ai-impact-analysis ls -la /app/config/team-a/
+```
+
+**5. Google Sheets upload fails:**
+- Verify service account email has Editor permission on spreadsheet
+- Check credentials file path is correct
+- Ensure Google Sheets API is enabled in Cloud Console
+
+**6. No team members found:**
+- Ensure config file exists (not just `.example` template)
+- Check YAML syntax is correct (proper indentation)
+- Verify team_members section is not empty
+
+For more help, check the [main README](../README.md) or open an issue on GitHub.

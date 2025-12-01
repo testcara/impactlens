@@ -97,6 +97,12 @@ def main():
         help="Output filename (default: auto-generated)",
         default=None,
     )
+    parser.add_argument(
+        "--reports-dir",
+        type=str,
+        help="Reports directory (default: reports/github)",
+        default="reports/github",
+    )
 
     args = parser.parse_args()
 
@@ -105,14 +111,14 @@ def main():
     config_file = project_root / "config" / "pr_report_config.yaml"
 
     try:
-        phases, _ = load_config_file(config_file)
+        phases, _, _ = load_config_file(config_file)
         phase_names = [phase[0] for phase in phases]  # Extract phase names
     except Exception as e:
         print(f"Warning: Could not load phase names from config: {e}")
         phase_names = []
 
     # Find matching reports
-    report_files = find_reports(args.author)
+    report_files = find_reports(args.author, reports_dir=args.reports_dir)
 
     if len(report_files) == 0:
         if args.author:
@@ -121,9 +127,9 @@ def main():
             print("Error: No general reports found")
         print("\nLooking for files matching pattern:")
         if args.author:
-            print(f"  reports/github/pr_metrics_{args.author}_*.json")
+            print(f"  {args.reports_dir}/pr_metrics_{args.author}_*.json")
         else:
-            print("  reports/github/pr_metrics_general_*.json")
+            print(f"  {args.reports_dir}/pr_metrics_general_*.json")
         return 1
 
     if len(report_files) < 2:
@@ -155,7 +161,7 @@ def main():
         report_generator=report_gen,
         phase_names=phase_names,
         identifier=args.author,
-        output_dir="reports/github",
+        output_dir=args.reports_dir,
         output_file=args.output,
         report_type="pr",
     )

@@ -49,6 +49,12 @@ def main():
         help="Work capacity for this member (0.0 to 1.0, e.g., '0.8' for 80%% time)",
         default=None,
     )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        help="Output directory for reports (default: reports/jira)",
+        default="reports/jira",
+    )
 
     args = parser.parse_args()
 
@@ -134,7 +140,9 @@ def main():
     print(report_text)
 
     # Save text report
-    report_filename = report_gen.save_text_report(report_text, assignee=args.assignee)
+    report_filename = report_gen.save_text_report(
+        report_text, assignee=args.assignee, output_dir=args.output_dir
+    )
     print(f"\nReport saved to: {report_filename}")
 
     # Generate and save JSON output (if dates are provided)
@@ -164,7 +172,7 @@ def main():
 
         # Save JSON output
         json_filename = report_gen.save_json_output(
-            json_output, args.start, args.end, assignee=args.assignee
+            json_output, args.start, args.end, assignee=args.assignee, output_dir=args.output_dir
         )
         print(f"Analysis results saved to: {json_filename}")
 

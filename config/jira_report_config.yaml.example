@@ -1,3 +1,8 @@
+# Output directory for reports (optional, for multi-team isolation)
+# If not specified, defaults to "reports/jira"
+# Example for team-specific isolation: "reports/team-a/jira"
+# output_dir: "reports/team-a/jira"
+
 phases:
   - name: "No AI Period"
     start: "2024-10-24"

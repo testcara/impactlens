@@ -24,6 +24,7 @@ A Python tool that quantifies the impact of AI coding assistants through objecti
 - **Measure AI ROI**: Compare development efficiency before and after AI tool adoption
 - **Data-Driven Decisions**: Use objective metrics (closure time, merge time, throughput) to evaluate AI effectiveness
 - **Team & Individual Insights**: Understand AI impact at organization and contributor levels
+- **Enterprise-Ready**: Multi-team support with isolated configs and reports for large organizations
 - **Automated Reporting**: Generate comprehensive reports with one command
 - **Shareable Results**: Auto-upload to Google Sheets for stakeholder visibility
 
@@ -219,12 +220,20 @@ Create `.env` file from template and add your credentials:
 
 ### Report Configuration
 
-Configure analysis phases and team members in YAML config files.
-Files: `config/jira_report_config.yaml` and `config/pr_report_config.yaml`
+Configure analysis phases and team members in YAML config files: `config/jira_report_config.yaml` and `config/pr_report_config.yaml`
 
-#### Phases Configuration
+**Default Setup (Single Team):**
 
-Define analysis phases (customize for your AI adoption timeline). You can define as many analysis periods as needed (dates in YYYY-MM-DD format).
+By default, the tool uses:
+- Config files: `config/jira_report_config.yaml`, `config/pr_report_config.yaml`
+- Output directories: `reports/jira/`, `reports/github/`
+- Environment: `.env` file
+
+Simply edit the config files in the `config/` directory with your team's information.
+
+#### Configuration Options
+
+**1. Phases** - Define analysis periods (required):
 
 ```yaml
 phases:
@@ -236,58 +245,77 @@ phases:
     end: "2024-12-31"
 ```
 
-#### Default Assignee/Author Configuration (Optional)
-
-For `config/jira_report_config.yaml`:
+**2. Team Members** - For individual reports (optional):
 
 ```yaml
-# "" = team reports, "email@company.com" = individual reports
-default_assignee: ""
-```
-
-For `config/pr_report_config.yaml`:
-
-```yaml
-# "" = team reports, "username" = individual reports
-default_author: ""
-```
-
-#### Team Members Configuration (Optional, for --all-members mode)
-
-For `config/jira_report_config.yaml`:
-
-```yaml
+# Jira config
 team_members:
   - member: alice
     email: alice@company.com
-    leave_days: 10 # Total leave days, or [10, 5] per phase
-    capacity: 1.0 # 1.0 = full time, 0.8 = 80%, or [1.0, 0.5] per phase
-  - member: bob
-    email: bob@company.com
-    leave_days: [5, 8] # Different per phase
-    capacity: [1.0, 0.0] # Left team in phase 2
-```
+    leave_days: 10      # or [10, 5] per phase
+    capacity: 1.0       # 1.0 = full time, or [1.0, 0.5] per phase
 
-For `config/pr_report_config.yaml`:
-
-```yaml
-# Team members (GitHub usernames)
+# PR config
 team_members:
   - name: alice-github
   - name: bob-github
 ```
 
-**Note:** If you only need Jira metrics, configure only Jira-related environment variables and config files. Same for PR metrics.
+**3. Default Assignee/Author** - Team vs individual (optional):
 
-#### Custom Configuration Files
+```yaml
+default_assignee: ""  # "" = team reports, "email@company.com" = individual
+default_author: ""    # "" = team reports, "username" = individual (PR config)
+```
 
-You can update the existing config files, or create custom YAML files and use the `--config` flag:
+**4. Output Directory** - Customize report location (optional):
+
+```yaml
+# Jira config
+output_dir: "reports/jira"              # Default
+output_dir: "reports/team-a/jira"       # Team-specific
+
+# PR config
+output_dir: "reports/github"            # Default
+output_dir: "reports/team-a/github"     # Team-specific
+```
+
+Essential for multi-team setups to isolate reports. If not specified, uses default directories.
+
+**Note:** If you only need Jira metrics, configure only Jira-related files. Same for PR metrics.
+
+#### Advanced: Custom Config Paths
+
+**Option 1: Custom Config File**
+
+Create your own config file and pass it with `--config`:
 
 ```bash
 ai-impact-analysis jira full --config my-custom-config.yaml
 ```
 
-**Note:** In your customized files, you don't need to specify all items mentioned above. Your customized files will be merged with the default config files in the `config/` directory.
+Your custom file will be merged with defaults from `config/` directory.
+
+**Option 2: Multi-Team Setup (Enterprise)**
+
+For organizations managing multiple teams, use separate config directories:
+
+```bash
+# Team A
+ai-impact-analysis full --config config/team-a
+docker-compose --env-file .env.team-a run ai-impact-analysis full --config /app/config/team-a
+
+# Team B
+ai-impact-analysis full --config config/team-b
+docker-compose --env-file .env.team-b run ai-impact-analysis full --config /app/config/team-b
+```
+
+**Multi-team isolation achieved through:**
+- **Config directories**: `config/team-a/`, `config/team-b/` (each with `jira_report_config.yaml` and `pr_report_config.yaml`)
+- **Environment files**: `.env.team-a`, `.env.team-b` (team-specific credentials)
+- **Output directories**: Configure `output_dir: "reports/team-a/jira"` in each team's config files
+
+➡️ **For complete configuration guide including multi-team setup, automation scripts, and best practices, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md)**
 
 ## Usage Examples
 
@@ -320,6 +348,12 @@ ai-impact-analysis full --with-claude-insights --claude-api-mode
 ai-impact-analysis jira full --no-upload
 ai-impact-analysis pr team --incremental
 ai-impact-analysis pr member testcara --incremental --no-upload
+
+# With custom config files (all commands support --config)
+ai-impact-analysis jira full --config config/team-a/jira_report_config.yaml
+ai-impact-analysis pr full --config config/team-a/pr_report_config.yaml
+ai-impact-analysis pr team --config config/team-a/pr_report_config.yaml --no-upload
+ai-impact-analysis pr member alice --config config/my-team/pr_report_config.yaml
 ```
 
 **Docker usage:**
@@ -500,7 +534,7 @@ Edit `config/analysis_prompt_template.yaml` to customize sections, output format
 
 ### For Users
 
-- **[Configuration Guide](docs/CONFIGURATION.md)** - Google Sheets integration, custom config files, environment variables
+- **[Configuration Guide](docs/CONFIGURATION.md)** - Complete configuration reference including Google Sheets, custom configs, multi-team setup, environment variables, and best practices
 - **[Metrics Guide](docs/METRICS_GUIDE.md)** - Detailed metric explanations, calculation formulas, interpretation guidelines
 
 ### For Contributors

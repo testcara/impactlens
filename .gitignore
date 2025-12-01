@@ -70,8 +70,8 @@ logs/
 *.key
 
 # Config files (user-specific configurations, not templates)
-config/jira_report_config.yaml
-config/pr_report_config.yaml
+config/*/jira_report_config.yaml
+config/*/pr_report_config.yaml
 
 # But keep config templates and directory structure
 !config/

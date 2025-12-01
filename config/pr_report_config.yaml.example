@@ -1,3 +1,8 @@
+# Output directory for reports (optional, for multi-team isolation)
+# If not specified, defaults to "reports/github"
+# Example for team-specific isolation: "reports/team-a/github"
+# output_dir: "reports/team-a/github"
+
 phases:
   - name: "No AI Period"
     start: "2024-10-24"

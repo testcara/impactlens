@@ -74,6 +74,12 @@ Examples:
         action="store_true",
         help="Incremental mode: only fetch PRs updated since last run (GraphQL only)",
     )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        help="Output directory for reports (default: reports/github)",
+        default="reports/github",
+    )
 
     args = parser.parse_args()
 
@@ -229,8 +235,12 @@ Examples:
             json.dump(output_data, f, indent=2, ensure_ascii=False)
         txt_file = None
     else:
-        json_file = report_gen.save_json_output(output_data, args.start, args.end, args.author)
-        txt_file = report_gen.save_text_report(text_report, args.start, args.end, args.author)
+        json_file = report_gen.save_json_output(
+            output_data, args.start, args.end, args.author, output_dir=args.output_dir
+        )
+        txt_file = report_gen.save_text_report(
+            text_report, args.start, args.end, args.author, output_dir=args.output_dir
+        )
 
     # Display report
     print("\n" + text_report)
