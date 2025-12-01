@@ -62,6 +62,12 @@ def main():
         help="Output filename (default: auto-generated)",
         default=None,
     )
+    parser.add_argument(
+        "--reports-dir",
+        type=str,
+        help="Reports directory (default: reports/jira)",
+        default="reports/jira",
+    )
     args = parser.parse_args()
 
     # Load phase configuration to get phase names
@@ -69,7 +75,7 @@ def main():
     config_file = project_root / "config" / "jira_report_config.yaml"
 
     try:
-        phases, _ = load_config_file(config_file)
+        phases, _, _ = load_config_file(config_file)
         phase_names = [phase[0] for phase in phases]  # Extract phase names
     except Exception as e:
         print(f"Warning: Could not load phase names from config: {e}")
@@ -85,7 +91,7 @@ def main():
                 print(f"Resolved '{args.assignee}' to '{email}'")
 
     # Find matching reports using resolved assignee
-    report_files = find_reports(resolved_assignee)
+    report_files = find_reports(resolved_assignee, reports_dir=args.reports_dir)
 
     if len(report_files) == 0:
         if args.assignee:
@@ -95,9 +101,9 @@ def main():
         print("\nLooking for files matching pattern:")
         if args.assignee:
             username = normalize_username(args.assignee)
-            print(f"  reports/jira/jira_report_{username}_*.txt")
+            print(f"  {args.reports_dir}/jira_report_{username}_*.txt")
         else:
-            print("  reports/jira/jira_report_general_*.txt")
+            print(f"  {args.reports_dir}/jira_report_general_*.txt")
         return 1
 
     if len(report_files) < 2:
@@ -130,7 +136,7 @@ def main():
         report_generator=report_gen,
         phase_names=phase_names,
         identifier=identifier,
-        output_dir="reports/jira",
+        output_dir=args.reports_dir,
         output_file=args.output,
         report_type="jira",
         phase_configs=phases,

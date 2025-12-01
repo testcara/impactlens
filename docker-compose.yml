@@ -9,7 +9,7 @@ services:
   # The CLI is fully accessible - any command that works with the CLI
   # works here by prefixing with "docker-compose run ai-impact-analysis"
   #
-  # Examples:
+  # Basic Examples:
   #   docker-compose run ai-impact-analysis --help
   #   docker-compose run ai-impact-analysis verify
   #   docker-compose run ai-impact-analysis full
@@ -17,6 +17,15 @@ services:
   #   docker-compose run ai-impact-analysis pr team --no-upload
   #   docker-compose run ai-impact-analysis pr member testcara --incremental
   #   docker-compose run ai-impact-analysis jira member user@example.com
+  #
+  # Multi-Team Usage (with custom env files and directory-based config):
+  #   docker-compose --env-file .env.team-a run ai-impact-analysis \
+  #     full --config /app/config/team-a
+  #
+  #   docker-compose --env-file .env.team-b run ai-impact-analysis \
+  #     full --config /app/config/team-b
+  #
+  # Note: --env-file must be placed BEFORE 'run' (docker-compose requirement)
   ai-impact-analysis:
     # Pre-built image from Quay.io (auto-built from master branch)
     image: quay.io/carawang/ai-impact-analysis:latest
@@ -135,6 +144,20 @@ services:
       echo '';
       echo '  # Custom config file';
       echo '  docker-compose run ai-impact-analysis jira full --config /app/config/custom.yaml';
+      echo '';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo 'MULTI-TEAM USAGE (Enterprise)';
+      echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+      echo '';
+      echo '  # Team A with custom env file and directory-based config';
+      echo '  docker-compose --env-file .env.team-a run ai-impact-analysis \\';
+      echo '    full --config /app/config/team-a';
+      echo '';
+      echo '  # Team B with custom env file and directory-based config';
+      echo '  docker-compose --env-file .env.team-b run ai-impact-analysis \\';
+      echo '    full --config /app/config/team-b';
+      echo '';
+      echo '  Note: --env-file must be placed BEFORE \"run\" (docker-compose requirement)';
       echo '';
       echo '╚════════════════════════════════════════════════════════════════════════╝';
       echo '';

@@ -65,9 +65,102 @@ def merge_configs(default_config: Dict[str, Any], custom_config: Dict[str, Any])
     return merged
 
 
+def validate_config_file(
+    custom_config_path: Optional[Path], default_config_path: Path, config_type: str = "config"
+) -> bool:
+    """
+    Validate that config files exist and are accessible.
+
+    Args:
+        custom_config_path: Path to custom config file (if specified by user)
+        default_config_path: Path to default config file
+        config_type: Type of config for error messages (e.g., "PR config", "Jira config")
+
+    Returns:
+        True if validation passes, False otherwise (with error message printed)
+    """
+    # Validate custom config file if specified
+    if custom_config_path:
+        if not custom_config_path.exists():
+            print(
+                f"{Colors.RED}Error: Specified {config_type} file does not exist: {custom_config_path}{Colors.NC}"
+            )
+            print(f"{Colors.YELLOW}Please check the path and try again.{Colors.NC}")
+            return False
+        if not custom_config_path.is_file():
+            print(
+                f"{Colors.RED}Error: Specified {config_type} path is not a file: {custom_config_path}{Colors.NC}"
+            )
+            print(f"{Colors.YELLOW}Please provide a valid config file path.{Colors.NC}")
+            return False
+
+    # Check if default config exists when no custom config is provided
+    if not custom_config_path and not default_config_path.exists():
+        print(
+            f"{Colors.RED}Error: Default {config_type} file not found: {default_config_path}{Colors.NC}"
+        )
+        print(
+            f"{Colors.YELLOW}Please create the config file or specify a custom config with --config{Colors.NC}"
+        )
+        return False
+
+    return True
+
+
+def load_and_resolve_config(
+    custom_config_path: Optional[Path],
+    default_config_path: Path,
+    default_reports_dir: Path,
+    config_type: str = "config",
+) -> Optional[Tuple[List[Tuple[str, str, str]], str, Path]]:
+    """
+    Validate, load config file, and resolve output directory.
+
+    This is a convenience function that integrates validation, loading, and output directory resolution.
+
+    Args:
+        custom_config_path: Path to custom config file (if specified by user)
+        default_config_path: Path to default config file
+        default_reports_dir: Default reports directory (e.g., project_root / "reports" / "jira")
+        config_type: Type of config for error messages (e.g., "PR config", "Jira config")
+
+    Returns:
+        Tuple of (phases, default_assignee_or_author, reports_dir) if successful, None if validation fails
+
+    Note:
+        Prints error messages and returns None on validation or loading errors.
+    """
+    # Step 1: Validate config files
+    if not validate_config_file(custom_config_path, default_config_path, config_type):
+        return None
+
+    # Step 2: Load configuration
+    try:
+        if custom_config_path:
+            # Merge custom config with default
+            phases, default_assignee_or_author, output_dir = load_config_file(
+                default_config_path, custom_config_path
+            )
+        else:
+            # Use default config only
+            phases, default_assignee_or_author, output_dir = load_config_file(default_config_path)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"{Colors.RED}Error loading config: {e}{Colors.NC}")
+        return None
+
+    # Step 3: Resolve output directory
+    if output_dir:
+        reports_dir = Path(output_dir)
+        print(f"{Colors.BLUE}Using custom output directory: {reports_dir}{Colors.NC}")
+    else:
+        reports_dir = default_reports_dir
+
+    return phases, default_assignee_or_author, reports_dir
+
+
 def load_config_file(
     config_path: Path, custom_config_path: Optional[Path] = None
-) -> Tuple[List[Tuple[str, str, str]], str]:
+) -> Tuple[List[Tuple[str, str, str]], str, Optional[str]]:
     """
     Load phase configuration from a YAML config file with optional custom config override.
 
@@ -76,8 +169,9 @@ def load_config_file(
         custom_config_path: Optional path to custom YAML config that overrides defaults
 
     Returns:
-        Tuple of (phases list, default assignee/author)
+        Tuple of (phases list, default assignee/author, output_dir)
         phases: List of (phase_name, start_date, end_date) tuples
+        output_dir: Optional custom output directory for team isolation
 
     Raises:
         FileNotFoundError: If config file doesn't exist
@@ -122,7 +216,10 @@ def load_config_file(
     # Extract default assignee/author
     default_assignee = config.get("default_assignee", "")
 
-    return phases, default_assignee
+    # Extract custom output directory (for team isolation)
+    output_dir = config.get("output_dir", None)
+
+    return phases, default_assignee, output_dir
 
 
 def load_team_members_from_yaml(config_path: Path, detailed: bool = False):

@@ -18,11 +18,11 @@ from typing import List, Optional
 from ai_impact_analysis.utils.workflow_utils import (
     Colors,
     get_project_root,
-    load_config_file,
     cleanup_old_reports,
     upload_to_google_sheets,
     find_latest_comparison_report,
     load_team_members,
+    load_and_resolve_config,
 )
 from ai_impact_analysis.utils.report_utils import normalize_username
 
@@ -45,6 +45,7 @@ def generate_phase_report(
     config_file: Optional[Path] = None,
     leave_days: int = 0,
     capacity: float = 1.0,
+    output_dir: Optional[str] = None,
 ) -> bool:
     """Generate report for a single phase."""
     args = [
@@ -68,6 +69,9 @@ def generate_phase_report(
     if capacity != 1.0:
         args.extend(["--capacity", str(capacity)])
 
+    if output_dir:
+        args.extend(["--output-dir", str(output_dir)])
+
     try:
         subprocess.run(args, check=True)
         return True
@@ -75,7 +79,9 @@ def generate_phase_report(
         return False
 
 
-def generate_comparison_report(assignee: Optional[str] = None) -> bool:
+def generate_comparison_report(
+    assignee: Optional[str] = None, output_dir: Optional[str] = None
+) -> bool:
     """Generate comparison report from phase reports."""
     args = [
         sys.executable,
@@ -85,6 +91,9 @@ def generate_comparison_report(assignee: Optional[str] = None) -> bool:
 
     if assignee:
         args.extend(["--assignee", assignee])
+
+    if output_dir:
+        args.extend(["--reports-dir", str(output_dir)])
 
     try:
         subprocess.run(args, check=True)
@@ -196,14 +205,17 @@ Examples:
     project_root = get_project_root()
     default_config_file = project_root / "config" / "jira_report_config.yaml"
     custom_config_file = Path(args.config) if args.config else None
+    default_reports_dir = project_root / "reports" / "jira"
 
-    # Use custom config if provided, otherwise use default
-    config_file = (
-        custom_config_file
-        if custom_config_file and custom_config_file.exists()
-        else default_config_file
+    # Validate, load config, and resolve output directory
+    result = load_and_resolve_config(
+        custom_config_file, default_config_file, default_reports_dir, "Jira config"
     )
-    reports_dir = project_root / "reports" / "jira"
+    if result is None:
+        return 1
+
+    phases, default_assignee, reports_dir = result
+    config_file = custom_config_file if custom_config_file else default_config_file
 
     # Handle --combine-only flag
     if args.combine_only:
@@ -236,18 +248,6 @@ Examples:
             "ai_impact_analysis.scripts.generate_jira_report",
             no_upload=args.no_upload,
         )
-
-    # Load configuration (with custom config merge if provided)
-    try:
-        if custom_config_file and custom_config_file.exists():
-            # Merge custom config with default
-            phases, default_assignee = load_config_file(default_config_file, custom_config_file)
-        else:
-            # Use default config only
-            phases, default_assignee = load_config_file(config_file)
-    except (FileNotFoundError, ValueError) as e:
-        print(f"{Colors.RED}Error loading config: {e}{Colors.NC}")
-        return 1
 
     # Determine assignee
     assignee = args.assignee or default_assignee or None
@@ -349,6 +349,7 @@ Examples:
             config_file=team_config_file,
             leave_days=phase_leave_days,
             capacity=phase_capacity,
+            output_dir=str(reports_dir),
         )
 
         if success:
@@ -362,7 +363,7 @@ Examples:
 
     # Generate comparison report
     print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
-    if not generate_comparison_report(assignee=assignee):
+    if not generate_comparison_report(assignee=assignee, output_dir=str(reports_dir)):
         print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")
         return 1
     print()

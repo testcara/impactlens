@@ -33,6 +33,83 @@ app.add_typer(pr_app, name="pr")
 console = Console()
 
 
+def _resolve_single_config(config_path: Path, config_filename: str) -> Path:
+    """
+    Internal helper: resolve a single config file path.
+
+    Args:
+        config_path: Path object (directory or file)
+        config_filename: Config filename to look for if directory
+
+    Returns:
+        Resolved config file path
+    """
+    if config_path.is_dir():
+        return config_path / config_filename
+    else:
+        return config_path
+
+
+def resolve_config_path(
+    config: Optional[str], config_filename: str, color: str = "cyan"
+) -> Optional[Path]:
+    """
+    Resolve config path - handles both directory and file paths.
+
+    Args:
+        config: Config path (directory or file) provided by user
+        config_filename: Config filename to look for if directory is provided
+        color: Color for console output (cyan, magenta, etc.)
+
+    Returns:
+        Resolved config file path, or None if config is None
+    """
+    if not config:
+        return None
+
+    config_path = Path(config)
+    resolved_path = _resolve_single_config(config_path, config_filename)
+
+    if config_path.is_dir():
+        console.print(f"[{color}]Using config directory: {config}[/{color}]")
+        console.print(f"  - Config file: {resolved_path}")
+    else:
+        console.print(f"[{color}]Using config file: {config}[/{color}]")
+
+    return resolved_path
+
+
+def resolve_config_paths_for_full(
+    config: Optional[str],
+) -> tuple[Optional[Path], Optional[Path]]:
+    """
+    Resolve both jira and pr config paths for full workflow.
+
+    Args:
+        config: Config path (directory or file) provided by user
+
+    Returns:
+        Tuple of (jira_config_path, pr_config_path)
+    """
+    if not config:
+        return None, None
+
+    config_path = Path(config)
+    jira_config = _resolve_single_config(config_path, "jira_report_config.yaml")
+    pr_config = _resolve_single_config(config_path, "pr_report_config.yaml")
+
+    if config_path.is_dir():
+        console.print(
+            f"[cyan]Using config directory: {config}[/cyan]\n"
+            f"  - Jira config: {jira_config}\n"
+            f"  - PR config: {pr_config}"
+        )
+    else:
+        console.print(f"[cyan]Using config file: {config}[/cyan]")
+
+    return jira_config, pr_config
+
+
 def run_script(script_path: str, args: list[str], description: str) -> int:
     """Run a Python script and display progress."""
     cmd = [sys.executable, "-m", script_path] + args
@@ -188,7 +265,11 @@ def jira_combine(
 
 @jira_app.command(name="full")
 def jira_full(
-    config: Optional[str] = typer.Option(None, "--config", help="Custom config file path"),
+    config: Optional[str] = typer.Option(
+        None,
+        "--config",
+        help="Config file path or directory (e.g., config/team-a/jira_report_config.yaml or config/team-a)",
+    ),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
@@ -202,11 +283,11 @@ def jira_full(
     """
     Complete Jira workflow: generate all reports and combine.
 
-    This command executes: team reports → member reports → combine → upload all.
+    Workflow: Team → Members → Combine → Upload (Claude insights optional with --with-claude-insights)
 
-    Claude insights are DISABLED by default. Use --with-claude-insights to enable.
-
-    Generates N+2 files: N member reports + 1 team + 1 combined.
+    Config parameter:
+    - Directory: config/team-a (auto-finds jira_report_config.yaml)
+    - Specific file: config/team-a/jira_report_config.yaml
     """
     workflow_steps = "Team → Members → Combine → Upload"
     if with_claude_insights:
@@ -219,13 +300,16 @@ def jira_full(
         )
     )
 
+    # Resolve config path (directory or specific file)
+    config_file_path = resolve_config_path(config, "jira_report_config.yaml", "cyan")
+
     failed_steps = []
 
     # Step 1: Generate team + all members
     console.print("\n[bold]Step 1/3:[/bold] Generating team + members reports...")
     args = ["--all-members"]
-    if config:
-        args.extend(["--config", config])
+    if config_file_path:
+        args.extend(["--config", str(config_file_path)])
     if no_upload:
         args.append("--no-upload")
 
@@ -235,8 +319,8 @@ def jira_full(
     # Step 2: Combine reports
     console.print("\n[bold]Step 2/3:[/bold] Combining reports...")
     args = ["--combine-only"]
-    if config:
-        args.extend(["--config", config])
+    if config_file_path:
+        args.extend(["--config", str(config_file_path)])
     if no_upload:
         args.append("--no-upload")
 
@@ -292,6 +376,7 @@ def jira_full(
 
 @pr_app.command(name="team")
 def pr_team(
+    config: Optional[str] = typer.Option(None, "--config", help="Custom config file path"),
     incremental: bool = typer.Option(False, "--incremental", help="Only fetch new/updated PRs"),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
 ):
@@ -305,6 +390,8 @@ def pr_team(
     )
 
     args = []
+    if config:
+        args.extend(["--config", config])
     if incremental:
         args.append("--incremental")
     if no_upload:
@@ -318,6 +405,7 @@ def pr_team(
 @pr_app.command(name="member")
 def pr_member(
     username: str = typer.Argument(..., help="GitHub username (e.g., wlin)"),
+    config: Optional[str] = typer.Option(None, "--config", help="Custom config file path"),
     incremental: bool = typer.Option(False, "--incremental", help="Only fetch new/updated PRs"),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
 ):
@@ -330,6 +418,8 @@ def pr_member(
     )
 
     args = [username]
+    if config:
+        args.extend(["--config", config])
     if incremental:
         args.append("--incremental")
     if no_upload:
@@ -342,6 +432,7 @@ def pr_member(
 
 @pr_app.command(name="members")
 def pr_members(
+    config: Optional[str] = typer.Option(None, "--config", help="Custom config file path"),
     incremental: bool = typer.Option(False, "--incremental", help="Only fetch new/updated PRs"),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
 ):
@@ -357,6 +448,8 @@ def pr_members(
     # Note: We need to manually iterate through members here
     # For now, using --all-members but this should be refactored
     args = ["--all-members"]
+    if config:
+        args.extend(["--config", config])
     if incremental:
         args.append("--incremental")
     if no_upload:
@@ -374,6 +467,7 @@ def pr_members(
 
 @pr_app.command(name="all")
 def pr_all(
+    config: Optional[str] = typer.Option(None, "--config", help="Custom config file path"),
     incremental: bool = typer.Option(False, "--incremental", help="Only fetch new/updated PRs"),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
 ):
@@ -387,6 +481,8 @@ def pr_all(
     )
 
     args = ["--all-members"]
+    if config:
+        args.extend(["--config", config])
     if incremental:
         args.append("--incremental")
     if no_upload:
@@ -399,6 +495,7 @@ def pr_all(
 
 @pr_app.command(name="combine")
 def pr_combine(
+    config: Optional[str] = typer.Option(None, "--config", help="Custom config file path"),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
 ):
     """COMBINE existing PR reports without regenerating."""
@@ -411,6 +508,8 @@ def pr_combine(
     )
 
     args = ["--combine-only"]
+    if config:
+        args.extend(["--config", config])
     if no_upload:
         args.append("--no-upload")
 
@@ -421,6 +520,11 @@ def pr_combine(
 
 @pr_app.command(name="full")
 def pr_full(
+    config: Optional[str] = typer.Option(
+        None,
+        "--config",
+        help="Config file path or directory (e.g., config/team-a/pr_report_config.yaml or config/team-a)",
+    ),
     incremental: bool = typer.Option(False, "--incremental", help="Only fetch new/updated PRs"),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
     with_claude_insights: bool = typer.Option(
@@ -435,11 +539,11 @@ def pr_full(
     """
     Complete PR workflow: generate all reports and combine.
 
-    This command executes: team reports → member reports → combine → upload all.
+    Workflow: Team → Members → Combine → Upload (Claude insights optional with --with-claude-insights)
 
-    Claude insights are DISABLED by default. Use --with-claude-insights to enable.
-
-    Generates N+2 files: N member reports + 1 team + 1 combined.
+    Config parameter:
+    - Directory: config/team-a (auto-finds pr_report_config.yaml)
+    - Specific file: config/team-a/pr_report_config.yaml
     """
     workflow_steps = "Team → Members → Combine → Upload"
     if with_claude_insights:
@@ -452,11 +556,16 @@ def pr_full(
         )
     )
 
+    # Resolve config path (directory or specific file)
+    config_file_path = resolve_config_path(config, "pr_report_config.yaml", "magenta")
+
     failed_steps = []
 
     # Step 1: Generate team + all members
     console.print("\n[bold]Step 1/3:[/bold] Generating team + members reports...")
     args = ["--all-members"]
+    if config_file_path:
+        args.extend(["--config", str(config_file_path)])
     if incremental:
         args.append("--incremental")
     if no_upload:
@@ -468,6 +577,8 @@ def pr_full(
     # Step 2: Combine reports
     console.print("\n[bold]Step 2/3:[/bold] Combining reports...")
     args = ["--combine-only"]
+    if config_file_path:
+        args.extend(["--config", str(config_file_path)])
     if no_upload:
         args.append("--no-upload")
 
@@ -523,6 +634,11 @@ def pr_full(
 
 @app.command(name="full")
 def full_workflow(
+    config: Optional[str] = typer.Option(
+        None,
+        "--config",
+        help="Config directory (e.g., config/team-a) or specific config file",
+    ),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
@@ -535,13 +651,14 @@ def full_workflow(
     ),
 ):
     """
-    Most comprehensive: Execute both Jira full + PR full workflows.
+    Complete workflow: Execute both Jira full + PR full workflows.
 
-    This runs complete Jira analysis followed by complete PR analysis.
+    Workflow: Jira (Team → Members → Combine) + PR (Team → Members → Combine) → Upload
+    (Claude insights optional with --with-claude-insights)
 
-    Claude insights are DISABLED by default. Use --with-claude-insights to enable.
-
-    Generates all Jira and GitHub PR reports.
+    Config parameter:
+    - Directory: config/team-a (auto-finds both jira_report_config.yaml and pr_report_config.yaml)
+    - Specific file: Uses for both workflows
     """
     console.print(
         Panel.fit(
@@ -550,6 +667,9 @@ def full_workflow(
             border_style="white",
         )
     )
+
+    # Resolve config paths (directory or specific files)
+    jira_config_path, pr_config_path = resolve_config_paths_for_full(config)
 
     failed_workflows = []
 
@@ -561,6 +681,8 @@ def full_workflow(
     jira_args = ["--all-members"]
     if no_upload:
         jira_args.append("--no-upload")
+    if jira_config_path:
+        jira_args.extend(["--config", str(jira_config_path)])
 
     # Jira: all
     if run_script("ai_impact_analysis.scripts.generate_jira_report", jira_args, "Jira all") != 0:
@@ -570,6 +692,8 @@ def full_workflow(
     jira_combine_args = ["--combine-only"]
     if no_upload:
         jira_combine_args.append("--no-upload")
+    if jira_config_path:
+        jira_combine_args.extend(["--config", str(jira_config_path)])
 
     if (
         run_script(
@@ -616,6 +740,8 @@ def full_workflow(
         pr_args.append("--incremental")
     if no_upload:
         pr_args.append("--no-upload")
+    if pr_config_path:
+        pr_args.extend(["--config", str(pr_config_path)])
 
     # PR: all
     if run_script("ai_impact_analysis.scripts.generate_pr_report", pr_args, "PR all") != 0:
@@ -625,6 +751,8 @@ def full_workflow(
     pr_combine_args = ["--combine-only"]
     if no_upload:
         pr_combine_args.append("--no-upload")
+    if pr_config_path:
+        pr_combine_args.extend(["--config", str(pr_config_path)])
 
     if (
         run_script("ai_impact_analysis.scripts.generate_pr_report", pr_combine_args, "PR combine")
