@@ -202,7 +202,20 @@ ai-impact-analysis full
 
 **Essential setup**:
 
-1. **Phases** (YAML) - Define before/after AI periods:
+1. **Project Settings** (YAML) - Define project/repo to analyze:
+   ```yaml
+   # Jira config (config/jira_report_config.yaml)
+   project:
+     jira_url: "https://issues.redhat.com"
+     jira_project_key: "KONFLUX"
+
+   # PR config (config/pr_report_config.yaml)
+   project:
+     github_repo_owner: "konflux-ci"
+     github_repo_name: "konflux-ui"
+   ```
+
+2. **Phases** (YAML) - Define before/after AI periods:
    ```yaml
    phases:
      - name: "Before AI"
@@ -213,17 +226,24 @@ ai-impact-analysis full
        end: "2024-12-31"
    ```
 
-2. **Credentials** (.env) - API tokens and passwords:
-   ```bash
-   cp .env.example .env
-   # Add: JIRA_API_TOKEN, GITHUB_TOKEN, etc.
-   ```
-
-3. **Team members** (YAML, optional) - For individual reports:
+3. **Team Members** (YAML) - Define team scope for filtering:
    ```yaml
+   # Jira: Only issues assigned to these members
    team_members:
      - member: alice
        email: alice@company.com
+
+   # PR: Only PRs authored by these members
+   team_members:
+     - name: alice-github
+     - name: bob-github
+   ```
+   Team reports aggregate only these members' data. Individual reports also generated.
+
+4. **Credentials** (.env) - API tokens and passwords:
+   ```bash
+   cp .env.example .env
+   # Add: JIRA_API_TOKEN, GITHUB_TOKEN, etc.
    ```
 
 ➡️ **For complete configuration reference including:**
