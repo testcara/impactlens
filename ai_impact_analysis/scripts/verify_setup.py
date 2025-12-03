@@ -219,6 +219,16 @@ def check_github_config() -> bool:
 
 def check_googlesheet_config() -> bool:
     """Check Google Sheets configuration and test authentication."""
+    # First check if Google Sheets API libraries are available
+    try:
+        import google.auth
+        import googleapiclient
+    except ImportError:
+        print_status(False, "Google Sheets API libraries not installed")
+        print("  Install with: pip install -e .")
+        print("  Note: Required for default upload behavior (use --no-upload to skip)")
+        return False
+
     creds_set = check_env_var("GOOGLE_CREDENTIALS_FILE")
     spreadsheet_id = os.getenv("GOOGLE_SPREADSHEET_ID")
     has_spreadsheet_id = check_env_var("GOOGLE_SPREADSHEET_ID", required=False)  # Optional

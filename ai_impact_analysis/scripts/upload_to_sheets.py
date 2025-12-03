@@ -54,9 +54,11 @@ try:
     from googleapiclient.errors import HttpError
     import socket
 except ImportError:
-    print("Error: Google Sheets API libraries not installed.")
+    print("Error: Google Sheets API libraries not installed.", file=sys.stderr)
+    print("Please install with: pip install -e .", file=sys.stderr)
     print(
-        "Please install with: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client"
+        "Or: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client",
+        file=sys.stderr,
     )
     sys.exit(1)
 
@@ -128,6 +130,7 @@ Note:
     # Derive sheet name from filename if not provided
     if not args.sheet_name:
         filename = Path(args.report).stem
+
         # Remove timestamp from filename for cleaner name
         # e.g., "comparison_report_wlin_20251022_111614" -> "Jira Report - wlin"
         # e.g., "pr_comparison_wlin_20251022_111614" -> "PR Report - wlin"
@@ -139,11 +142,11 @@ Note:
             args.sheet_name = "AI Analysis - PR"
         elif filename.startswith("ai_analysis_jira"):
             args.sheet_name = "AI Analysis - Jira"
-        # Check if it's a combined PR report
-        elif filename.startswith("combined_pr_report"):
+        # Check if it's a combined PR report (may have project prefix)
+        elif "combined_pr_report" in filename:
             args.sheet_name = "PR Report - Combined"
-        # Check if it's a combined Jira report
-        elif filename.startswith("combined_jira_report"):
+        # Check if it's a combined Jira report (may have project prefix)
+        elif "combined_jira_report" in filename:
             args.sheet_name = "Jira Report - Combined"
         # Check if it's a PR comparison report
         elif filename.startswith("pr_comparison_"):
@@ -170,6 +173,16 @@ Note:
                 normalized = normalize_username(parts[0])
                 args.sheet_name = f"Jira Report - {normalized}"
 
+    # Add project prefix to sheet name if available
+    if "jira" in args.sheet_name.lower():
+        project_key = os.getenv("JIRA_PROJECT_KEY", "")
+        if project_key:
+            args.sheet_name = f"{project_key} {args.sheet_name}"
+    elif "pr" in args.sheet_name.lower() or "ai analysis" in args.sheet_name.lower():
+        repo_name = os.getenv("GITHUB_REPO_NAME", "")
+        if repo_name:
+            args.sheet_name = f"{repo_name} {args.sheet_name}"
+
     print("\n📊 Uploading report to Google Sheets...")
     print(f"Report: {args.report}")
     print(f"Sheet name: {args.sheet_name}")
@@ -186,14 +199,14 @@ Note:
     try:
         creds = get_credentials(args.credentials)
     except Exception as e:
-        print(f"Error getting credentials: {e}")
+        print(f"Error getting credentials: {e}", file=sys.stderr)
         sys.exit(1)
 
     # Build service
     try:
         service = build_service(creds)
     except Exception as e:
-        print(f"Error building Google Sheets service: {e}")
+        print(f"Error building Google Sheets service: {e}", file=sys.stderr)
         sys.exit(1)
 
     # Read report data
@@ -212,7 +225,7 @@ Note:
             data = read_tsv_report(args.report)
             print(f"✓ Read {len(data)} rows")
     except Exception as e:
-        print(f"Error reading report file: {e}")
+        print(f"Error reading report file: {e}", file=sys.stderr)
         sys.exit(1)
 
     # Create or use existing spreadsheet
@@ -256,44 +269,52 @@ Note:
             )
 
     except HttpError as error:
-        print(f"\n❌ Google Sheets API error: {error}")
+        print(f"\n❌ Google Sheets API error: {error}", file=sys.stderr)
         if error.resp.status == 403:
-            print("\n💡 Permission Issue:")
-            print("   If using a service account, you must share the spreadsheet with:")
+            print("\n💡 Permission Issue:", file=sys.stderr)
+            print(
+                "   If using a service account, you must share the spreadsheet with:",
+                file=sys.stderr,
+            )
             sa_email = get_service_account_email()
             if sa_email:
-                print(f"   {sa_email}")
+                print(f"   {sa_email}", file=sys.stderr)
             else:
-                print("   The service account email (found in your credentials JSON file)")
-            print("\n   Steps:")
-            print("   1. Open the spreadsheet in Google Sheets")
-            print("   2. Click 'Share' button")
-            print("   3. Add the service account email with 'Editor' permission")
+                print(
+                    "   The service account email (found in your credentials JSON file)",
+                    file=sys.stderr,
+                )
+            print("\n   Steps:", file=sys.stderr)
+            print("   1. Open the spreadsheet in Google Sheets", file=sys.stderr)
+            print("   2. Click 'Share' button", file=sys.stderr)
+            print("   3. Add the service account email with 'Editor' permission", file=sys.stderr)
         elif error.resp.status == 404:
-            print("\n💡 Spreadsheet not found. Please check GOOGLE_SPREADSHEET_ID.")
+            print(
+                "\n💡 Spreadsheet not found. Please check GOOGLE_SPREADSHEET_ID.", file=sys.stderr
+            )
         sys.exit(1)
     except socket.timeout as e:
-        print(f"\n❌ Timeout error: {e}")
-        print("\n💡 Possible causes:")
-        print("   1. Network connectivity issues")
-        print("   2. Spreadsheet permission issues (see below)")
-        print("   3. Large data upload taking too long")
-        print("\n💡 If using a service account with GOOGLE_SPREADSHEET_ID:")
-        print("   Share the spreadsheet with your service account email:")
+        print(f"\n❌ Timeout error: {e}", file=sys.stderr)
+        print("\n💡 Possible causes:", file=sys.stderr)
+        print("   1. Network connectivity issues", file=sys.stderr)
+        print("   2. Spreadsheet permission issues (see below)", file=sys.stderr)
+        print("   3. Large data upload taking too long", file=sys.stderr)
+        print("\n💡 If using a service account with GOOGLE_SPREADSHEET_ID:", file=sys.stderr)
+        print("   Share the spreadsheet with your service account email:", file=sys.stderr)
         sa_email = get_service_account_email()
         if sa_email:
-            print(f"   {sa_email}")
+            print(f"   {sa_email}", file=sys.stderr)
         else:
-            print("   (Found in 'client_email' field of your credentials JSON)")
+            print("   (Found in 'client_email' field of your credentials JSON)", file=sys.stderr)
         sys.exit(1)
     except ValueError as e:
-        print(f"\n❌ {e}")
+        print(f"\n❌ {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n❌ Error: {e}", file=sys.stderr)
         import traceback
 
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
 
 

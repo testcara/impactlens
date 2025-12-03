@@ -28,12 +28,12 @@ try:
     from google.auth.transport.requests import Request
     from googleapiclient.discovery import build
     from googleapiclient.errors import HttpError
-except ImportError:
-    print("Error: Google Sheets API libraries not installed.")
-    print(
-        "Please install with: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client"
-    )
-    sys.exit(1)
+except ImportError as e:
+    raise ImportError(
+        "Google Sheets API libraries not installed. "
+        "Install with: pip install -e . "
+        "or: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client"
+    ) from e
 
 
 # If modifying these scopes, delete the file token.json.
@@ -60,8 +60,9 @@ def get_credentials(credentials_file=None, token_file="tmp/google_sheets_token.j
     if not credentials_file:
         credentials_file = os.getenv("GOOGLE_CREDENTIALS_FILE")
 
-    if not credentials_file or not os.path.exists(credentials_file):
-        print("Error: Google credentials file not found.")
+    if not credentials_file:
+        print("❌ Error: Google credentials file path not specified.")
+        print("\nℹ️  Google Sheets upload requires authentication.")
         print("\nSetup instructions:")
         print("1. Go to https://console.cloud.google.com")
         print("2. Create a project and enable Google Sheets API")
@@ -75,6 +76,19 @@ def get_credentials(credentials_file=None, token_file="tmp/google_sheets_token.j
         )
         sys.exit(1)
 
+    if not os.path.exists(credentials_file):
+        print(f"❌ Error: Google credentials file not found: {credentials_file}")
+        print(f"\nℹ️  The specified credentials file does not exist.")
+        print("\nPossible causes:")
+        print("  • File path is incorrect")
+        print("  • File was not created properly")
+        print("  • In CI/CD: GOOGLE_CREDENTIALS_BASE64 secret may be missing or invalid")
+        print("\nTo fix:")
+        print("  • Verify the file exists at the specified path")
+        print("  • Check that GOOGLE_CREDENTIALS_FILE environment variable is correct")
+        print("  • In GitHub Actions: Ensure GOOGLE_CREDENTIALS_BASE64 secret is set")
+        sys.exit(1)
+
     # Try Service Account first
     try:
         creds = service_account.Credentials.from_service_account_file(
@@ -82,8 +96,17 @@ def get_credentials(credentials_file=None, token_file="tmp/google_sheets_token.j
         )
         print("✓ Using Service Account authentication")
         return creds
-    except Exception:
-        pass
+    except ValueError as e:
+        print(f"❌ Error: Invalid service account credentials file: {credentials_file}")
+        print(f"   Details: {e}")
+        print("\nℹ️  The credentials file appears to be corrupted or invalid.")
+        print("   • Verify the file contains valid JSON")
+        print("   • Re-download the credentials from Google Cloud Console")
+        print("   • In CI/CD: Check that GOOGLE_CREDENTIALS_BASE64 is correctly base64-encoded")
+        sys.exit(1)
+    except Exception as e:
+        # Not a service account file, try OAuth 2.0 flow
+        print(f"Note: Not a service account file ({e}), trying OAuth 2.0...")
 
     # Fall back to OAuth 2.0
     # The token.json stores the user's access and refresh tokens

@@ -549,6 +549,8 @@ class PRReportGenerator:
 
         lines.append("")
         lines.append("For detailed metric explanations, see:")
-        lines.append("https://github.com/testcara/ai_impact_analysis#pr-report-metrics")
+        lines.append(
+            "https://github.com/testcara/ai_impact_analysis/blob/master/docs/METRICS_GUIDE.md"
+        )
 
         return "\n".join(lines)

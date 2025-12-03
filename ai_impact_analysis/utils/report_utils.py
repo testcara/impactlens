@@ -192,6 +192,7 @@ def generate_comparison_report(
     output_file: Optional[str] = None,
     report_type: str = "jira",
     phase_configs: Optional[List[Tuple[str, str, str]]] = None,
+    project_prefix: Optional[str] = None,
 ) -> str:
     """
     Generate comparison report from multiple phase reports.
@@ -207,6 +208,7 @@ def generate_comparison_report(
         output_file: Optional custom output filename
         report_type: "jira" or "pr" for file naming
         phase_configs: Optional list of (name, start_date, end_date) tuples from config (for displaying phase dates)
+        project_prefix: Optional prefix for filename (e.g., project_key for Jira, repo_name for PR)
 
     Returns:
         Path to generated comparison report file
@@ -266,11 +268,17 @@ def generate_comparison_report(
         else:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # Build filename
+        # Build filename with optional project prefix
         if identifier:
-            filename = f"{report_type}_comparison_{identifier}_{timestamp}.tsv"
+            base_filename = f"{report_type}_comparison_{identifier}_{timestamp}.tsv"
         else:
-            filename = f"{report_type}_comparison_general_{timestamp}.tsv"
+            base_filename = f"{report_type}_comparison_general_{timestamp}.tsv"
+
+        # Add project prefix if provided
+        if project_prefix:
+            filename = f"{project_prefix}_{base_filename}"
+        else:
+            filename = base_filename
 
         output_path = os.path.join(output_dir, filename)
 
@@ -289,7 +297,10 @@ def generate_comparison_report(
 
 
 def combine_comparison_reports(
-    reports_dir: str, report_type: str = "jira", title: Optional[str] = None
+    reports_dir: str,
+    report_type: str = "jira",
+    title: Optional[str] = None,
+    project_prefix: Optional[str] = None,
 ) -> str:
     """
     Combine all individual member comparison reports into a single report grouped by metric.
@@ -301,6 +312,7 @@ def combine_comparison_reports(
         reports_dir: Directory containing comparison reports
         report_type: "jira" or "pr"
         title: Optional title for the combined report
+        project_prefix: Optional prefix for filename (e.g., project_key for Jira, repo_name for PR)
 
     Returns:
         Path to generated combined report file
@@ -450,9 +462,19 @@ def combine_comparison_reports(
 
         lines.append("")  # Empty line between sections
 
-    # Determine output filename
+    # Determine output filename with optional project prefix
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = reports_dir / f"combined_{report_type}_report_{timestamp}.tsv"
+    base_filename = f"combined_{report_type}_report_{timestamp}.tsv"
+
+    # Add project prefix if provided
+    if project_prefix:
+        # Normalize project prefix for filename (replace spaces and special chars with underscores)
+        normalized_prefix = project_prefix.replace(" ", "_").replace("-", "_")
+        filename = f"{normalized_prefix}_{base_filename}"
+    else:
+        filename = base_filename
+
+    output_file = reports_dir / filename
 
     # Write output
     with open(output_file, "w", encoding="utf-8") as f:

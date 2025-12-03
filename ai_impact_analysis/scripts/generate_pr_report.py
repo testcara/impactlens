@@ -73,7 +73,9 @@ def generate_phase_metrics(
 
 
 def generate_comparison_report(
-    author: Optional[str] = None, output_dir: Optional[str] = None
+    author: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    config_file: Optional[Path] = None,
 ) -> bool:
     """Generate comparison report from phase metrics."""
     args = [
@@ -88,6 +90,9 @@ def generate_comparison_report(
     if output_dir:
         args.extend(["--reports-dir", str(output_dir)])
 
+    if config_file:
+        args.extend(["--config", str(config_file)])
+
     try:
         subprocess.run(args, check=True)
         return True
@@ -99,9 +104,19 @@ def generate_all_members_reports(
     team_members_file: Path,
     script_name: str,
     no_upload: bool = False,
+    upload_members: bool = False,
     config_file: Optional[Path] = None,
 ) -> int:
-    """Generate reports for all team members."""
+    """
+    Generate reports for all team members.
+
+    Args:
+        team_members_file: Path to config file with team members
+        script_name: Script module name to invoke
+        no_upload: If True, skip all uploads
+        upload_members: If True, upload member reports (default: False, only team report is uploaded)
+        config_file: Optional custom config file path
+    """
     print_header("Generating reports for all team members")
 
     members = load_team_members(team_members_file)
@@ -109,7 +124,7 @@ def generate_all_members_reports(
         print(f"{Colors.RED}Error: No team members found in {team_members_file}{Colors.NC}")
         return 1
 
-    # Generate team overall report first
+    # Generate team overall report first (always upload unless --no-upload)
     print(f"{Colors.BLUE}>>> Generating Team Overall Report{Colors.NC}")
     print()
     cmd = [sys.executable, "-m", script_name]
@@ -125,6 +140,7 @@ def generate_all_members_reports(
     print()
 
     # Generate individual reports for each member
+    # Only upload if --upload-members is specified (and --no-upload is not set)
     failed_members = []
     for member in members:
         print(f"{Colors.BLUE}>>> Generating Report for: {member}{Colors.NC}")
@@ -132,7 +148,8 @@ def generate_all_members_reports(
         cmd = [sys.executable, "-m", script_name, member]
         if config_file:
             cmd.extend(["--config", str(config_file)])
-        if no_upload:
+        # Skip upload for member reports unless --upload-members is specified
+        if no_upload or not upload_members:
             cmd.append("--no-upload")
         result = subprocess.run(cmd)
         if result.returncode != 0:
@@ -200,6 +217,11 @@ Examples:
         help="Skip uploading report to Google Sheets",
     )
     parser.add_argument(
+        "--upload-members",
+        action="store_true",
+        help="Upload individual member reports to Google Sheets (default: only team and combined reports)",
+    )
+    parser.add_argument(
         "--config",
         type=str,
         help="Path to custom config file (default: config/pr_report_config.yaml)",
@@ -256,6 +278,7 @@ Examples:
             config_file,  # Use same config file for team members
             "ai_impact_analysis.scripts.generate_pr_report",
             no_upload=args.no_upload,
+            upload_members=args.upload_members,
             config_file=config_file,
         )
 
@@ -303,7 +326,9 @@ Examples:
 
     # Generate comparison report
     print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
-    if not generate_comparison_report(author=author, output_dir=str(reports_dir)):
+    if not generate_comparison_report(
+        author=author, output_dir=str(reports_dir), config_file=config_file
+    ):
         print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")
         return 1
     print()
