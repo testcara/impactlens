@@ -244,6 +244,32 @@ tox -e github-integration
 
 **Note:** Integration tests make real API calls and are slow. Run unit tests during development.
 
+#### CI Integration Tests (Automated)
+
+When you commit Python code changes, CI automatically runs integration tests using test configs:
+
+```bash
+# Test configs are in config/test/
+# - jira_report_config.yaml: 2-week test period, 2 members
+# - pr_report_config.yaml: 2-week test period, 2 members
+
+# You can run the same tests locally:
+python -m ai_impact_analysis.cli jira full \
+  --config config/test/jira_report_config.yaml \
+  --no-upload
+
+python -m ai_impact_analysis.cli pr full \
+  --config config/test/pr_report_config.yaml \
+  --no-upload
+```
+
+**CI Workflow:**
+1. **Trigger**: Python code changes (`.py`, `pyproject.toml`, `requirements.txt`)
+2. **Steps**: Unit tests → Lint → Type check → **Integration test**
+3. **Output**: Test reports uploaded as artifacts (7-day retention)
+
+This validates the full pipeline executes correctly with real API calls.
+
 ### Manual Testing Workflow
 
 **Test CLI commands:**
