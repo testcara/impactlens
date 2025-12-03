@@ -116,6 +116,9 @@ ai-impact-analysis/
 │   ├── jira_report_config.yaml.example  # Jira config template
 │   ├── pr_report_config.yaml.example    # PR config template
 │   ├── analysis_prompt_template.yaml    # AI analysis prompts
+│   ├── test/                     # CI integration test configs
+│   │   ├── jira_report_config.yaml
+│   │   └── pr_report_config.yaml
 │   ├── team-a/                   # Team-specific configs (multi-team)
 │   │   ├── jira_report_config.yaml
 │   │   └── pr_report_config.yaml
@@ -157,7 +160,7 @@ ai-impact-analysis/
 2. **Generate reports via PR**:
    ```bash
    git checkout -b report/my-team-2024-12
-   git add config/my-team/
+   git add -f config/my-team/  # -f forces adding ignored config files
    git commit -m "chore: generate AI impact report for my-team"
    git push origin report/my-team-2024-12
    # Create PR → CI auto-generates reports → View in PR comments

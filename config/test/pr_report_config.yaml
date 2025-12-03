@@ -1,0 +1,23 @@
+# Test configuration for CI integration testing
+# This config uses a small date range and minimal team members for fast testing
+
+project:
+  github_repo_owner: "konflux-ci"
+  github_repo_name: "konflux-ui"
+
+phases:
+  - name: "Test Period 1"
+    start: "2024-11-11"
+    end: "2024-11-14"
+  - name: "Test Period 2"
+    start: "2024-11-15"
+    end: "2024-11-18"
+
+default_author: "" # "" represent team
+
+team_members:
+  - name: testcara
+  - name: sahil143
+
+# Use test output directory to avoid polluting main reports
+output_dir: "reports/test/github"

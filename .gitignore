@@ -73,6 +73,10 @@ logs/
 config/*/jira_report_config.yaml
 config/*/pr_report_config.yaml
 
+# But keep test configs for CI integration testing
+!config/test/
+!config/test/*.yaml
+
 # But keep config templates and directory structure
 !config/
 !config/*.example

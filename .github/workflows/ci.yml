@@ -3,8 +3,20 @@ name: CI
 on:
   push:
     branches: [ master ]
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - 'requirements.txt'
+      - 'config/test/**'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [ master ]
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - 'requirements.txt'
+      - 'config/test/**'
+      - '.github/workflows/ci.yml'
 
 jobs:
   test:
@@ -51,3 +63,98 @@ jobs:
       uses: codecov/codecov-action@v4
       with:
         fail_ci_if_error: false
+
+  integration-test:
+    name: Integration Test (Full Pipeline)
+    runs-on: ubuntu-latest
+    needs: test
+    # Only run if credentials are available
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Run integration test - Jira reports
+        env:
+          JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          if [ -z "$JIRA_API_TOKEN" ]; then
+            echo "⚠️  JIRA_API_TOKEN not set, skipping Jira integration test"
+            exit 0
+          fi
+
+          echo "=========================================="
+          echo "Running Jira Integration Test"
+          echo "=========================================="
+
+          python -m ai_impact_analysis.cli jira full \
+            --config config/test/jira_report_config.yaml \
+            --no-upload
+
+          echo ""
+          echo "✓ Jira integration test completed"
+          ls -lh reports/test/jira/ || echo "No reports generated"
+
+      - name: Run integration test - PR reports
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=========================================="
+          echo "Running PR Integration Test"
+          echo "=========================================="
+          echo "Command: python -m ai_impact_analysis.cli pr full --config config/test/pr_report_config.yaml --no-upload"
+          echo ""
+
+          python -m ai_impact_analysis.cli pr full \
+            --config config/test/pr_report_config.yaml \
+            --no-upload
+
+          echo ""
+          echo "✓ PR integration test completed"
+          ls -lh reports/test/github/ || echo "No reports generated"
+
+      - name: Upload test reports as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-reports
+          path: reports/test/
+          retention-days: 7
+
+      - name: Integration test summary
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "Integration Test Summary"
+          echo "=========================================="
+          echo ""
+          echo "Test configuration used:"
+          echo "  - Jira: config/test/jira_report_config.yaml"
+          echo "  - PR: config/test/pr_report_config.yaml"
+          echo ""
+          echo "Reports generated in: reports/test/"
+          echo ""
+          if [ -d "reports/test/jira" ]; then
+            echo "Jira reports:"
+            find reports/test/jira -type f -name "*.tsv" -o -name "*.txt" | head -5
+          fi
+          echo ""
+          if [ -d "reports/test/github" ]; then
+            echo "PR reports:"
+            find reports/test/github -type f -name "*.tsv" -o -name "*.txt" | head -5
+          fi
+          echo ""
+          echo "✓ Integration test pipeline completed successfully"

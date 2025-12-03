@@ -224,6 +224,9 @@ The tool is **completely flexible** - the examples use `team-a` for clarity.
 ```
 ai-analysis/
 ├── config/
+│   ├── test/                     # CI integration test configs (internal use)
+│   │   ├── jira_report_config.yaml
+│   │   └── pr_report_config.yaml
 │   ├── team-a/
 │   │   ├── jira_report_config.yaml
 │   │   └── pr_report_config.yaml
@@ -234,6 +237,9 @@ ai-analysis/
 │       ├── jira_report_config.yaml
 │       └── pr_report_config.yaml
 ├── reports/
+│   ├── test/                     # CI test reports (auto-generated)
+│   │   ├── jira/
+│   │   └── github/
 │   ├── team-a/
 │   │   ├── jira/
 │   │   └── github/
