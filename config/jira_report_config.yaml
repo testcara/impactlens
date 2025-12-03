@@ -1,18 +1,8 @@
 # Project configuration (non-sensitive settings)
-# These settings can be safely version-controlled
 project:
-  # Jira project settings
-  jira_url: "https://issues.redhat.com"  # Jira instance URL
-  jira_project_key: "Konflux UI"  # Jira project key or name
-
-  # Google Sheets settings (optional)
-  # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
-  # If you do not set, would upload the default google-sheet.
-
-# Output directory for reports (optional, for multi-team isolation)
-# If not specified, defaults to "reports/jira"
-# Example for team-specific isolation: "reports/team-a/jira"
-# output_dir: "reports/team-a/jira"
+  jira_url: "https://issues.redhat.com"
+  jira_project_key: "Konflux UI"
+  google_spreadsheet_id: "1UZakjytgKZbtpHaY15kdN43lR5ranS1v9djVRjUi_SA"
 
 phases:
   - name: "No AI Period"

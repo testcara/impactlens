@@ -112,7 +112,7 @@ def load_and_resolve_config(
     default_config_path: Path,
     default_reports_dir: Path,
     config_type: str = "config",
-) -> Optional[Tuple[List[Tuple[str, str, str]], str, Path]]:
+) -> Optional[Tuple[List[Tuple[str, str, str]], str, Path, Dict[str, Any]]]:
     """
     Validate, load config file, and resolve output directory.
 
@@ -125,7 +125,8 @@ def load_and_resolve_config(
         config_type: Type of config for error messages (e.g., "PR config", "Jira config")
 
     Returns:
-        Tuple of (phases, default_assignee_or_author, reports_dir) if successful, None if validation fails
+        Tuple of (phases, default_assignee_or_author, reports_dir, project_settings) if successful,
+        None if validation fails
 
     Note:
         Prints error messages and returns None on validation or loading errors.
@@ -138,12 +139,14 @@ def load_and_resolve_config(
     try:
         if custom_config_path:
             # Merge custom config with default
-            phases, default_assignee_or_author, output_dir = load_config_file(
+            phases, default_assignee_or_author, output_dir, project_settings = load_config_file(
                 default_config_path, custom_config_path
             )
         else:
             # Use default config only
-            phases, default_assignee_or_author, output_dir = load_config_file(default_config_path)
+            phases, default_assignee_or_author, output_dir, project_settings = load_config_file(
+                default_config_path
+            )
     except (FileNotFoundError, ValueError) as e:
         print(f"{Colors.RED}Error loading config: {e}{Colors.NC}")
         return None
@@ -155,12 +158,12 @@ def load_and_resolve_config(
     else:
         reports_dir = default_reports_dir
 
-    return phases, default_assignee_or_author, reports_dir
+    return phases, default_assignee_or_author, reports_dir, project_settings
 
 
 def load_config_file(
     config_path: Path, custom_config_path: Optional[Path] = None
-) -> Tuple[List[Tuple[str, str, str]], str, Optional[str]]:
+) -> Tuple[List[Tuple[str, str, str]], str, Optional[str], Dict[str, Any]]:
     """
     Load phase configuration from a YAML config file with optional custom config override.
 
@@ -169,9 +172,11 @@ def load_config_file(
         custom_config_path: Optional path to custom YAML config that overrides defaults
 
     Returns:
-        Tuple of (phases list, default assignee/author, output_dir)
+        Tuple of (phases, default_assignee, output_dir, project_settings)
         phases: List of (phase_name, start_date, end_date) tuples
+        default_assignee: Default assignee/author (empty string for team)
         output_dir: Optional custom output directory for team isolation
+        project_settings: Dict with project configuration (jira_url, github_repo_owner, etc.)
 
     Raises:
         FileNotFoundError: If config file doesn't exist
@@ -219,7 +224,25 @@ def load_config_file(
     # Extract custom output directory (for team isolation)
     output_dir = config.get("output_dir", None)
 
-    return phases, default_assignee, output_dir
+    # Extract project settings (non-sensitive configuration)
+    project_settings = config.get("project", {})
+
+    # Apply project settings to environment variables (config overrides env)
+    # This allows config files to override .env settings
+    env_mappings = {
+        "jira_url": "JIRA_URL",
+        "jira_project_key": "JIRA_PROJECT_KEY",
+        "github_repo_owner": "GITHUB_REPO_OWNER",
+        "github_repo_name": "GITHUB_REPO_NAME",
+        "google_spreadsheet_id": "GOOGLE_SPREADSHEET_ID",
+    }
+
+    for config_key, env_var in env_mappings.items():
+        config_value = project_settings.get(config_key)
+        if config_value:  # Config has value, override environment variable
+            os.environ[env_var] = str(config_value)
+
+    return phases, default_assignee, output_dir, project_settings
 
 
 def load_team_members_from_yaml(config_path: Path, detailed: bool = False):

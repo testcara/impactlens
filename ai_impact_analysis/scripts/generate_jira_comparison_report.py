@@ -75,7 +75,7 @@ def main():
     config_file = project_root / "config" / "jira_report_config.yaml"
 
     try:
-        phases, _, _ = load_config_file(config_file)
+        phases, _, _, _ = load_config_file(config_file)
         phase_names = [phase[0] for phase in phases]  # Extract phase names
     except Exception as e:
         print(f"Warning: Could not load phase names from config: {e}")

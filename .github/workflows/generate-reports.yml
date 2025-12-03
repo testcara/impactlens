@@ -1,0 +1,147 @@
+name: Generate AI Impact Reports
+
+on:
+  # Trigger when config files are modified in PRs
+  pull_request:
+    paths:
+      - 'config/**/jira_report_config.yaml'
+      - 'config/**/pr_report_config.yaml'
+
+  # Allow manual trigger with team selection
+  workflow_dispatch:
+    inputs:
+      team:
+        description: 'Team config directory (e.g., konfluxui)'
+        required: false
+        default: ''
+      report_type:
+        description: 'Report type to generate'
+        required: true
+        type: choice
+        options:
+          - both
+          - jira
+          - pr
+        default: 'both'
+
+jobs:
+  generate-reports:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for git diff
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Setup Google Credentials
+        if: secrets.GOOGLE_CREDENTIALS_BASE64 != ''
+        run: |
+          echo "${{ secrets.GOOGLE_CREDENTIALS_BASE64 }}" | base64 -d > /tmp/google-credentials.json
+          echo "GOOGLE_CREDENTIALS_FILE=/tmp/google-credentials.json" >> $GITHUB_ENV
+
+      - name: Determine config path
+        id: config
+        run: |
+          if [ -n "${{ github.event.inputs.team }}" ]; then
+            # Manual trigger with team specified
+            CONFIG_DIR="config/${{ github.event.inputs.team }}"
+            echo "Using manually specified team: ${{ github.event.inputs.team }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PR trigger - detect which config changed
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+            echo "Comparing $BASE_SHA...$HEAD_SHA"
+            CHANGED_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA)
+            echo "Changed files:"
+            echo "$CHANGED_FILES"
+
+            # Extract config directory from changed files
+            CONFIG_DIR=$(echo "$CHANGED_FILES" | grep -E '^config/[^/]+/' | head -1 | cut -d/ -f1,2)
+
+            # If no team-specific config changed, use root config
+            if [ -z "$CONFIG_DIR" ] || [ "$CONFIG_DIR" = "config" ]; then
+              CONFIG_DIR="config"
+            fi
+          else
+            # Default to root config
+            CONFIG_DIR="config"
+          fi
+
+          echo "config_dir=$CONFIG_DIR" >> $GITHUB_OUTPUT
+          echo "Using config directory: $CONFIG_DIR"
+
+      - name: Generate Jira Report
+        if: github.event.inputs.report_type == 'jira' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == ''
+        env:
+          JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+        run: |
+          CONFIG_PATH="${{ steps.config.outputs.config_dir }}/jira_report_config.yaml"
+          if [ -f "$CONFIG_PATH" ]; then
+            echo "Generating Jira report with config: $CONFIG_PATH"
+            python -m ai_impact_analysis.cli jira full \
+              --config "$CONFIG_PATH" \
+              --no-upload
+          else
+            echo "Jira config not found at $CONFIG_PATH, skipping"
+          fi
+
+      - name: Generate PR Report
+        if: github.event.inputs.report_type == 'pr' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+        run: |
+          CONFIG_PATH="${{ steps.config.outputs.config_dir }}/pr_report_config.yaml"
+          if [ -f "$CONFIG_PATH" ]; then
+            echo "Generating PR report with config: $CONFIG_PATH"
+            python -m ai_impact_analysis.cli pr full \
+              --config "$CONFIG_PATH" \
+              --no-upload
+          else
+            echo "PR config not found at $CONFIG_PATH, skipping"
+          fi
+
+      - name: Upload Reports as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-impact-reports
+          path: |
+            reports/**/*.tsv
+            reports/**/*.json
+            reports/**/*.txt
+          retention-days: 30
+
+      - name: Comment on PR with Report Summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Find the latest comparison reports
+            const reportsDir = 'reports';
+            let comment = '## 📊 AI Impact Analysis Reports Generated\n\n';
+            comment += 'Reports have been generated based on your configuration changes.\n\n';
+            comment += '📥 Download the artifacts from the workflow run to view detailed reports.\n';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              body: comment
+            });

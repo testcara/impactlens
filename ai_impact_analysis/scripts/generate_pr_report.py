@@ -219,7 +219,7 @@ Examples:
     if result is None:
         return 1
 
-    phases, default_author, reports_dir = result
+    phases, default_author, reports_dir, project_settings = result
     config_file = custom_config_file if custom_config_file else default_config_file
 
     # Handle --combine-only flag
