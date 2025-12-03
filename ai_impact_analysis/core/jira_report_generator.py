@@ -670,6 +670,8 @@ class JiraReportGenerator:
 
         lines.append("")
         lines.append("For detailed metric explanations, see:")
-        lines.append("https://github.com/testcara/ai_impact_analysis#jira-report-metrics")
+        lines.append(
+            "https://github.com/testcara/ai_impact_analysis/blob/master/docs/METRICS_GUIDE.md"
+        )
 
         return "\n".join(lines)

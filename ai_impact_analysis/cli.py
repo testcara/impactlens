@@ -271,6 +271,11 @@ def jira_full(
         help="Config file path or directory (e.g., config/team-a/jira_report_config.yaml or config/team-a)",
     ),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
+    upload_members: bool = typer.Option(
+        False,
+        "--upload-members",
+        help="Upload individual member reports (default: only team/combined)",
+    ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
     ),
@@ -312,6 +317,8 @@ def jira_full(
         args.extend(["--config", str(config_file_path)])
     if no_upload:
         args.append("--no-upload")
+    if upload_members:
+        args.append("--upload-members")
 
     if run_script("ai_impact_analysis.scripts.generate_jira_report", args, "Jira all reports") != 0:
         failed_steps.append("Jira all reports")
@@ -527,6 +534,11 @@ def pr_full(
     ),
     incremental: bool = typer.Option(False, "--incremental", help="Only fetch new/updated PRs"),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
+    upload_members: bool = typer.Option(
+        False,
+        "--upload-members",
+        help="Upload individual member reports (default: only team/combined)",
+    ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
     ),
@@ -570,6 +582,8 @@ def pr_full(
         args.append("--incremental")
     if no_upload:
         args.append("--no-upload")
+    if upload_members:
+        args.append("--upload-members")
 
     if run_script("ai_impact_analysis.scripts.generate_pr_report", args, "PR all reports") != 0:
         failed_steps.append("PR all reports")
@@ -640,6 +654,11 @@ def full_workflow(
         help="Config directory (e.g., config/team-a) or specific config file",
     ),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
+    upload_members: bool = typer.Option(
+        False,
+        "--upload-members",
+        help="Upload individual member reports (default: only team/combined)",
+    ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
     ),
@@ -681,6 +700,8 @@ def full_workflow(
     jira_args = ["--all-members"]
     if no_upload:
         jira_args.append("--no-upload")
+    if upload_members:
+        jira_args.append("--upload-members")
     if jira_config_path:
         jira_args.extend(["--config", str(jira_config_path)])
 
@@ -740,6 +761,8 @@ def full_workflow(
         pr_args.append("--incremental")
     if no_upload:
         pr_args.append("--no-upload")
+    if upload_members:
+        pr_args.append("--upload-members")
     if pr_config_path:
         pr_args.extend(["--config", str(pr_config_path)])
 

@@ -1,3 +1,13 @@
+# Project configuration (non-sensitive settings)
+# These settings can be safely version-controlled
+project:
+  # GitHub repository settings
+  github_repo_owner: "konflux-ci"  # GitHub repository owner/organization
+  github_repo_name: "konflux-ui"  # GitHub repository name
+
+  # Google Sheets settings (optional)
+  google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
+
 # Output directory for reports (optional, for multi-team isolation)
 # If not specified, defaults to "reports/github"
 # Example for team-specific isolation: "reports/team-a/github"

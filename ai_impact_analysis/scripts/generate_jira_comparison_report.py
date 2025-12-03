@@ -68,18 +68,28 @@ def main():
         help="Reports directory (default: reports/jira)",
         default="reports/jira",
     )
+    parser.add_argument(
+        "--config",
+        type=str,
+        help="Path to custom config YAML file",
+        default=None,
+    )
     args = parser.parse_args()
 
     # Load phase configuration to get phase names
     project_root = get_project_root()
-    config_file = project_root / "config" / "jira_report_config.yaml"
+    default_config_file = project_root / "config" / "jira_report_config.yaml"
+    custom_config_file = Path(args.config) if args.config else None
 
     try:
-        phases, _, _ = load_config_file(config_file)
+        phases, _, _, _ = load_config_file(default_config_file, custom_config_file)
         phase_names = [phase[0] for phase in phases]  # Extract phase names
     except Exception as e:
         print(f"Warning: Could not load phase names from config: {e}")
         phase_names = []
+
+    # Use custom config if provided, otherwise use default
+    config_file = custom_config_file if custom_config_file else default_config_file
 
     # Resolve member identifier (supports both "wlin" and "wlin@redhat.com")
     resolved_assignee = args.assignee
@@ -123,8 +133,15 @@ def main():
         print(f"  Phase {i}: {f}")
     print()
 
-    # Use phase names from config if available, otherwise use generic names
-    if not phase_names or len(phase_names) < len(report_files):
+    # Use phase names from config, limit report files to match config phases
+    if phase_names and len(report_files) > len(phase_names):
+        print(
+            f"Warning: Found {len(report_files)} reports but config only has {len(phase_names)} phases"
+        )
+        print(f"Using only the {len(phase_names)} most recent reports to match config")
+        report_files = sorted(report_files)[-len(phase_names) :]
+    elif not phase_names:
+        # No config available, use generic names for all found reports
         phase_names = [f"Phase {i+1}" for i in range(len(report_files))]
 
     # Generate comparison report using shared utility

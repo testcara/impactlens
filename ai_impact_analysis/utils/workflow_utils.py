@@ -71,6 +71,11 @@ def validate_config_file(
     """
     Validate that config files exist and are accessible.
 
+    Design:
+    - If custom config specified, it must exist (default is optional for merging)
+    - If no custom config, default config must exist
+    - If both exist, they will be merged
+
     Args:
         custom_config_path: Path to custom config file (if specified by user)
         default_config_path: Path to default config file
@@ -79,7 +84,7 @@ def validate_config_file(
     Returns:
         True if validation passes, False otherwise (with error message printed)
     """
-    # Validate custom config file if specified
+    # Validate custom config file if specified (it must exist)
     if custom_config_path:
         if not custom_config_path.exists():
             print(
@@ -93,9 +98,12 @@ def validate_config_file(
             )
             print(f"{Colors.YELLOW}Please provide a valid config file path.{Colors.NC}")
             return False
+        # Custom config exists and is valid
+        # Default config is optional (will be used for merging if it exists)
+        return True
 
-    # Check if default config exists when no custom config is provided
-    if not custom_config_path and not default_config_path.exists():
+    # No custom config provided, so default config must exist
+    if not default_config_path.exists():
         print(
             f"{Colors.RED}Error: Default {config_type} file not found: {default_config_path}{Colors.NC}"
         )
@@ -112,7 +120,7 @@ def load_and_resolve_config(
     default_config_path: Path,
     default_reports_dir: Path,
     config_type: str = "config",
-) -> Optional[Tuple[List[Tuple[str, str, str]], str, Path]]:
+) -> Optional[Tuple[List[Tuple[str, str, str]], str, Path, Dict[str, Any]]]:
     """
     Validate, load config file, and resolve output directory.
 
@@ -125,7 +133,8 @@ def load_and_resolve_config(
         config_type: Type of config for error messages (e.g., "PR config", "Jira config")
 
     Returns:
-        Tuple of (phases, default_assignee_or_author, reports_dir) if successful, None if validation fails
+        Tuple of (phases, default_assignee_or_author, reports_dir, project_settings) if successful,
+        None if validation fails
 
     Note:
         Prints error messages and returns None on validation or loading errors.
@@ -138,12 +147,14 @@ def load_and_resolve_config(
     try:
         if custom_config_path:
             # Merge custom config with default
-            phases, default_assignee_or_author, output_dir = load_config_file(
+            phases, default_assignee_or_author, output_dir, project_settings = load_config_file(
                 default_config_path, custom_config_path
             )
         else:
             # Use default config only
-            phases, default_assignee_or_author, output_dir = load_config_file(default_config_path)
+            phases, default_assignee_or_author, output_dir, project_settings = load_config_file(
+                default_config_path
+            )
     except (FileNotFoundError, ValueError) as e:
         print(f"{Colors.RED}Error loading config: {e}{Colors.NC}")
         return None
@@ -155,50 +166,84 @@ def load_and_resolve_config(
     else:
         reports_dir = default_reports_dir
 
-    return phases, default_assignee_or_author, reports_dir
+    return phases, default_assignee_or_author, reports_dir, project_settings
 
 
 def load_config_file(
     config_path: Path, custom_config_path: Optional[Path] = None
-) -> Tuple[List[Tuple[str, str, str]], str, Optional[str]]:
+) -> Tuple[List[Tuple[str, str, str]], str, Optional[str], Dict[str, Any]]:
     """
     Load phase configuration from a YAML config file with optional custom config override.
+
+    Design:
+    1. If custom config exists AND default config exists → merge (custom overrides default)
+    2. If custom config exists BUT default config does NOT exist → use custom directly
+    3. If default config exists WITHOUT custom config → use default
 
     Args:
         config_path: Path to default YAML configuration file
         custom_config_path: Optional path to custom YAML config that overrides defaults
 
     Returns:
-        Tuple of (phases list, default assignee/author, output_dir)
+        Tuple of (phases, default_assignee, output_dir, project_settings)
         phases: List of (phase_name, start_date, end_date) tuples
+        default_assignee: Default assignee/author (empty string for team)
         output_dir: Optional custom output directory for team isolation
+        project_settings: Dict with project configuration (jira_url, github_repo_owner, etc.)
 
     Raises:
-        FileNotFoundError: If config file doesn't exist
+        FileNotFoundError: If required config file doesn't exist
         ValueError: If config format is invalid
     """
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
+    config = None
 
-    try:
-        with open(config_path, "r") as f:
-            config = yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML format in {config_path}: {e}")
-
-    if not config:
-        raise ValueError(f"Empty config file: {config_path}")
-
-    # Merge with custom config if provided
+    # Case 1 & 2: Custom config provided
     if custom_config_path and custom_config_path.exists():
+        # Load custom config
         try:
             with open(custom_config_path, "r") as f:
                 custom_config = yaml.safe_load(f)
-            if custom_config:
-                config = merge_configs(config, custom_config)
-                print(f"[INFO] Merged custom config from: {custom_config_path}")
         except yaml.YAMLError as e:
-            print(f"[WARNING] Invalid YAML format in custom config {custom_config_path}: {e}")
+            raise ValueError(f"Invalid YAML format in {custom_config_path}: {e}")
+
+        if not custom_config:
+            raise ValueError(f"Empty config file: {custom_config_path}")
+
+        # Case 1: If default config also exists, merge them (custom overrides default)
+        if config_path.exists():
+            try:
+                with open(config_path, "r") as f:
+                    default_config = yaml.safe_load(f)
+                if default_config:
+                    config = merge_configs(default_config, custom_config)
+                    print(
+                        f"[INFO] Merged custom config {custom_config_path} with default {config_path}"
+                    )
+                else:
+                    config = custom_config
+            except yaml.YAMLError as e:
+                print(f"[WARNING] Invalid YAML in default config {config_path}: {e}")
+                config = custom_config
+        else:
+            # Case 2: Only custom config exists, use it directly
+            config = custom_config
+            print(f"[INFO] Using custom config: {custom_config_path}")
+
+    # Case 3: No custom config, use default
+    else:
+        if not config_path.exists():
+            raise FileNotFoundError(f"Config file not found: {config_path}")
+
+        try:
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML format in {config_path}: {e}")
+
+        if not config:
+            raise ValueError(f"Empty config file: {config_path}")
+
+        print(f"[INFO] Using default config: {config_path}")
 
     # Extract phases
     phases = []
@@ -219,7 +264,25 @@ def load_config_file(
     # Extract custom output directory (for team isolation)
     output_dir = config.get("output_dir", None)
 
-    return phases, default_assignee, output_dir
+    # Extract project settings (non-sensitive configuration)
+    project_settings = config.get("project", {})
+
+    # Apply project settings to environment variables (config overrides env)
+    # This allows config files to override .env settings
+    env_mappings = {
+        "jira_url": "JIRA_URL",
+        "jira_project_key": "JIRA_PROJECT_KEY",
+        "github_repo_owner": "GITHUB_REPO_OWNER",
+        "github_repo_name": "GITHUB_REPO_NAME",
+        "google_spreadsheet_id": "GOOGLE_SPREADSHEET_ID",
+    }
+
+    for config_key, env_var in env_mappings.items():
+        config_value = project_settings.get(config_key)
+        if config_value:  # Config has value, override environment variable
+            os.environ[env_var] = str(config_value)
+
+    return phases, default_assignee, output_dir, project_settings
 
 
 def load_team_members_from_yaml(config_path: Path, detailed: bool = False):
@@ -310,12 +373,18 @@ def cleanup_old_reports(reports_dir: Path, identifier: str, report_type: str) ->
             f"pr_report_{identifier}_*.txt",
             f"pr_comparison_{identifier}_*.tsv",
         ]
+        # Also clean combined reports for the "general" identifier (team report)
+        if identifier == "general":
+            patterns.append(f"combined_pr_report_*.tsv")
     elif report_type == "jira":
         patterns = [
             f"jira_metrics_{identifier}_*.json",
             f"jira_report_{identifier}_*.txt",
             f"jira_comparison_{identifier}_*.tsv",
         ]
+        # Also clean combined reports for the "general" identifier (team report)
+        if identifier == "general":
+            patterns.append(f"combined_jira_report_*.tsv")
     else:
         raise ValueError(f"Unknown report type: {report_type}")
 
@@ -373,7 +442,7 @@ def upload_to_google_sheets(
     if credentials and spreadsheet_id:
         print(f"{Colors.YELLOW}📤 Uploading to Google Sheets...{Colors.NC}")
         try:
-            subprocess.run(
+            result = subprocess.run(
                 [
                     sys.executable,
                     "-m",
@@ -382,12 +451,29 @@ def upload_to_google_sheets(
                     str(report_file),
                 ],
                 check=True,
+                capture_output=True,
+                text=True,
             )
+            # Print stdout from upload script
+            if result.stdout:
+                print(result.stdout, end="")
             print(f"{Colors.GREEN}   ✓ Upload successful{Colors.NC}")
             print()
             return True
         except subprocess.CalledProcessError as e:
             print(f"{Colors.RED}   ⚠ Upload failed: {e}{Colors.NC}")
+            # Print stderr to show actual error details
+            if e.stderr:
+                print(f"{Colors.RED}   Error details (stderr):{Colors.NC}")
+                print(e.stderr)
+            # Also print stdout in case error is there
+            if e.stdout:
+                print(f"{Colors.RED}   Output (stdout):{Colors.NC}")
+                print(e.stdout)
+            if not e.stderr and not e.stdout:
+                print(
+                    f"{Colors.RED}   No error output captured. Exit code: {e.returncode}{Colors.NC}"
+                )
             if show_manual_instructions:
                 print("   You can upload manually:")
                 print(
