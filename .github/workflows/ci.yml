@@ -86,6 +86,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
+      - name: Restore GitHub PR cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/github
+          key: integration-test-pr-cache-${{ hashFiles('config/test/pr_report_config.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            integration-test-pr-cache-${{ hashFiles('config/test/pr_report_config.yaml') }}-
+            integration-test-pr-cache-
+
       - name: Run integration test - Jira reports
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
@@ -115,12 +124,13 @@ jobs:
           echo "=========================================="
           echo "Running PR Integration Test"
           echo "=========================================="
-          echo "Command: python -m ai_impact_analysis.cli pr full --config config/test/pr_report_config.yaml --no-upload"
+          echo "Command: python -m ai_impact_analysis.cli pr full --config config/test/pr_report_config.yaml --no-upload --incremental"
           echo ""
 
           python -m ai_impact_analysis.cli pr full \
             --config config/test/pr_report_config.yaml \
-            --no-upload
+            --no-upload \
+            --incremental
 
           echo ""
           echo "✓ PR integration test completed"
