@@ -515,7 +515,7 @@ Examples:
 
         return 0
 
-    # Prompt preview mode: just display the prompt
+    # Prompt preview mode: display and save the prompt
     if args.prompt_only:
         logger.info("")
         logger.info("=" * 80)
@@ -524,14 +524,25 @@ Examples:
         logger.info("")
         print(prompt)
         logger.info("")
+
+        # Save prompt to file
+        report_name = Path(report_path).name
+        output_dir_path = Path(args.output_dir)
+        output_dir_path.mkdir(parents=True, exist_ok=True)
+        prompt_file = output_dir_path / f"analysis_prompt_{report_name.replace('.tsv', '.txt')}"
+
+        with open(prompt_file, "w", encoding="utf-8") as f:
+            f.write(prompt)
+
+        logger.info(f"💾 Prompt saved to: {prompt_file}")
+        logger.info("")
         logger.info("=" * 80)
         logger.info("📋 NEXT STEPS")
         logger.info("=" * 80)
         logger.info("")
-        logger.info("1. Copy the analysis prompt above")
-        logger.info("2. Run: claude")
-        logger.info("3. Paste the prompt to get analysis")
-        logger.info("4. Save the result using --save-analysis flag")
+        logger.info("1. Copy the prompt from the file above")
+        logger.info("2. Paste into any AI assistant (Claude, ChatGPT, Gemini, etc.)")
+        logger.info("3. Get instant analysis and insights")
         logger.info("")
         return 0
 

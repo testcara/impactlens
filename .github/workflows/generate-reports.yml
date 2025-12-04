@@ -72,6 +72,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
+      - name: Restore GitHub PR cache
+        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        uses: actions/cache@v4
+        with:
+          path: .cache/github
+          key: github-pr-cache-${{ hashFiles('config/**/pr_report_config.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            github-pr-cache-${{ hashFiles('config/**/pr_report_config.yaml') }}-
+            github-pr-cache-
+
       - name: Setup Google Credentials
         if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
         run: |
@@ -174,12 +184,40 @@ jobs:
           CONFIG_PATH="${{ steps.config.outputs.config_dir }}/pr_report_config.yaml"
           if [ -f "$CONFIG_PATH" ]; then
             echo "Generating PR report with config: $CONFIG_PATH"
-            echo "Running command: python -m ai_impact_analysis.cli pr full --config \"$CONFIG_PATH\""
+            echo "Running command: python -m ai_impact_analysis.cli pr full --config \"$CONFIG_PATH\" --incremental"
             python -m ai_impact_analysis.cli pr full \
-              --config "$CONFIG_PATH"
+              --config "$CONFIG_PATH" \
+              --incremental
           else
             echo "PR config not found at $CONFIG_PATH, skipping"
           fi
+
+      - name: Generate Analysis Prompts
+        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        run: |
+          echo "Generating AI analysis prompts for combined reports..."
+
+          # Find and generate prompts for Jira combined reports
+          for report in reports/**/combined_jira_report_*.tsv; do
+            if [ -f "$report" ]; then
+              echo "Generating prompt for: $report"
+              python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+                --report "$report" \
+                --prompt-only || echo "Warning: Failed to generate prompt for $report"
+            fi
+          done
+
+          # Find and generate prompts for PR combined reports
+          for report in reports/**/combined_pr_report_*.tsv; do
+            if [ -f "$report" ]; then
+              echo "Generating prompt for: $report"
+              python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+                --report "$report" \
+                --prompt-only || echo "Warning: Failed to generate prompt for $report"
+            fi
+          done
+
+          echo "✓ Analysis prompts generated"
 
       - name: Upload Reports as Artifacts
         if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
@@ -192,11 +230,40 @@ jobs:
             reports/**/*.txt
           retention-days: 30
 
+      - name: Collect Report Statistics
+        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        id: report_stats
+        run: |
+          # Count different types of files
+          JSON_COUNT=$(find reports -name "*.json" -type f 2>/dev/null | wc -l)
+          COMPARISON_COUNT=$(find reports -name "*comparison*.tsv" -type f 2>/dev/null | wc -l)
+          COMBINED_COUNT=$(find reports -name "*combined*.tsv" -type f 2>/dev/null | wc -l)
+          TOTAL_TSV=$(find reports -name "*.tsv" -type f 2>/dev/null | wc -l)
+          PROMPT_COUNT=$(find reports -name "analysis_prompt_*.txt" -type f 2>/dev/null | wc -l)
+
+          echo "json_count=$JSON_COUNT" >> $GITHUB_OUTPUT
+          echo "comparison_count=$COMPARISON_COUNT" >> $GITHUB_OUTPUT
+          echo "combined_count=$COMBINED_COUNT" >> $GITHUB_OUTPUT
+          echo "total_tsv=$TOTAL_TSV" >> $GITHUB_OUTPUT
+          echo "prompt_count=$PROMPT_COUNT" >> $GITHUB_OUTPUT
+
+          echo "Report statistics:"
+          echo "  JSON files: $JSON_COUNT"
+          echo "  Comparison TSV files: $COMPARISON_COUNT"
+          echo "  Combined TSV files: $COMBINED_COUNT"
+          echo "  Total TSV files: $TOTAL_TSV"
+          echo "  Analysis prompts: $PROMPT_COUNT"
+
       - name: Comment on PR - Success
         if: github.event_name == 'pull_request' && success() && steps.check_files.outputs.skip != 'true'
         continue-on-error: true
         env:
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+          JSON_COUNT: ${{ steps.report_stats.outputs.json_count }}
+          COMPARISON_COUNT: ${{ steps.report_stats.outputs.comparison_count }}
+          COMBINED_COUNT: ${{ steps.report_stats.outputs.combined_count }}
+          TOTAL_TSV: ${{ steps.report_stats.outputs.total_tsv }}
+          PROMPT_COUNT: ${{ steps.report_stats.outputs.prompt_count }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -205,19 +272,33 @@ jobs:
               ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}`
               : null;
 
+            const jsonCount = process.env.JSON_COUNT || '0';
+            const comparisonCount = process.env.COMPARISON_COUNT || '0';
+            const combinedCount = process.env.COMBINED_COUNT || '0';
+            const totalTsv = process.env.TOTAL_TSV || '0';
+            const promptCount = process.env.PROMPT_COUNT || '0';
+
+            const artifactsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
             let body = '## ✅ Reports Generated Successfully\n\n';
 
+            // File statistics
+            body += `📊 **Generated**: ${jsonCount} JSON | ${totalTsv} TSV (${comparisonCount} comparison + ${combinedCount} combined)`;
+
+            // Links
             if (sheetsUrl) {
-              body += `📊 **View Reports**: [Google Sheets](${sheetsUrl})\n\n`;
-            } else {
-              body += '📊 Reports generated successfully. Download from workflow artifacts.\n\n';
+              body += ` | [View in Google Sheets](${sheetsUrl})`;
+            }
+            body += ` | [Download All Files](${artifactsUrl})\n\n`;
+
+            // AI Analysis prompts
+            if (parseInt(promptCount) > 0) {
+              body += `🤖 **AI Analysis Ready**: ${promptCount} analysis prompt(s) generated | [Download Prompts](${artifactsUrl})\n\n`;
+              body += '> 💡 **Tip**: Copy any prompt file and paste into Claude, ChatGPT, or Gemini to get instant insights!\n\n';
             }
 
             body += '---\n\n';
-            body += '⚠️ **Important Notes**:\n';
-            body += '- ❌ **DO NOT MERGE** this PR - Config-only PRs are for report generation\n';
-            body += '- 📊 Reports have been uploaded to Google Sheets (see link above)\n';
-            body += '- 🔒 Please **manually close** this PR after reviewing the reports\n';
+            body += '⚠️ **Important**: ❌ DO NOT MERGE - 🔒 Manually close this PR after reviewing reports\n';
 
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
