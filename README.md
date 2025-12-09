@@ -1,6 +1,6 @@
-# AI Impact Analysis
+# ImpactLens
 
-**A data-driven tool to quantify the impact of AI coding assistants on development efficiency through Jira and GitHub metrics.**
+A data-driven tool that delivers actionable insights for measuring AI coding assistant ROI and enabling objective performance reviews through Jira and GitHub metrics analysis.
 
 ## Table of Contents
 
@@ -17,16 +17,16 @@
 
 ## Overview
 
-A Python tool that quantifies the impact of AI coding assistants through objective, data-driven metrics from Jira and GitHub.
+ImpactLens helps engineering leaders and teams measure the real-world impact of AI coding assistants by analyzing development metrics from Jira and GitHub. Get objective insights into productivity changes, team performance, and AI tool ROI.
 
 **Business Value:**
 
 - **Measure AI ROI**: Compare development efficiency before and after AI tool adoption
-- **Data-Driven Decisions**: Use objective metrics (closure time, merge time, throughput) to evaluate AI effectiveness
-- **Team & Individual Insights**: Understand AI impact at organization and contributor levels
-- **Enterprise-Ready**: Multi-team support with isolated configs and reports for large organizations
+- **Objective Metrics**: Track closure time, merge time, throughput, and more to evaluate AI effectiveness
+- **Team & Individual Insights**: Understand AI impact at team and contributor levels
+- **Multi-Team Support**: Isolated configs and reports for multiple teams
 - **Automated Reporting**: Generate comprehensive reports with one command
-- **Shareable Results**: Auto-upload to Google Sheets for stakeholder visibility
+- **Easy Sharing**: Auto-upload to Google Sheets for stakeholder visibility
 
 **Use Cases:**
 
@@ -149,6 +149,7 @@ ai-impact-analysis/
 **Prerequisites:** GitHub repository access only - CI pre-configured!
 
 1. **Clone & create team config**:
+
    ```bash
    git clone https://github.com/testcara/ai_impact_analysis.git
    cd ai_impact_analysis
@@ -158,6 +159,7 @@ ai-impact-analysis/
    ```
 
 2. **Generate reports via PR**:
+
    ```bash
    git checkout -b report/my-team-2024-12
    git add -f config/my-team/  # -f forces adding ignored config files
@@ -171,7 +173,13 @@ ai-impact-analysis/
    - Download from workflow artifacts
    - **Manually close PR** after reviewing (DO NOT MERGE config-only PRs)
 
-> **Note:** Uses default credentials. For custom credentials/sheets, see [Configuration Guide](docs/CONFIGURATION.md)
+> **Note:** Uses default credentials and default Google Sheet.
+>
+> **For custom Google Sheets**: Add your spreadsheet ID to config, then **grant Editor access** to CI service account: `cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com`
+>
+> 🔒 **Privacy**: This service account can only access sheets you explicitly share with it. No access to your other Google Drive files.
+>
+> For detailed setup, see [Configuration Guide](docs/CONFIGURATION.md)
 
 ---
 
@@ -203,6 +211,7 @@ ai-impact-analysis full
 **Essential setup**:
 
 1. **Project Settings** (YAML) - Define project/repo to analyze:
+
    ```yaml
    # Jira config (config/jira_report_config.yaml)
    project:
@@ -216,6 +225,7 @@ ai-impact-analysis full
    ```
 
 2. **Phases** (YAML) - Define before/after AI periods:
+
    ```yaml
    phases:
      - name: "Before AI"
@@ -227,6 +237,7 @@ ai-impact-analysis full
    ```
 
 3. **Team Members** (YAML) - Define team scope for filtering:
+
    ```yaml
    # Jira: Only issues assigned to these members
    team_members:
@@ -238,6 +249,7 @@ ai-impact-analysis full
      - name: alice-github
      - name: bob-github
    ```
+
    Team reports aggregate only these members' data. Individual reports also generated.
 
 4. **Credentials** (.env) - API tokens and passwords:
@@ -247,6 +259,7 @@ ai-impact-analysis full
    ```
 
 ➡️ **For complete configuration reference including:**
+
 - Multi-team setup & isolation
 - Google Sheets integration
 - Custom config paths
@@ -323,6 +336,7 @@ The `full` command workflow: Get metrics → Generate reports → Upload reports
 - `--rest-api` - Use REST API instead of GraphQL for Jira metrics (default: GraphQL, ~30% faster)
 
 **Upload Behavior:**
+
 - **Default**: Only team and combined reports are uploaded to Google Sheets
 - **Member reports**: Not uploaded by default (to save quota), use `--upload-members` to enable
 
@@ -341,6 +355,7 @@ The `full` command workflow: Get metrics → Generate reports → Upload reports
 - `{project}_combined_pr_report_*.tsv` - Combined view (all members grouped by metric)
 
 **Note:**
+
 - `{project}` prefix is added when `jira_project_key` or `github_repo_name` is configured
 - AI-powered analysis reports are listed separately in the [AI-Powered Analysis](#ai-powered-analysis-experimental) section
 
@@ -493,6 +508,14 @@ Edit `config/analysis_prompt_template.yaml` to customize sections, output format
 ### For Contributors
 
 - **[Contributing Guide](docs/CONTRIBUTING.md)** - Development setup, commit guidelines, testing, code quality, pull requests
+
+## Next Steps
+
+- **Validation & Testing**: Expand usage with diverse teams/organizations to validate product value
+- **Unified Data Platform**: Migrate to centralized data warehouse (e.g., Snowflake) to consolidate metrics from multiple sources (Jira, GitHub, GitLab, Slacks, etc.)
+- **Enhanced Metrics**: Add more metrics and industry benchmarks and percentile rankings for peer comparison
+- **AI-Powered Insights**: Expand beyond Claude to support multiple AI providers (OpenAI, Gemini, etc.), customizable analysis templates, and interactive analysis interface
+- **Visualization**: Build interactive dashboard for better insights and executive reporting
 
 ## Support
 

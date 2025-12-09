@@ -27,39 +27,69 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check if only docs changed
+      id: docs_check
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          echo "Changed files:"
+          echo "$FILES"
+
+          # Check if only docs/config files changed
+          if echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore)$'; then
+            echo "code_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "code_changed=false" >> $GITHUB_OUTPUT
+            echo "Only documentation/config files changed, skipping tests"
+          fi
+        else
+          echo "code_changed=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Skip tests (docs only)
+      if: steps.docs_check.outputs.code_changed == 'false'
+      run: |
+        echo "✓ Skipping tests - only documentation files changed"
+        exit 0
 
     - name: Set up Python ${{ matrix.python-version }}
+      if: steps.docs_check.outputs.code_changed == 'true'
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Install tox
+      if: steps.docs_check.outputs.code_changed == 'true'
       run: |
         python -m pip install --upgrade pip
         pip install tox tox-gh-actions
 
     - name: Run tests with tox
+      if: steps.docs_check.outputs.code_changed == 'true'
       run: |
         tox -e py$(echo "${{ matrix.python-version }}" | tr -d '.')
 
     - name: Run lint checks
-      if: matrix.python-version == '3.11'
+      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
       run: |
         tox -e lint
 
     - name: Run type checking
-      if: matrix.python-version == '3.11'
+      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
       continue-on-error: true
       run: |
         tox -e type
 
     - name: Run coverage
-      if: matrix.python-version == '3.11'
+      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
       run: |
         tox -e coverage
 
     - name: Upload coverage reports
-      if: matrix.python-version == '3.11'
+      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
       uses: codecov/codecov-action@v4
       with:
         fail_ci_if_error: false
@@ -75,6 +105,29 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if only docs changed
+        id: docs_check
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+            if echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore)$'; then
+              echo "code_changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "code_changed=false" >> $GITHUB_OUTPUT
+              echo "Only documentation/config files changed, skipping integration tests"
+            fi
+          else
+            echo "code_changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip integration tests (docs only)
+        if: steps.docs_check.outputs.code_changed == 'false'
+        run: |
+          echo "✓ Skipping integration tests - only documentation files changed"
+          exit 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
