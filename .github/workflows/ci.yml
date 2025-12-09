@@ -3,20 +3,8 @@ name: CI
 on:
   push:
     branches: [ master ]
-    paths:
-      - '**.py'
-      - 'pyproject.toml'
-      - 'requirements.txt'
-      - 'config/test/**'
-      - '.github/workflows/ci.yml'
   pull_request:
     branches: [ master ]
-    paths:
-      - '**.py'
-      - 'pyproject.toml'
-      - 'requirements.txt'
-      - 'config/test/**'
-      - '.github/workflows/ci.yml'
 
 jobs:
   test:
@@ -130,16 +118,19 @@ jobs:
           exit 0
 
       - name: Set up Python
+        if: steps.docs_check.outputs.code_changed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install dependencies
+        if: steps.docs_check.outputs.code_changed == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -e .
 
       - name: Restore GitHub PR cache
+        if: steps.docs_check.outputs.code_changed == 'true'
         uses: actions/cache@v4
         with:
           path: .cache/github
@@ -149,6 +140,7 @@ jobs:
             integration-test-pr-cache-
 
       - name: Run integration test - Jira reports
+        if: steps.docs_check.outputs.code_changed == 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
@@ -171,6 +163,7 @@ jobs:
           ls -lh reports/test/jira/ || echo "No reports generated"
 
       - name: Run integration test - PR reports
+        if: steps.docs_check.outputs.code_changed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -190,7 +183,7 @@ jobs:
           ls -lh reports/test/github/ || echo "No reports generated"
 
       - name: Upload test reports as artifacts
-        if: always()
+        if: steps.docs_check.outputs.code_changed == 'true' && always()
         uses: actions/upload-artifact@v4
         with:
           name: integration-test-reports
@@ -198,7 +191,7 @@ jobs:
           retention-days: 7
 
       - name: Integration test summary
-        if: always()
+        if: steps.docs_check.outputs.code_changed == 'true' && always()
         run: |
           echo "=========================================="
           echo "Integration Test Summary"

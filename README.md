@@ -22,8 +22,8 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 **Business Value:**
 
 - **Measure AI ROI**: Compare development efficiency before and after AI tool adoption
-- **Objective Metrics**: Track closure time, merge time, throughput, and more to evaluate AI effectiveness
-- **Team & Individual Insights**: Understand AI impact at team and contributor levels
+- **Performance Reviews**: Objective metrics for evaluating team and individual performance
+- **Data-Driven Insights**: Track closure time, merge time, throughput, and more to help making informed decisions
 - **Multi-Team Support**: Isolated configs and reports for multiple teams
 - **Automated Reporting**: Generate comprehensive reports with one command
 - **Easy Sharing**: Auto-upload to Google Sheets for stakeholder visibility
@@ -32,6 +32,7 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 
 - Engineering leaders evaluating AI tool investments
 - Teams measuring productivity improvements
+- Managers conducting objective performance reviews for teams and individuals
 - Researchers studying AI coding assistant effectiveness
 - Organizations tracking developer efficiency over time
 
