@@ -145,7 +145,7 @@ jobs:
           echo "=========================================="
 
           # Run verify command
-          python -m ai_impact_analysis.cli verify
+          python -m impactlens.cli verify
 
           echo ""
           echo "=========================================="
@@ -168,8 +168,8 @@ jobs:
           CONFIG_PATH="${{ steps.config.outputs.config_dir }}/jira_report_config.yaml"
           if [ -f "$CONFIG_PATH" ]; then
             echo "Generating Jira report with config: $CONFIG_PATH"
-            echo "Running command: python -m ai_impact_analysis.cli jira full --config \"$CONFIG_PATH\""
-            python -m ai_impact_analysis.cli jira full \
+            echo "Running command: python -m impactlens.cli jira full --config \"$CONFIG_PATH\""
+            python -m impactlens.cli jira full \
               --config "$CONFIG_PATH"
           else
             echo "Jira config not found at $CONFIG_PATH, skipping"
@@ -184,8 +184,8 @@ jobs:
           CONFIG_PATH="${{ steps.config.outputs.config_dir }}/pr_report_config.yaml"
           if [ -f "$CONFIG_PATH" ]; then
             echo "Generating PR report with config: $CONFIG_PATH"
-            echo "Running command: python -m ai_impact_analysis.cli pr full --config \"$CONFIG_PATH\" --incremental"
-            python -m ai_impact_analysis.cli pr full \
+            echo "Running command: python -m impactlens.cli pr full --config \"$CONFIG_PATH\" --incremental"
+            python -m impactlens.cli pr full \
               --config "$CONFIG_PATH" \
               --incremental
           else
@@ -201,7 +201,7 @@ jobs:
           for report in reports/**/combined_jira_report_*.tsv; do
             if [ -f "$report" ]; then
               echo "Generating prompt for: $report"
-              python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+              python -m impactlens.scripts.analyze_with_claude_code \
                 --report "$report" \
                 --prompt-only || echo "Warning: Failed to generate prompt for $report"
             fi
@@ -211,7 +211,7 @@ jobs:
           for report in reports/**/combined_pr_report_*.tsv; do
             if [ -f "$report" ]; then
               echo "Generating prompt for: $report"
-              python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+              python -m impactlens.scripts.analyze_with_claude_code \
                 --report "$report" \
                 --prompt-only || echo "Warning: Failed to generate prompt for $report"
             fi

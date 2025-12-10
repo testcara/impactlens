@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Generate Jira AI Impact Analysis Report.
+Generate GitHub PR AI Impact Analysis Report.
 
-This script orchestrates the complete Jira report generation workflow:
+This script orchestrates the complete GitHub PR report generation workflow:
 1. Load configuration
-2. Generate reports for each configured phase
+2. Generate PR metrics for each configured phase
 3. Create comparison report
 4. Optionally upload to Google Sheets
 """
@@ -15,7 +15,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
-from ai_impact_analysis.utils.workflow_utils import (
+from impactlens.utils.workflow_utils import (
     Colors,
     get_project_root,
     cleanup_old_reports,
@@ -24,7 +24,7 @@ from ai_impact_analysis.utils.workflow_utils import (
     load_team_members,
     load_and_resolve_config,
 )
-from ai_impact_analysis.utils.report_utils import normalize_username
+from impactlens.utils.report_utils import normalize_username
 
 
 def print_header(title: str, subtitle: Optional[str] = None) -> None:
@@ -37,37 +37,30 @@ def print_header(title: str, subtitle: Optional[str] = None) -> None:
     print()
 
 
-def generate_phase_report(
+def generate_phase_metrics(
     phase_name: str,
     start_date: str,
     end_date: str,
-    assignee: Optional[str] = None,
-    config_file: Optional[Path] = None,
-    leave_days: int = 0,
-    capacity: float = 1.0,
+    author: Optional[str] = None,
+    incremental: bool = False,
     output_dir: Optional[str] = None,
 ) -> bool:
-    """Generate report for a single phase."""
+    """Generate PR metrics for a single phase."""
     args = [
         sys.executable,
         "-m",
-        "ai_impact_analysis.scripts.get_jira_metrics",
+        "impactlens.scripts.get_pr_metrics",
         "--start",
         start_date,
         "--end",
         end_date,
     ]
 
-    if assignee:
-        args.extend(["--assignee", assignee])
-    elif config_file and config_file.exists():
-        args.extend(["--config", str(config_file)])
+    if author:
+        args.extend(["--author", author])
 
-    if leave_days > 0:
-        args.extend(["--leave-days", str(leave_days)])
-
-    if capacity != 1.0:
-        args.extend(["--capacity", str(capacity)])
+    if incremental:
+        args.append("--incremental")
 
     if output_dir:
         args.extend(["--output-dir", str(output_dir)])
@@ -80,19 +73,19 @@ def generate_phase_report(
 
 
 def generate_comparison_report(
-    assignee: Optional[str] = None,
+    author: Optional[str] = None,
     output_dir: Optional[str] = None,
     config_file: Optional[Path] = None,
 ) -> bool:
-    """Generate comparison report from phase reports."""
+    """Generate comparison report from phase metrics."""
     args = [
         sys.executable,
         "-m",
-        "ai_impact_analysis.scripts.generate_jira_comparison_report",
+        "impactlens.scripts.generate_pr_comparison_report",
     ]
 
-    if assignee:
-        args.extend(["--assignee", assignee])
+    if author:
+        args.extend(["--author", author])
 
     if output_dir:
         args.extend(["--reports-dir", str(output_dir)])
@@ -122,7 +115,7 @@ def generate_all_members_reports(
         script_name: Script module name to invoke
         no_upload: If True, skip all uploads
         upload_members: If True, upload member reports (default: False, only team report is uploaded)
-        config_file: Optional custom config file to pass to subcommands
+        config_file: Optional custom config file path
     """
     print_header("Generating reports for all team members")
 
@@ -186,21 +179,22 @@ def generate_all_members_reports(
 def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Generate Jira AI Impact Analysis Report",
+        description="Generate GitHub PR AI Impact Analysis Report",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python3 -m ai_impact_analysis.script.generate_jira_report                      # Team overall
-  python3 -m ai_impact_analysis.script.generate_jira_report wlin@redhat.com     # Individual
-  python3 -m ai_impact_analysis.script.generate_jira_report --all-members        # All members
-  python3 -m ai_impact_analysis.script.generate_jira_report --combine-only       # Combine only
+  python3 -m impactlens.script.generate_pr_report                    # Team overall
+  python3 -m impactlens.script.generate_pr_report wlin              # Individual
+  python3 -m impactlens.script.generate_pr_report --all-members      # All members
+  python3 -m impactlens.script.generate_pr_report --combine-only     # Combine only
+  python3 -m impactlens.script.generate_pr_report --incremental      # Incremental mode
         """,
     )
 
     parser.add_argument(
-        "assignee",
+        "author",
         nargs="?",
-        help="Assignee email to filter issues (optional)",
+        help="GitHub author username to filter PRs (optional)",
     )
     parser.add_argument(
         "--all-members",
@@ -211,6 +205,11 @@ Examples:
         "--combine-only",
         action="store_true",
         help="Combine existing TSV reports without regenerating",
+    )
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Only fetch new/updated PRs (faster for repeated runs)",
     )
     parser.add_argument(
         "--no-upload",
@@ -225,172 +224,101 @@ Examples:
     parser.add_argument(
         "--config",
         type=str,
-        help="Path to custom config YAML file. Settings override defaults from config/jira_report_config.yaml",
-        default=None,
+        help="Path to custom config file (default: config/pr_report_config.yaml)",
     )
 
     args = parser.parse_args()
 
     project_root = get_project_root()
-    default_config_file = project_root / "config" / "jira_report_config.yaml"
+    default_config_file = project_root / "config" / "pr_report_config.yaml"
     custom_config_file = Path(args.config) if args.config else None
-    default_reports_dir = project_root / "reports" / "jira"
+    default_reports_dir = project_root / "reports" / "github"
 
     # Validate, load config, and resolve output directory
     result = load_and_resolve_config(
-        custom_config_file, default_config_file, default_reports_dir, "Jira config"
+        custom_config_file, default_config_file, default_reports_dir, "PR config"
     )
     if result is None:
         return 1
 
-    phases, default_assignee, reports_dir, project_settings = result
+    phases, default_author, reports_dir, project_settings = result
     config_file = custom_config_file if custom_config_file else default_config_file
 
     # Handle --combine-only flag
     if args.combine_only:
-        from ai_impact_analysis.utils.report_utils import combine_comparison_reports
+        from impactlens.utils.report_utils import combine_comparison_reports
 
-        print_header("Combining Existing Jira Reports")
-
-        # Get project prefix from config
-        project_prefix = project_settings.get("jira_project_key")
+        print_header("Combining Existing GitHub PR Reports")
 
         try:
             output_file = combine_comparison_reports(
                 reports_dir=str(reports_dir),
-                report_type="jira",
-                title="Jira AI Impact Analysis - Combined Report (Grouped by Metric)",
-                project_prefix=project_prefix,
+                report_type="pr",
+                title="GitHub PR AI Impact Analysis - Combined Report (Grouped by Metric)",
             )
             print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
             print()
+
+            # Upload to Google Sheets if not disabled
             upload_to_google_sheets(output_file, skip_upload=args.no_upload)
+
+            print()
+            print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
+            print(f"{Colors.GREEN}✓ Combined report completed successfully!{Colors.NC}")
+            print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
+            return 0
+
         except Exception as e:
             print(f"{Colors.RED}Error combining reports: {e}{Colors.NC}")
-            import traceback
-
-            traceback.print_exc()
             return 1
-
-        return 0
 
     # Handle --all-members flag
     if args.all_members:
         return generate_all_members_reports(
             config_file,  # Use same config file for team members
-            "ai_impact_analysis.scripts.generate_jira_report",
+            "impactlens.scripts.generate_pr_report",
             no_upload=args.no_upload,
             upload_members=args.upload_members,
             config_file=config_file,
         )
 
-    # Determine assignee
-    assignee = args.assignee or default_assignee or None
+    # Determine author
+    author = args.author or default_author or None
 
-    if assignee:
-        print_header("AI Impact Analysis Report Generator", f"Assignee: {assignee}")
+    if author:
+        print_header("GitHub PR Analysis Report Generator", f"Author: {author}")
     else:
-        print_header("AI Impact Analysis Report Generator", "Team Overall Report")
+        print_header("GitHub PR Analysis Report Generator", "Team Overall Report")
 
     print()
 
     # Step 1: Cleanup old reports
     print(f"{Colors.YELLOW}Step 1: Cleaning up old files...{Colors.NC}")
-    identifier = normalize_username(assignee) if assignee else "general"
-    cleanup_old_reports(reports_dir, identifier, "jira")
+    identifier = normalize_username(author) if author else "general"
+    cleanup_old_reports(reports_dir, identifier, "pr")
     print()
 
-    # Step 2-N: Generate reports for each phase
+    # Step 2-N: Generate metrics for each phase
     step_num = 2
-    # Use config file for team members filtering (only when not filtering by assignee)
-    team_config_file = config_file if not assignee else None
 
-    # Load leave_days and capacity
-    leave_days_list = None
-    capacity_list = None
-    from ai_impact_analysis.utils.workflow_utils import load_team_members_from_yaml
-
-    team_members_details = load_team_members_from_yaml(config_file, detailed=True)
-
-    if assignee:
-        # Individual report: get specific member's values
-        for member_id, details in team_members_details.items():
-            if member_id == assignee or details.get("member") == assignee:
-                # Process leave_days
-                leave_days_config = details.get("leave_days", 0)
-                if isinstance(leave_days_config, list):
-                    leave_days_list = leave_days_config
-                else:
-                    # Single value, use for all phases
-                    leave_days_list = [leave_days_config] * len(phases)
-
-                # Process capacity
-                capacity_config = details.get("capacity", 1.0)
-                if isinstance(capacity_config, list):
-                    capacity_list = capacity_config
-                else:
-                    # Single value, use for all phases
-                    capacity_list = [capacity_config] * len(phases)
-                break
-    else:
-        # Team report: aggregate all members' values
-        # Initialize lists for each phase
-        leave_days_list = [0.0] * len(phases)
-        capacity_list = [0.0] * len(phases)
-
-        for member_id, details in team_members_details.items():
-            # Process leave_days
-            leave_days_config = details.get("leave_days", 0)
-            if isinstance(leave_days_config, list):
-                for i, ld in enumerate(leave_days_config):
-                    if i < len(leave_days_list):
-                        leave_days_list[i] += ld
-            else:
-                # Single value, add to all phases
-                for i in range(len(phases)):
-                    leave_days_list[i] += leave_days_config
-
-            # Process capacity
-            capacity_config = details.get("capacity", 1.0)
-            if isinstance(capacity_config, list):
-                for i, cap in enumerate(capacity_config):
-                    if i < len(capacity_list):
-                        capacity_list[i] += cap
-            else:
-                # Single value, add to all phases
-                for i in range(len(phases)):
-                    capacity_list[i] += capacity_config
-
-    for phase_index, (phase_name, start_date, end_date) in enumerate(phases):
+    for phase_name, start_date, end_date in phases:
         print(
-            f"{Colors.YELLOW}Step {step_num}: Generating report for '{phase_name}' ({start_date} to {end_date})...{Colors.NC}"
+            f"{Colors.YELLOW}Step {step_num}: Collecting PR metrics for '{phase_name}' ({start_date} to {end_date})...{Colors.NC}"
         )
 
-        # Get leave_days for this phase
-        phase_leave_days = 0
-        if leave_days_list and phase_index < len(leave_days_list):
-            phase_leave_days = leave_days_list[phase_index]
-
-        # Get capacity for this phase
-        phase_capacity = 1.0
-        if capacity_list and phase_index < len(capacity_list):
-            phase_capacity = capacity_list[phase_index]
-
-        success = generate_phase_report(
+        success = generate_phase_metrics(
             phase_name,
             start_date,
             end_date,
-            assignee=assignee,
-            config_file=team_config_file,
-            leave_days=phase_leave_days,
-            capacity=phase_capacity,
+            author=author,
+            incremental=args.incremental,
             output_dir=str(reports_dir),
         )
 
         if success:
-            print(f"{Colors.GREEN}  ✓ '{phase_name}' report generated{Colors.NC}")
+            print(f"{Colors.GREEN}  ✓ '{phase_name}' metrics collected{Colors.NC}")
         else:
-            print(f"{Colors.RED}  ✗ Failed to generate '{phase_name}' report{Colors.NC}")
+            print(f"{Colors.RED}  ✗ Failed to collect '{phase_name}' metrics{Colors.NC}")
             return 1
 
         print()
@@ -399,20 +327,18 @@ Examples:
     # Generate comparison report
     print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
     if not generate_comparison_report(
-        assignee=assignee, output_dir=str(reports_dir), config_file=config_file
+        author=author, output_dir=str(reports_dir), config_file=config_file
     ):
         print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")
         return 1
     print()
 
     # Find and upload the latest comparison report
-    comparison_file = find_latest_comparison_report(reports_dir, identifier, "jira")
+    comparison_file = find_latest_comparison_report(reports_dir, identifier, "pr")
     if comparison_file:
         print(f"{Colors.GREEN}✓ Report generated: {comparison_file.name}{Colors.NC}")
         print()
         upload_to_google_sheets(comparison_file, skip_upload=args.no_upload)
-    else:
-        print(f"No comparison file found!")
 
     print(f"{Colors.GREEN}Done!{Colors.NC}")
     return 0

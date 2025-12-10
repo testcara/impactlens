@@ -8,22 +8,22 @@ Automatically analyzes reports using either:
 
 Usage:
     # Option 1: Use Claude Code CLI (default)
-    python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
+    python -m impactlens.scripts.analyze_with_claude_code \\
       --report reports/github/combined_pr_report_*.tsv
 
     # Option 2: Use Anthropic API with environment variable
     export ANTHROPIC_API_KEY="sk-ant-..."
-    python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
+    python -m impactlens.scripts.analyze_with_claude_code \\
       --report reports/github/combined_pr_report_*.tsv \\
       --claude-api-mode
 
     # Option 3: Use Anthropic API with explicit key parameter
-    python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
+    python -m impactlens.scripts.analyze_with_claude_code \\
       --report reports/github/combined_pr_report_*.tsv \\
       --claude-api-mode --anthropic-api-key "sk-ant-..."
 
     # Prompt preview mode: only displays the prompt without calling Claude
-    python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
+    python -m impactlens.scripts.analyze_with_claude_code \\
       --report reports/github/combined_pr_report_*.tsv \\
       --prompt-only
 """
@@ -41,9 +41,9 @@ from glob import glob
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from ai_impact_analysis.utils.report_preprocessor import ReportPreprocessor
-from ai_impact_analysis.utils.logger import logger
-from ai_impact_analysis.utils.workflow_utils import upload_to_google_sheets
+from impactlens.utils.report_preprocessor import ReportPreprocessor
+from impactlens.utils.logger import logger
+from impactlens.utils.workflow_utils import upload_to_google_sheets
 
 
 def find_latest_report(report_pattern: str) -> str:
@@ -389,22 +389,22 @@ def main():
         epilog="""
 Examples:
   # Use Claude Code CLI (default)
-  python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
+  python -m impactlens.scripts.analyze_with_claude_code \\
     --report "reports/github/combined_pr_report_*.tsv"
 
   # Use Anthropic API with environment variable
   export ANTHROPIC_API_KEY="sk-ant-..."
-  python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
+  python -m impactlens.scripts.analyze_with_claude_code \\
     --report "reports/github/combined_pr_report_*.tsv" \\
     --claude-api-mode
 
   # Use Anthropic API with explicit key parameter
-  python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
+  python -m impactlens.scripts.analyze_with_claude_code \\
     --report "reports/github/combined_pr_report_*.tsv" \\
     --claude-api-mode --anthropic-api-key "sk-ant-..."
 
   # Prompt preview mode: only shows prompt without calling Claude
-  python -m ai_impact_analysis.scripts.analyze_with_claude_code \\
+  python -m impactlens.scripts.analyze_with_claude_code \\
     --report "reports/github/combined_pr_report_*.tsv" \\
     --prompt-only
         """,
@@ -606,7 +606,7 @@ Examples:
         logger.error(f"Error: {str(e)}")
         logger.error("")
         logger.error("💡 TIP: Try prompt preview mode instead:")
-        logger.error(f"   python -m ai_impact_analysis.scripts.analyze_with_claude_code \\")
+        logger.error(f"   python -m impactlens.scripts.analyze_with_claude_code \\")
         logger.error(f'     --report "{report_path}" \\')
         logger.error(f"     --prompt-only")
         logger.error("")

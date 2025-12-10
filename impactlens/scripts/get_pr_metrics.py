@@ -3,7 +3,7 @@
 CLI script to fetch and analyze GitHub PR metrics.
 
 This is a thin wrapper around the core business logic in
-ai_impact_analysis.core.pr_metrics_calculator
+impactlens.core.pr_metrics_calculator
 """
 
 import os
@@ -12,11 +12,11 @@ import argparse
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from ai_impact_analysis.clients.github_client import GitHubClient
-from ai_impact_analysis.clients.github_client_graphql import GitHubGraphQLClient
-from ai_impact_analysis.core.pr_metrics_calculator import PRMetricsCalculator
-from ai_impact_analysis.core.pr_report_generator import PRReportGenerator
-from ai_impact_analysis.utils.logger import logger
+from impactlens.clients.github_client import GitHubClient
+from impactlens.clients.github_client_graphql import GitHubGraphQLClient
+from impactlens.core.pr_metrics_calculator import PRMetricsCalculator
+from impactlens.core.pr_report_generator import PRReportGenerator
+from impactlens.utils.logger import logger
 
 
 def main():
@@ -32,13 +32,13 @@ Environment Variables:
 
 Examples:
   # Get PRs for October 2024
-  python3 ai_impact_analysis/scripts/get_pr_metrics.py --start 2024-10-01 --end 2024-10-31
+  python3 impactlens/scripts/get_pr_metrics.py --start 2024-10-01 --end 2024-10-31
 
   # Get PRs for specific author
-  python3 ai_impact_analysis/scripts/get_pr_metrics.py --start 2024-10-01 --end 2024-10-31 --author wlin
+  python3 impactlens/scripts/get_pr_metrics.py --start 2024-10-01 --end 2024-10-31 --author wlin
 
   # Custom output file
-  python3 ai_impact_analysis/scripts/get_pr_metrics.py --start 2024-10-01 --end 2024-10-31 --output my_report.json
+  python3 impactlens/scripts/get_pr_metrics.py --start 2024-10-01 --end 2024-10-31 --output my_report.json
         """,
     )
 

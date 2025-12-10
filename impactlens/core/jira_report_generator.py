@@ -10,13 +10,13 @@ import json
 import re
 from datetime import datetime
 
-from ai_impact_analysis.utils.report_utils import (
+from impactlens.utils.report_utils import (
     normalize_username,
     calculate_percentage_change,
     format_metric_changes,
     add_metric_change,
 )
-from ai_impact_analysis.utils.core_utils import calculate_days_between
+from impactlens.utils.core_utils import calculate_days_between
 
 
 class JiraReportGenerator:
@@ -670,8 +670,6 @@ class JiraReportGenerator:
 
         lines.append("")
         lines.append("For detailed metric explanations, see:")
-        lines.append(
-            "https://github.com/testcara/ai_impact_analysis/blob/master/docs/METRICS_GUIDE.md"
-        )
+        lines.append("https://github.com/testcara/impactlens/blob/master/docs/METRICS_GUIDE.md")
 
         return "\n".join(lines)

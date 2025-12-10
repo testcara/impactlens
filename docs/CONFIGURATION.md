@@ -37,7 +37,7 @@ By default, the tool uses:
 
 4. Run analysis:
    ```bash
-   ai-impact-analysis full
+   impactlens full
    ```
 
 That's it! Reports will be generated in `reports/jira/` and `reports/github/`.
@@ -184,21 +184,21 @@ All commands support `--config` parameter:
 
 ```bash
 # Full workflow
-ai-impact-analysis jira full --config my-config.yaml
-ai-impact-analysis pr full --config my-config.yaml
+impactlens jira full --config my-config.yaml
+impactlens pr full --config my-config.yaml
 
 # Individual commands
-ai-impact-analysis jira team --config my-config.yaml
-ai-impact-analysis jira member alice@company.com --config my-config.yaml
-ai-impact-analysis jira members --config my-config.yaml
-ai-impact-analysis jira all --config my-config.yaml
-ai-impact-analysis jira combine --config my-config.yaml
+impactlens jira team --config my-config.yaml
+impactlens jira member alice@company.com --config my-config.yaml
+impactlens jira members --config my-config.yaml
+impactlens jira all --config my-config.yaml
+impactlens jira combine --config my-config.yaml
 
-ai-impact-analysis pr team --config my-config.yaml
-ai-impact-analysis pr member alice --config my-config.yaml
-ai-impact-analysis pr members --config my-config.yaml
-ai-impact-analysis pr all --config my-config.yaml
-ai-impact-analysis pr combine --config my-config.yaml
+impactlens pr team --config my-config.yaml
+impactlens pr member alice --config my-config.yaml
+impactlens pr members --config my-config.yaml
+impactlens pr all --config my-config.yaml
+impactlens pr combine --config my-config.yaml
 ```
 
 **How merging works:**
@@ -343,12 +343,12 @@ team_members:
 ```bash
 # Recommended: Directory config (auto-finds both jira & pr configs)
 source .env.team-a
-ai-impact-analysis full --config config/team-a
+impactlens full --config config/team-a
 
 # Alternative: Specific files
 source .env.team-a
-ai-impact-analysis jira full --config config/team-a/jira_report_config.yaml
-ai-impact-analysis pr full --config config/team-a/pr_report_config.yaml
+impactlens jira full --config config/team-a/jira_report_config.yaml
+impactlens pr full --config config/team-a/pr_report_config.yaml
 
 # All other commands also support --config (see "Custom Config Files" section for full list)
 ```
@@ -359,14 +359,14 @@ ai-impact-analysis pr full --config config/team-a/pr_report_config.yaml
 
 ```bash
 # Recommended: Directory config
-docker-compose --env-file .env.team-a run ai-impact-analysis \
+docker-compose --env-file .env.team-a run impactlens \
   full --config /app/config/team-a
 
 # Alternative: Specific files
-docker-compose --env-file .env.team-a run ai-impact-analysis \
+docker-compose --env-file .env.team-a run impactlens \
   jira full --config /app/config/team-a/jira_report_config.yaml
 
-docker-compose --env-file .env.team-a run ai-impact-analysis \
+docker-compose --env-file .env.team-a run impactlens \
   pr full --config /app/config/team-a/pr_report_config.yaml
 
 # All other commands also support --config (see "Custom Config Files" section for full list)
@@ -427,7 +427,7 @@ if [ ! -d "$CONFIG_DIR" ]; then
 fi
 
 echo "Running $MODE analysis for $TEAM..."
-docker-compose --env-file "$ENV_FILE" run ai-impact-analysis \
+docker-compose --env-file "$ENV_FILE" run impactlens \
   $MODE --config "/app/$CONFIG_DIR"
 ```
 
@@ -464,7 +464,7 @@ If migrating from single-team setup:
 
 4. **Test new structure:**
    ```bash
-   docker-compose run ai-impact-analysis verify
+   docker-compose run impactlens verify
    ```
 
 ### Google Sheets Integration
@@ -498,12 +498,12 @@ export GOOGLE_SPREADSHEET_ID="1ABCdefGHI..."
 
 ```bash
 # Automatic upload (if environment variables configured)
-ai-impact-analysis jira full    # Generates & auto-uploads Jira reports
-ai-impact-analysis pr full      # Generates & auto-uploads PR reports
+impactlens jira full    # Generates & auto-uploads Jira reports
+impactlens pr full      # Generates & auto-uploads PR reports
 
 # Skip upload with --no-upload flag
-ai-impact-analysis jira full --no-upload
-ai-impact-analysis pr full --no-upload
+impactlens jira full --no-upload
+impactlens pr full --no-upload
 ```
 
 #### Features
@@ -617,7 +617,7 @@ cp config/pr_report_config.yaml.example config/pr_report_config.yaml
 docker-compose --env-file .env.team-a config | grep JIRA_PROJECT_KEY
 
 # Make sure --env-file is BEFORE run
-docker-compose --env-file .env.team-a run ai-impact-analysis verify
+docker-compose --env-file .env.team-a run impactlens verify
 ```
 
 **3. Reports in wrong directory:**
@@ -631,7 +631,7 @@ docker-compose --env-file .env.team-a run ai-impact-analysis verify
 ls -la config/team-a/
 
 # Docker - Check inside container
-docker-compose run ai-impact-analysis ls -la /app/config/team-a/
+docker-compose run impactlens ls -la /app/config/team-a/
 ```
 
 **5. Google Sheets upload fails:**

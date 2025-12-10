@@ -154,7 +154,7 @@ jobs:
           echo "Running Jira Integration Test"
           echo "=========================================="
 
-          python -m ai_impact_analysis.cli jira full \
+          python -m impactlens.cli jira full \
             --config config/test/jira_report_config.yaml \
             --no-upload
 
@@ -170,10 +170,10 @@ jobs:
           echo "=========================================="
           echo "Running PR Integration Test"
           echo "=========================================="
-          echo "Command: python -m ai_impact_analysis.cli pr full --config config/test/pr_report_config.yaml --no-upload --incremental"
+          echo "Command: python -m impactlens.cli pr full --config config/test/pr_report_config.yaml --no-upload --incremental"
           echo ""
 
-          python -m ai_impact_analysis.cli pr full \
+          python -m impactlens.cli pr full \
             --config config/test/pr_report_config.yaml \
             --no-upload \
             --incremental

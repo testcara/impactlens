@@ -1,6 +1,6 @@
 """Core business logic for AI Impact Analysis."""
 
-from ai_impact_analysis.core.report_orchestrator import (
+from impactlens.core.report_orchestrator import (
     ReportOrchestrator,
     JiraReportOrchestrator,
     GitHubReportOrchestrator,

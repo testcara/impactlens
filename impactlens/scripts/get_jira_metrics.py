@@ -3,14 +3,14 @@
 CLI script to fetch and analyze Jira metrics.
 
 This is a thin wrapper around the core business logic in
-ai_impact_analysis.core.jira_metrics_calculator
+impactlens.core.jira_metrics_calculator
 """
 
 import argparse
 import sys
 
-from ai_impact_analysis.core.jira_metrics_calculator import JiraMetricsCalculator
-from ai_impact_analysis.core.jira_report_generator import JiraReportGenerator
+from impactlens.core.jira_metrics_calculator import JiraMetricsCalculator
+from impactlens.core.jira_report_generator import JiraReportGenerator
 
 
 def main():
@@ -70,7 +70,7 @@ def main():
 
     # Determine which config file to use for leave_days lookup
     from pathlib import Path
-    from ai_impact_analysis.utils.workflow_utils import (
+    from impactlens.utils.workflow_utils import (
         get_project_root,
         load_team_members_from_yaml,
     )

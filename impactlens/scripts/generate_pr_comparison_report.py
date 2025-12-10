@@ -13,9 +13,9 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from ai_impact_analysis.core.pr_report_generator import PRReportGenerator
-from ai_impact_analysis.utils.report_utils import generate_comparison_report
-from ai_impact_analysis.utils.workflow_utils import load_config_file, get_project_root
+from impactlens.core.pr_report_generator import PRReportGenerator
+from impactlens.utils.report_utils import generate_comparison_report
+from impactlens.utils.workflow_utils import load_config_file, get_project_root
 
 
 def parse_phase_config(config_path="config/github_phases.conf"):

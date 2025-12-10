@@ -9,7 +9,7 @@ import csv
 from typing import Dict, List, Tuple, Any, Optional
 from datetime import datetime
 
-from ai_impact_analysis.utils.report_utils import calculate_percentage_change
+from impactlens.utils.report_utils import calculate_percentage_change
 
 
 class ReportPreprocessor:
