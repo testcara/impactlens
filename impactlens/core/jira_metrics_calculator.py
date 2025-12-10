@@ -11,8 +11,8 @@ import requests
 from datetime import datetime
 from pathlib import Path
 
-from ai_impact_analysis.utils.report_utils import normalize_username
-from ai_impact_analysis.utils.workflow_utils import load_team_members_from_yaml
+from impactlens.utils.report_utils import normalize_username
+from impactlens.utils.workflow_utils import load_team_members_from_yaml
 
 
 class JiraMetricsCalculator:

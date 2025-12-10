@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
 from datetime import datetime
 
-from ai_impact_analysis.utils.logger import Colors
+from impactlens.utils.logger import Colors
 
 
 def get_project_root() -> Path:
@@ -32,7 +32,7 @@ def get_project_root() -> Path:
                 (parent / ".git").exists(),
                 (parent / "pyproject.toml").exists(),
                 (parent / "setup.py").exists(),
-                (parent / "requirements.txt").exists() and (parent / "ai_impact_analysis").is_dir(),
+                (parent / "requirements.txt").exists() and (parent / "impactlens").is_dir(),
             ]
         ):
             return parent
@@ -430,9 +430,7 @@ def upload_to_google_sheets(
             print(f"{Colors.BLUE}⏭️  Skipping upload (--no-upload specified){Colors.NC}")
             print()
             print("📤 To upload later:")
-            print(
-                f"  python3 -m ai_impact_analysis.scripts.upload_to_sheets --report {report_file}"
-            )
+            print(f"  python3 -m impactlens.scripts.upload_to_sheets --report {report_file}")
             print()
         return True
 
@@ -446,7 +444,7 @@ def upload_to_google_sheets(
                 [
                     sys.executable,
                     "-m",
-                    "ai_impact_analysis.scripts.upload_to_sheets",
+                    "impactlens.scripts.upload_to_sheets",
                     "--report",
                     str(report_file),
                 ],
@@ -476,9 +474,7 @@ def upload_to_google_sheets(
                 )
             if show_manual_instructions:
                 print("   You can upload manually:")
-                print(
-                    f"   python3 -m ai_impact_analysis.scripts.upload_to_sheets --report {report_file}"
-                )
+                print(f"   python3 -m impactlens.scripts.upload_to_sheets --report {report_file}")
             print()
             return False
     else:
@@ -491,9 +487,7 @@ def upload_to_google_sheets(
             print("  export GOOGLE_SPREADSHEET_ID=your_spreadsheet_id")
             print()
             print("Or upload manually:")
-            print(
-                f"  python3 -m ai_impact_analysis.scripts.upload_to_sheets --report {report_file}"
-            )
+            print(f"  python3 -m impactlens.scripts.upload_to_sheets --report {report_file}")
             print()
         return False
 
@@ -595,9 +589,9 @@ def run_report_for_member(
     args = [sys.executable, "-m"]
 
     if report_type == "jira":
-        args.extend(["ai_impact_analysis.cli.generate_jira_report", member])
+        args.extend(["impactlens.cli.generate_jira_report", member])
     elif report_type == "pr":
-        args.extend(["ai_impact_analysis.cli.generate_pr_report", member])
+        args.extend(["impactlens.cli.generate_pr_report", member])
     else:
         return False
 

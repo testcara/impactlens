@@ -18,7 +18,7 @@ COPY requirements.txt pyproject.toml ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the entire application
-COPY ai_impact_analysis/ ./ai_impact_analysis/
+COPY impactlens/ ./impactlens/
 COPY config/ ./config/
 
 # Create default config files from templates (if they don't exist)
@@ -36,4 +36,4 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Default command shows help
-CMD ["ai-impact-analysis", "--help"]
+CMD ["impactlens", "--help"]

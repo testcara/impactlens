@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-AI Impact Analysis - Unified CLI Interface.
+ImpactLens - Unified CLI Interface.
 
-This module provides a unified command-line interface for all AI impact analysis operations.
+This module provides a unified command-line interface for all ImpactLens operations.
 It uses clear subcommands to avoid ambiguity and ensure consistent behavior.
 """
 
@@ -18,8 +18,8 @@ from rich.table import Table
 
 # Main app
 app = typer.Typer(
-    name="ai-impact-analysis",
-    help="AI Impact Analysis Tool - Measure the impact of AI tools on development efficiency",
+    name="impactlens",
+    help="ImpactLens - Measure the impact of AI tools on development efficiency as well as team and individual performance",
     add_completion=False,
 )
 
@@ -151,7 +151,7 @@ def jira_team(
     if no_upload:
         args.append("--no-upload")
 
-    script = "ai_impact_analysis.scripts.generate_jira_report"
+    script = "impactlens.scripts.generate_jira_report"
     return_code = run_script(script, args, "Generating Jira team report")
     sys.exit(return_code)
 
@@ -176,7 +176,7 @@ def jira_member(
     if no_upload:
         args.append("--no-upload")
 
-    script = "ai_impact_analysis.scripts.generate_jira_report"
+    script = "impactlens.scripts.generate_jira_report"
     return_code = run_script(script, args, f"Generating Jira report for {email}")
     sys.exit(return_code)
 
@@ -203,7 +203,7 @@ def jira_members(
     if no_upload:
         args.append("--no-upload")
 
-    script = "ai_impact_analysis.scripts.generate_jira_report"
+    script = "impactlens.scripts.generate_jira_report"
     return_code = run_script(script, args, "Generating Jira reports for all members")
 
     console.print(
@@ -233,7 +233,7 @@ def jira_all(
     if no_upload:
         args.append("--no-upload")
 
-    script = "ai_impact_analysis.scripts.generate_jira_report"
+    script = "impactlens.scripts.generate_jira_report"
     return_code = run_script(script, args, "Generating Jira team + members reports")
     sys.exit(return_code)
 
@@ -258,7 +258,7 @@ def jira_combine(
     if no_upload:
         args.append("--no-upload")
 
-    script = "ai_impact_analysis.scripts.generate_jira_report"
+    script = "impactlens.scripts.generate_jira_report"
     return_code = run_script(script, args, "Combining Jira reports")
     sys.exit(return_code)
 
@@ -320,7 +320,7 @@ def jira_full(
     if upload_members:
         args.append("--upload-members")
 
-    if run_script("ai_impact_analysis.scripts.generate_jira_report", args, "Jira all reports") != 0:
+    if run_script("impactlens.scripts.generate_jira_report", args, "Jira all reports") != 0:
         failed_steps.append("Jira all reports")
 
     # Step 2: Combine reports
@@ -331,7 +331,7 @@ def jira_full(
     if no_upload:
         args.append("--no-upload")
 
-    if run_script("ai_impact_analysis.scripts.generate_jira_report", args, "Jira combine") != 0:
+    if run_script("impactlens.scripts.generate_jira_report", args, "Jira combine") != 0:
         failed_steps.append("Jira combine")
 
     # Step 3: Claude Insights (opt-in)
@@ -350,7 +350,7 @@ def jira_full(
 
             if (
                 run_script(
-                    "ai_impact_analysis.scripts.analyze_with_claude_code",
+                    "impactlens.scripts.analyze_with_claude_code",
                     analyze_args,
                     f"Claude insights: {latest_jira.name}",
                 )
@@ -404,7 +404,7 @@ def pr_team(
     if no_upload:
         args.append("--no-upload")
 
-    script = "ai_impact_analysis.scripts.generate_pr_report"
+    script = "impactlens.scripts.generate_pr_report"
     return_code = run_script(script, args, "Generating PR team report")
     sys.exit(return_code)
 
@@ -432,7 +432,7 @@ def pr_member(
     if no_upload:
         args.append("--no-upload")
 
-    script = "ai_impact_analysis.scripts.generate_pr_report"
+    script = "impactlens.scripts.generate_pr_report"
     return_code = run_script(script, args, f"Generating PR report for {username}")
     sys.exit(return_code)
 
@@ -462,7 +462,7 @@ def pr_members(
     if no_upload:
         args.append("--no-upload")
 
-    script = "ai_impact_analysis.scripts.generate_pr_report"
+    script = "impactlens.scripts.generate_pr_report"
     return_code = run_script(script, args, "Generating PR reports for all members")
 
     console.print(
@@ -495,7 +495,7 @@ def pr_all(
     if no_upload:
         args.append("--no-upload")
 
-    script = "ai_impact_analysis.scripts.generate_pr_report"
+    script = "impactlens.scripts.generate_pr_report"
     return_code = run_script(script, args, "Generating PR team + members reports")
     sys.exit(return_code)
 
@@ -520,7 +520,7 @@ def pr_combine(
     if no_upload:
         args.append("--no-upload")
 
-    script = "ai_impact_analysis.scripts.generate_pr_report"
+    script = "impactlens.scripts.generate_pr_report"
     return_code = run_script(script, args, "Combining PR reports")
     sys.exit(return_code)
 
@@ -585,7 +585,7 @@ def pr_full(
     if upload_members:
         args.append("--upload-members")
 
-    if run_script("ai_impact_analysis.scripts.generate_pr_report", args, "PR all reports") != 0:
+    if run_script("impactlens.scripts.generate_pr_report", args, "PR all reports") != 0:
         failed_steps.append("PR all reports")
 
     # Step 2: Combine reports
@@ -596,7 +596,7 @@ def pr_full(
     if no_upload:
         args.append("--no-upload")
 
-    if run_script("ai_impact_analysis.scripts.generate_pr_report", args, "PR combine") != 0:
+    if run_script("impactlens.scripts.generate_pr_report", args, "PR combine") != 0:
         failed_steps.append("PR combine")
 
     # Step 3: Claude Insights (opt-in)
@@ -615,7 +615,7 @@ def pr_full(
 
             if (
                 run_script(
-                    "ai_impact_analysis.scripts.analyze_with_claude_code",
+                    "impactlens.scripts.analyze_with_claude_code",
                     analyze_args,
                     f"Claude insights: {latest_pr.name}",
                 )
@@ -706,7 +706,7 @@ def full_workflow(
         jira_args.extend(["--config", str(jira_config_path)])
 
     # Jira: all
-    if run_script("ai_impact_analysis.scripts.generate_jira_report", jira_args, "Jira all") != 0:
+    if run_script("impactlens.scripts.generate_jira_report", jira_args, "Jira all") != 0:
         failed_workflows.append("Jira all")
 
     # Jira: combine
@@ -717,9 +717,7 @@ def full_workflow(
         jira_combine_args.extend(["--config", str(jira_config_path)])
 
     if (
-        run_script(
-            "ai_impact_analysis.scripts.generate_jira_report", jira_combine_args, "Jira combine"
-        )
+        run_script("impactlens.scripts.generate_jira_report", jira_combine_args, "Jira combine")
         != 0
     ):
         failed_workflows.append("Jira combine")
@@ -739,7 +737,7 @@ def full_workflow(
 
             if (
                 run_script(
-                    "ai_impact_analysis.scripts.analyze_with_claude_code",
+                    "impactlens.scripts.analyze_with_claude_code",
                     analyze_args,
                     f"Jira Claude insights",
                 )
@@ -767,7 +765,7 @@ def full_workflow(
         pr_args.extend(["--config", str(pr_config_path)])
 
     # PR: all
-    if run_script("ai_impact_analysis.scripts.generate_pr_report", pr_args, "PR all") != 0:
+    if run_script("impactlens.scripts.generate_pr_report", pr_args, "PR all") != 0:
         failed_workflows.append("PR all")
 
     # PR: combine
@@ -777,10 +775,7 @@ def full_workflow(
     if pr_config_path:
         pr_combine_args.extend(["--config", str(pr_config_path)])
 
-    if (
-        run_script("ai_impact_analysis.scripts.generate_pr_report", pr_combine_args, "PR combine")
-        != 0
-    ):
+    if run_script("impactlens.scripts.generate_pr_report", pr_combine_args, "PR combine") != 0:
         failed_workflows.append("PR combine")
 
     # PR: Claude insights (opt-in)
@@ -798,7 +793,7 @@ def full_workflow(
 
             if (
                 run_script(
-                    "ai_impact_analysis.scripts.analyze_with_claude_code",
+                    "impactlens.scripts.analyze_with_claude_code",
                     analyze_args,
                     f"PR Claude insights",
                 )
@@ -830,7 +825,7 @@ def verify():
     """Verify setup and configuration."""
     console.print(Panel.fit("[bold blue]Setup Verification[/bold blue]", border_style="blue"))
 
-    script = "ai_impact_analysis.scripts.verify_setup"
+    script = "impactlens.scripts.verify_setup"
     return_code = run_script(script, [], "Verifying setup")
     sys.exit(return_code)
 
@@ -862,9 +857,9 @@ def main(ctx: typer.Context):
                 "[bold]AI Impact Analysis Tool[/bold]\n\n"
                 "Generate reports to measure the impact of AI coding assistants.\n\n"
                 "Quick Start:\n"
-                "  [cyan]ai-impact-analysis jira full[/cyan]     - Complete Jira workflow\n"
-                "  [magenta]ai-impact-analysis pr full[/magenta]       - Complete PR workflow\n"
-                "  [white]ai-impact-analysis full[/white]          - Complete Jira + PR workflow\n\n"
+                "  [cyan]impactlens jira full[/cyan]     - Complete Jira workflow\n"
+                "  [magenta]impactlens pr full[/magenta]       - Complete PR workflow\n"
+                "  [white]impactlens full[/white]          - Complete Jira + PR workflow\n\n"
                 "Use --help with any command for more information.",
                 border_style="blue",
             )
@@ -882,7 +877,7 @@ def main(ctx: typer.Context):
         table.add_row("version", "Show version information")
 
         console.print(table)
-        console.print("\n[dim]Run 'ai-impact-analysis <command> --help' for detailed usage[/dim]")
+        console.print("\n[dim]Run 'impactlens <command> --help' for detailed usage[/dim]")
 
 
 if __name__ == "__main__":

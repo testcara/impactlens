@@ -6,7 +6,7 @@ Extracted from cli/get_pr_metrics.py
 """
 
 from datetime import datetime
-from ai_impact_analysis.utils.core_utils import calculate_daily_throughput
+from impactlens.utils.core_utils import calculate_daily_throughput
 
 
 class PRMetricsCalculator:

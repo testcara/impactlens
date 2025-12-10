@@ -12,9 +12,9 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-from ai_impact_analysis.core.jira_report_generator import JiraReportGenerator
-from ai_impact_analysis.utils.report_utils import normalize_username, generate_comparison_report
-from ai_impact_analysis.utils.workflow_utils import (
+from impactlens.core.jira_report_generator import JiraReportGenerator
+from impactlens.utils.report_utils import normalize_username, generate_comparison_report
+from impactlens.utils.workflow_utils import (
     load_config_file,
     get_project_root,
     load_team_members_from_yaml,

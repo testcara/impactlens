@@ -3,7 +3,7 @@
 import os
 import pytest
 from unittest.mock import Mock, patch
-from ai_impact_analysis.clients.github_client import GitHubClient
+from impactlens.clients.github_client import GitHubClient
 
 
 class TestGitHubClient:
@@ -43,7 +43,7 @@ class TestGitHubClient:
             with pytest.raises(ValueError, match="Repository owner and name are required"):
                 GitHubClient(token="token")
 
-    @patch("ai_impact_analysis.clients.github_client.requests.get")
+    @patch("impactlens.clients.github_client.requests.get")
     def test_fetch_merged_prs_success(self, mock_get):
         """Test fetching merged PRs successfully."""
         # Mock first page with one PR
@@ -75,7 +75,7 @@ class TestGitHubClient:
         assert prs[0]["number"] == 1
         assert prs[0]["title"] == "Test PR"
 
-    @patch("ai_impact_analysis.clients.github_client.requests.get")
+    @patch("impactlens.clients.github_client.requests.get")
     def test_fetch_merged_prs_http_error(self, mock_get):
         """Test fetching PRs with HTTP error."""
         mock_response = Mock()
@@ -87,7 +87,7 @@ class TestGitHubClient:
         with pytest.raises(Exception, match="HTTP Error"):
             client.fetch_merged_prs("2024-10-01", "2024-10-31")
 
-    @patch("ai_impact_analysis.clients.github_client.requests.get")
+    @patch("impactlens.clients.github_client.requests.get")
     def test_get_pr_commits(self, mock_get):
         """Test getting PR commits."""
         mock_response = Mock()
@@ -103,7 +103,7 @@ class TestGitHubClient:
         assert len(commits) == 1
         assert commits[0]["sha"] == "abc123"
 
-    @patch("ai_impact_analysis.clients.github_client.requests.get")
+    @patch("impactlens.clients.github_client.requests.get")
     def test_get_pr_reviews(self, mock_get):
         """Test getting PR reviews."""
         mock_response = Mock()
@@ -124,7 +124,7 @@ class TestGitHubClient:
         assert len(reviews) == 1
         assert reviews[0]["state"] == "APPROVED"
 
-    @patch("ai_impact_analysis.clients.github_client.requests.get")
+    @patch("impactlens.clients.github_client.requests.get")
     def test_get_pr_comments(self, mock_get):
         """Test getting PR comments."""
         # Mock review comments

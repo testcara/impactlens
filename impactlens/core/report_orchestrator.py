@@ -10,8 +10,8 @@ import sys
 from pathlib import Path
 from typing import Optional, List
 
-from ai_impact_analysis.models import Phase, AnalysisConfig
-from ai_impact_analysis.utils import (
+from impactlens.models import Phase, AnalysisConfig
+from impactlens.utils import (
     Colors,
     cleanup_old_reports,
     find_latest_comparison_report,
@@ -142,7 +142,7 @@ class JiraReportOrchestrator(ReportOrchestrator):
         args = [
             sys.executable,
             "-m",
-            "ai_impact_analysis.cli.get_jira_metrics",
+            "impactlens.cli.get_jira_metrics",
             "--start",
             phase.start_date,
             "--end",
@@ -165,7 +165,7 @@ class JiraReportOrchestrator(ReportOrchestrator):
         args = [
             sys.executable,
             "-m",
-            "ai_impact_analysis.cli.generate_jira_comparison_report",
+            "impactlens.cli.generate_jira_comparison_report",
         ]
 
         if assignee:
@@ -188,7 +188,7 @@ class GitHubReportOrchestrator(ReportOrchestrator):
         args = [
             sys.executable,
             "-m",
-            "ai_impact_analysis.cli.get_pr_metrics",
+            "impactlens.cli.get_pr_metrics",
             "--start",
             phase.start_date,
             "--end",
@@ -212,7 +212,7 @@ class GitHubReportOrchestrator(ReportOrchestrator):
         args = [
             sys.executable,
             "-m",
-            "ai_impact_analysis.cli.generate_pr_comparison_report",
+            "impactlens.cli.generate_pr_comparison_report",
         ]
 
         if assignee:

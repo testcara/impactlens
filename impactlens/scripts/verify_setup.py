@@ -10,7 +10,7 @@ import sys
 import subprocess
 from pathlib import Path
 
-from ai_impact_analysis.utils.logger import Colors, print_header, print_status, print_section
+from impactlens.utils.logger import Colors, print_header, print_status, print_section
 
 
 def check_python_version() -> bool:
@@ -30,7 +30,7 @@ def check_pythonpath() -> bool:
     """Check if PYTHONPATH is set correctly by trying to import the package."""
     # The best way to check is to try importing the package
     try:
-        import ai_impact_analysis
+        import impactlens
 
         print_status(True, "PYTHONPATH configured (package can be imported)")
         return True
@@ -70,9 +70,9 @@ def check_module_imports() -> bool:
     sys.path.insert(0, str(Path.cwd()))
 
     modules = [
-        ("ai_impact_analysis.clients.jira_client", "JiraClient"),
-        ("ai_impact_analysis.clients.github_client", "GitHubClient"),
-        ("ai_impact_analysis.utils.report_utils", "normalize_username"),
+        ("impactlens.clients.jira_client", "JiraClient"),
+        ("impactlens.clients.github_client", "GitHubClient"),
+        ("impactlens.utils.report_utils", "normalize_username"),
     ]
     all_imported = True
     for module_path, name in modules:
@@ -152,7 +152,7 @@ def check_jira_config() -> bool:
 
     # Test actual connection
     try:
-        from ai_impact_analysis.clients.jira_client import JiraClient
+        from impactlens.clients.jira_client import JiraClient
 
         jira_url = os.getenv("JIRA_URL")
         api_token = os.getenv("JIRA_API_TOKEN")
@@ -238,7 +238,7 @@ def check_googlesheet_config() -> bool:
 
     # Test actual authentication
     try:
-        from ai_impact_analysis.clients.sheets_client import (
+        from impactlens.clients.sheets_client import (
             get_credentials,
             build_service,
             get_existing_sheets,
@@ -286,18 +286,18 @@ def check_cli() -> bool:
     """Check if CLI command is working."""
     try:
         result = subprocess.run(
-            ["ai-impact-analysis", "--help"],
+            ["impactlens", "--help"],
             capture_output=True,
             timeout=5,
         )
         if result.returncode == 0:
-            print_status(True, "ai-impact-analysis CLI")
+            print_status(True, "impactlens CLI")
             return True
         else:
-            print_status(False, "ai-impact-analysis CLI failed")
+            print_status(False, "impactlens CLI failed")
             return False
     except FileNotFoundError:
-        print_status(False, "ai-impact-analysis command not found")
+        print_status(False, "impactlens command not found")
         print("  Run: pip install -e .")
         return False
     except Exception as e:
@@ -313,7 +313,7 @@ def print_summary(jira_ready: bool, github_ready: bool, sheets_ready: bool) -> N
 
     if jira_ready:
         print_status(True, "Jira connection verified - ready for analysis")
-        print("  Run: ai-impact-analysis jira full")
+        print("  Run: impactlens jira full")
     else:
         print_status(False, "Jira connection failed or not configured", warning=True)
         print("  Check: JIRA_URL, JIRA_API_TOKEN, JIRA_PROJECT_KEY in .env")
@@ -321,7 +321,7 @@ def print_summary(jira_ready: bool, github_ready: bool, sheets_ready: bool) -> N
 
     if github_ready:
         print_status(True, "GitHub connection verified - ready for analysis")
-        print("  Run: ai-impact-analysis pr full")
+        print("  Run: impactlens pr full")
     else:
         print_status(False, "GitHub connection failed or not configured", warning=True)
         print("  Check: GITHUB_TOKEN, GITHUB_REPO_OWNER, GITHUB_REPO_NAME in .env")

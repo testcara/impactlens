@@ -43,7 +43,7 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         CLI Interface                            │
-│                      (ai-impact-analysis)                        │
+│                         (impactlens)                             │
 └──────────────┬──────────────────────────────┬───────────────────┘
                │                              │
        ┌───────▼────────┐            ┌────────▼──────────┐
@@ -85,8 +85,8 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 ### Directory Structure
 
 ```
-ai-impact-analysis/
-├── ai_impact_analysis/           # Core library
+impactlens/
+├── impactlens/           # Core library
 │   ├── cli.py                    # CLI entry point
 │   ├── clients/                  # API clients
 │   │   ├── jira_client.py        # Jira REST/GraphQL API
@@ -152,8 +152,8 @@ ai-impact-analysis/
 1. **Clone & create team config**:
 
    ```bash
-   git clone https://github.com/testcara/ai_impact_analysis.git
-   cd ai_impact_analysis
+   git clone https://github.com/testcara/impactlens.git
+   cd impactlens
    mkdir -p config/my-team
    cp config/*_config.yaml.example config/my-team/
    # Edit configs with your team settings
@@ -189,16 +189,16 @@ ai-impact-analysis/
 **For local development and testing**:
 
 ```bash
-git clone https://github.com/testcara/ai_impact_analysis.git
-cd ai_impact_analysis
+git clone https://github.com/testcara/impactlens.git
+cd impactlens
 
 # Docker (no Python needed)
 cp .env.example .env && vim .env
-docker-compose run ai-impact-analysis full
+docker-compose run impactlens full
 
 # CLI (Python developers)
 pip install -e . && cp .env.example .env && source .env
-ai-impact-analysis full
+impactlens full
 ```
 
 ➡️ **For detailed local setup, multi-team configuration, and Google Sheets integration**, see **[Configuration Guide](docs/CONFIGURATION.md)**
@@ -278,52 +278,52 @@ ai-impact-analysis full
 **Verify setup:**
 
 ```bash
-ai-impact-analysis verify
+impactlens verify
 ```
 
 **Generate reports:**
 
 ```bash
-ai-impact-analysis full                              # ALL reports (Jira + PR)
-ai-impact-analysis jira full                         # Jira: Team + Members + Combined
-ai-impact-analysis pr full                           # PR: Team + Members + Combined
-ai-impact-analysis jira team                         # Jira team report only
-ai-impact-analysis pr team                           # PR team report only
-ai-impact-analysis jira member alice@company.com     # Jira for one member
-ai-impact-analysis pr member alice-github            # PR for one member (GitHub username)
+impactlens full                              # ALL reports (Jira + PR)
+impactlens jira full                         # Jira: Team + Members + Combined
+impactlens pr full                           # PR: Team + Members + Combined
+impactlens jira team                         # Jira team report only
+impactlens pr team                           # PR team report only
+impactlens jira member alice@company.com     # Jira for one member
+impactlens pr member alice-github            # PR for one member (GitHub username)
 ```
 
 **Advanced usage with options:**
 
 ```bash
 # Upload control
-ai-impact-analysis full --upload-members                     # Upload ALL reports including members
-ai-impact-analysis jira full --no-upload                     # Skip all uploads
-ai-impact-analysis pr full --upload-members                  # Upload PR members reports
+impactlens full --upload-members                     # Upload ALL reports including members
+impactlens jira full --no-upload                     # Skip all uploads
+impactlens pr full --upload-members                  # Upload PR members reports
 
 # With Claude insights
-ai-impact-analysis full --with-claude-insights --claude-api-mode
+impactlens full --with-claude-insights --claude-api-mode
 
 # Incremental PR fetching
-ai-impact-analysis pr team --incremental
-ai-impact-analysis pr member testcara --incremental --no-upload
+impactlens pr team --incremental
+impactlens pr member testcara --incremental --no-upload
 
 # With custom config files (all commands support --config)
-ai-impact-analysis jira full --config config/team-a/jira_report_config.yaml
-ai-impact-analysis pr full --config config/team-a/pr_report_config.yaml --upload-members
-ai-impact-analysis pr team --config config/team-a/pr_report_config.yaml --no-upload
-ai-impact-analysis pr member alice --config config/my-team/pr_report_config.yaml
+impactlens jira full --config config/team-a/jira_report_config.yaml
+impactlens pr full --config config/team-a/pr_report_config.yaml --upload-members
+impactlens pr team --config config/team-a/pr_report_config.yaml --no-upload
+impactlens pr member alice --config config/my-team/pr_report_config.yaml
 ```
 
 **Docker usage:**
 
 ```bash
-# Just prefix CLI commands with "docker-compose run ai-impact-analysis"
-docker-compose run ai-impact-analysis verify
-docker-compose run ai-impact-analysis full
-docker-compose run ai-impact-analysis full --upload-members              # Upload all including members
-docker-compose run ai-impact-analysis jira full --no-upload
-docker-compose run ai-impact-analysis pr member testcara --incremental
+# Just prefix CLI commands with "docker-compose run impactlens"
+docker-compose run impactlens verify
+docker-compose run impactlens full
+docker-compose run impactlens full --upload-members              # Upload all including members
+docker-compose run impactlens jira full --no-upload
+docker-compose run impactlens pr member testcara --incremental
 ```
 
 **Workflow:**
@@ -403,21 +403,21 @@ source .env
 
 ```bash
 # Requires Claude Code CLI installation (see Prerequisites)
-ai-impact-analysis jira full --with-claude-insights
-ai-impact-analysis pr full --with-claude-insights
-ai-impact-analysis full --with-claude-insights
+impactlens jira full --with-claude-insights
+impactlens pr full --with-claude-insights
+impactlens full --with-claude-insights
 ```
 
 **With Anthropic API (CLI or Docker):**
 
 ```bash
 # CLI - Requires ANTHROPIC_API_KEY in .env
-ai-impact-analysis full --with-claude-insights --claude-api-mode
-ai-impact-analysis jira full --with-claude-insights --claude-api-mode
-ai-impact-analysis pr full --with-claude-insights --claude-api-mode
+impactlens full --with-claude-insights --claude-api-mode
+impactlens jira full --with-claude-insights --claude-api-mode
+impactlens pr full --with-claude-insights --claude-api-mode
 
 # Docker - Same commands, just add prefix
-docker-compose run ai-impact-analysis full --with-claude-insights --claude-api-mode
+docker-compose run impactlens full --with-claude-insights --claude-api-mode
 ```
 
 #### Manual Script Execution (For existing reports)
@@ -426,10 +426,10 @@ docker-compose run ai-impact-analysis full --with-claude-insights --claude-api-m
 
 ```bash
 # Analyze existing reports (requires Claude Code CLI installed)
-python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+python -m impactlens.scripts.analyze_with_claude_code \
   --report "reports/jira/combined_jira_report_*.tsv"
 
-python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+python -m impactlens.scripts.analyze_with_claude_code \
   --report "reports/github/combined_pr_report_*.tsv"
 ```
 
@@ -437,13 +437,13 @@ python -m ai_impact_analysis.scripts.analyze_with_claude_code \
 
 ```bash
 # CLI
-python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+python -m impactlens.scripts.analyze_with_claude_code \
   --report "reports/jira/combined_jira_report_*.tsv" \
   --claude-api-mode
 
 # Docker - Same command, just add prefix
-docker-compose run ai-impact-analysis \
-  python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+docker-compose run impactlens \
+  python -m impactlens.scripts.analyze_with_claude_code \
   --report "reports/jira/combined_jira_report_*.tsv" \
   --claude-api-mode
 ```
@@ -522,9 +522,9 @@ Edit `config/analysis_prompt_template.yaml` to customize sections, output format
 
 **Get help:**
 
-- Issues: https://github.com/testcara/ai_impact_analysis/issues
+- Issues: https://github.com/testcara/impactlens/issues
 - Documentation: See `docs/` directory
-- Command help: `ai-impact-analysis --help`
+- Command help: `impactlens --help`
 
 ## License
 
