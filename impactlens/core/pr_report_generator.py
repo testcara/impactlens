@@ -12,6 +12,8 @@ from datetime import datetime
 from impactlens.utils.report_utils import (
     add_metric_change,
     format_metric_changes,
+    get_identifier_for_file,
+    get_identifier_for_display,
 )
 from impactlens.utils.core_utils import calculate_days_between
 
@@ -20,7 +22,15 @@ class PRReportGenerator:
     """Generates reports from PR metrics data."""
 
     def generate_text_report(
-        self, stats, prs_with_metrics, start_date, end_date, repo_owner, repo_name, author=None
+        self,
+        stats,
+        prs_with_metrics,
+        start_date,
+        end_date,
+        repo_owner,
+        repo_name,
+        author=None,
+        hide_individual_names=False,
     ):
         """
         Generate human-readable text report for a single period.
@@ -33,6 +43,7 @@ class PRReportGenerator:
             repo_owner: Repository owner
             repo_name: Repository name
             author: Optional author filter
+            hide_individual_names: If True, anonymize author in report
 
         Returns:
             String report
@@ -44,7 +55,8 @@ class PRReportGenerator:
         lines.append(f"Period: {start_date} to {end_date}")
         lines.append(f"Repository: {repo_owner}/{repo_name}")
         if author:
-            lines.append(f"Author: {author}")
+            display_author = get_identifier_for_display(author, hide_individual_names)
+            lines.append(f"Author: {display_author}")
         lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append("")
 
@@ -167,7 +179,13 @@ class PRReportGenerator:
         }
 
     def save_json_output(
-        self, output_data, start_date, end_date, author=None, output_dir="reports/github"
+        self,
+        output_data,
+        start_date,
+        end_date,
+        author=None,
+        output_dir="reports/github",
+        hide_individual_names=False,
     ):
         """
         Save JSON output to file.
@@ -178,6 +196,7 @@ class PRReportGenerator:
             end_date: End date (YYYY-MM-DD)
             author: Optional author
             output_dir: Output directory
+            hide_individual_names: If True, anonymize the filename
 
         Returns:
             Output filename
@@ -187,7 +206,9 @@ class PRReportGenerator:
         date_range = f"{start_date}_{end_date}".replace("-", "")
 
         if author:
-            filename = f"{output_dir}/pr_metrics_{author}_{date_range}.json"
+            # Get file identifier (normalized and optionally anonymized)
+            identifier = get_identifier_for_file(author, hide_individual_names)
+            filename = f"{output_dir}/pr_metrics_{identifier}_{date_range}.json"
         else:
             filename = f"{output_dir}/pr_metrics_general_{date_range}.json"
 
@@ -197,7 +218,13 @@ class PRReportGenerator:
         return filename
 
     def save_text_report(
-        self, report_text, start_date, end_date, author=None, output_dir="reports/github"
+        self,
+        report_text,
+        start_date,
+        end_date,
+        author=None,
+        output_dir="reports/github",
+        hide_individual_names=False,
     ):
         """
         Save text report to file.
@@ -208,6 +235,7 @@ class PRReportGenerator:
             end_date: End date (YYYY-MM-DD)
             author: Optional author
             output_dir: Output directory
+            hide_individual_names: If True, anonymize the filename
 
         Returns:
             Output filename
@@ -217,7 +245,9 @@ class PRReportGenerator:
         date_range = f"{start_date}_{end_date}".replace("-", "")
 
         if author:
-            filename = f"{output_dir}/pr_report_{author}_{date_range}.txt"
+            # Get file identifier (normalized and optionally anonymized)
+            identifier = get_identifier_for_file(author, hide_individual_names)
+            filename = f"{output_dir}/pr_report_{identifier}_{date_range}.txt"
         else:
             filename = f"{output_dir}/pr_report_general_{date_range}.txt"
 

@@ -5,10 +5,56 @@ This module provides common functions used across different report generators
 to avoid code duplication.
 """
 
+import glob
 import os
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional, Any, Tuple, Dict
+
+from impactlens.utils.anonymization import anonymize_name
+
+
+def get_identifier_for_display(name_or_email: str, hide_individual_names: bool = False) -> str:
+    """
+    Get display identifier for a user (for terminal output, headers, etc.).
+
+    This function handles the complete transformation pipeline:
+    1. Normalize the input (remove email domain, etc.)
+    2. Anonymize if requested
+
+    Args:
+        name_or_email: Username or email (e.g., "wlin@redhat.com" or "wlin")
+        hide_individual_names: Whether to anonymize the name
+
+    Returns:
+        Display identifier (e.g., "wlin" or "Developer-1AC5")
+
+    Examples:
+        >>> get_identifier_for_display("wlin@redhat.com", False)
+        'wlin'
+        >>> get_identifier_for_display("wlin@redhat.com", True)
+        'Developer-1AC5'
+    """
+    normalized = normalize_username(name_or_email)
+    return anonymize_name(normalized) if hide_individual_names else normalized
+
+
+def get_identifier_for_file(name_or_email: str, hide_individual_names: bool = False) -> str:
+    """
+    Get identifier for file naming (same logic as display, for consistency).
+
+    This is an alias for get_identifier_for_display to make the intent clear
+    when used for file naming.
+
+    Args:
+        name_or_email: Username or email
+        hide_individual_names: Whether to anonymize the name
+
+    Returns:
+        File identifier (e.g., "wlin" or "Developer-1AC5")
+    """
+    return get_identifier_for_display(name_or_email, hide_individual_names)
 
 
 def normalize_username(username):
@@ -193,6 +239,7 @@ def generate_comparison_report(
     report_type: str = "jira",
     phase_configs: Optional[List[Tuple[str, str, str]]] = None,
     project_prefix: Optional[str] = None,
+    hide_individual_names: bool = False,
 ) -> str:
     """
     Generate comparison report from multiple phase reports.
@@ -286,12 +333,15 @@ def generate_comparison_report(
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(comparison_tsv)
 
-    print(f"\n✓ Report generated: {output_path}")
-    print("\nYou can now:")
-    print(f"  1. Open {output_path} in any text editor")
-    print("  2. Copy all content (Ctrl+A, Ctrl+C)")
-    print("  3. Paste directly into Google Sheets (no need to split columns)")
-    print("  4. The data will automatically be placed in separate columns")
+    if not hide_individual_names:
+        print(f"\n✓ Report generated: {output_path}")
+        print("\nYou can now:")
+        print(f"  1. Open {output_path} in any text editor")
+        print("  2. Copy all content (Ctrl+A, Ctrl+C)")
+        print("  3. Paste directly into Google Sheets (no need to split columns)")
+        print("  4. The data will automatically be placed in separate columns")
+    else:
+        print(f"\n✓ Comparison report generated (filename hidden for privacy)")
 
     return output_path
 
@@ -301,6 +351,7 @@ def combine_comparison_reports(
     report_type: str = "jira",
     title: Optional[str] = None,
     project_prefix: Optional[str] = None,
+    hide_individual_names: bool = False,
 ) -> str:
     """
     Combine all individual member comparison reports into a single report grouped by metric.
@@ -313,13 +364,11 @@ def combine_comparison_reports(
         report_type: "jira" or "pr"
         title: Optional title for the combined report
         project_prefix: Optional prefix for filename (e.g., project_key for Jira, repo_name for PR)
+        hide_individual_names: Whether to anonymize individual names and hide sensitive fields
 
     Returns:
         Path to generated combined report file
     """
-    import glob
-    from pathlib import Path
-
     reports_dir = Path(reports_dir)
 
     # Find all individual comparison reports (exclude "general")
@@ -348,11 +397,16 @@ def combine_comparison_reports(
         basename = os.path.basename(report_file)
         parts = basename.split("_")
         if len(parts) >= 3:
-            member_name = parts[2]  # e.g., "wlin", "sbudhwar", "general"
+            original_member_name = parts[2]  # e.g., "wlin", "sbudhwar", "general"
         else:
             continue
 
-        print(f"  Processing {member_name}...")
+        # Get display identifier for member
+        display_member_name = get_identifier_for_display(
+            original_member_name, hide_individual_names
+        )
+
+        print(f"  Processing {display_member_name}...")
 
         # Parse the report
         with open(report_file, "r", encoding="utf-8") as f:
@@ -389,10 +443,19 @@ def combine_comparison_reports(
             parts = line.split("\t")
             if len(parts) >= 2:
                 metric_name = parts[0]
+
+                # Skip sensitive fields when anonymizing
+                if hide_individual_names and metric_name in [
+                    "Leave Days",
+                    "Capacity",
+                    "Team Member Email",
+                ]:
+                    continue
+
                 values = parts[1:]
                 metric_data[metric_name] = values
 
-        members_data[member_name] = metric_data
+        members_data[display_member_name] = metric_data
 
     if not members_data or not phase_names:
         raise ValueError("Failed to parse comparison reports")

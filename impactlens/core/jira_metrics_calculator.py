@@ -11,6 +11,7 @@ import requests
 from datetime import datetime
 from pathlib import Path
 
+from impactlens.utils.logger import logger
 from impactlens.utils.report_utils import normalize_username
 from impactlens.utils.workflow_utils import load_team_members_from_yaml
 
@@ -62,30 +63,31 @@ class JiraMetricsCalculator:
         if expand:
             params["expand"] = expand
 
-        print("\n[DEBUG] === Jira API Request ===")
-        print(f"[DEBUG] URL: {url}")
-        print(f"[DEBUG] JQL Query: {jql_query}")
-        print("[DEBUG] Parameters:")
+        logger.debug("=== Jira API Request ===")
+        logger.debug(f"URL: {url}")
+        logger.debug(f"JQL Query: {jql_query}")
+        logger.debug("Parameters:")
         for key, value in params.items():
-            print(f"[DEBUG]   {key}: {value}")
-        print("[DEBUG] =========================\n")
+            logger.debug(f"  {key}: {value}")
+        logger.debug("=========================")
 
         try:
             response = requests.get(url, headers=self.headers, params=params)
 
-            print(f"[DEBUG] Response Status Code: {response.status_code}")
-            print(f"[DEBUG] Response URL: {response.url}")
+            logger.debug(f"Response Status Code: {response.status_code}")
+            logger.debug(f"Response URL: {response.url}")
 
             if not response.ok:
-                print(f"[DEBUG] Error Response: {response.text}")
+                logger.warning(f"Jira API request failed with status {response.status_code}")
+                logger.debug(f"Error Response: {response.text}")
 
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching Jira data: {e}")
-            print(f"[DEBUG] Request failed with exception: {type(e).__name__}")
+            logger.error(f"Error fetching Jira data: {e}")
+            logger.debug(f"Request failed with exception: {type(e).__name__}")
             if hasattr(e, "response") and e.response is not None:
-                print(f"[DEBUG] Response text: {e.response.text}")
+                logger.debug(f"Response text: {e.response.text}")
             return None
 
     def calculate_state_durations(self, issue):
@@ -247,7 +249,7 @@ class JiraMetricsCalculator:
         # Add assignee filter
         if assignee:
             jql_parts.append(f'assignee = "{assignee}"')
-            print(f"Filtering by assignee: {assignee}")
+            logger.debug(f"Filtering by assignee: {assignee}")
         elif team_members_file:
             # Load team members from config file using YAML parser
             try:
@@ -258,24 +260,26 @@ class JiraMetricsCalculator:
                         [f'assignee = "{member}"' for member in team_members]
                     )
                     jql_parts.append(f"({assignee_conditions})")
-                    print(f"Limiting to team members from config: {len(team_members)} members")
-                    print(f"Team members: {', '.join(team_members)}")
+                    logger.info(
+                        f"Limiting to team members from config: {len(team_members)} members"
+                    )
+                    logger.debug(f"Team members: {', '.join(team_members)}")
                 else:
-                    print("Warning: No team members found in config file")
+                    logger.warning("No team members found in config file")
             except Exception as e:
-                print(f"Warning: Error reading team members file: {e}")
+                logger.warning(f"Error reading team members file: {e}")
 
         # Add date filters
         if start_date or end_date:
             if start_date:
                 start_jql = self.convert_date_to_jql(start_date)
                 jql_parts.append(f"resolved >= {start_jql}")
-                print(f"Start date {start_date} converted to: {start_jql}")
+                logger.debug(f"Start date {start_date} converted to: {start_jql}")
 
             if end_date:
                 end_jql = self.convert_date_to_jql(end_date)
                 jql_parts.append(f"resolved <= {end_jql}")
-                print(f"End date {end_date} converted to: {end_jql}")
+                logger.debug(f"End date {end_date} converted to: {end_jql}")
         else:
             # Only use status when no date filter
             if status:
@@ -298,21 +302,23 @@ class JiraMetricsCalculator:
         initial_data = self.fetch_jira_data(jql_query, max_results=1)
         total_issues = initial_data.get("total", 0) if initial_data else 0
 
-        print(f"Total issues found for analysis: {total_issues}")
+        logger.info(f"Total issues found for analysis: {total_issues}")
 
         if total_issues == 0:
             return []
 
         all_issues = []
         for start_at in range(0, total_issues, batch_size):
-            print(f"Fetching issues {start_at} to {min(start_at + batch_size, total_issues)}...")
+            logger.debug(
+                f"Fetching issues {start_at} to {min(start_at + batch_size, total_issues)}..."
+            )
             data = self.fetch_jira_data(
                 jql_query, start_at=start_at, max_results=batch_size, expand="changelog"
             )
             if data and "issues" in data:
                 all_issues.extend(data["issues"])
             else:
-                print(f"Failed to fetch batch starting at {start_at}")
+                logger.warning(f"Failed to fetch batch starting at {start_at}")
                 break
 
         return all_issues
@@ -356,7 +362,7 @@ class JiraMetricsCalculator:
                     time_diff = (resolution_date - created_date).total_seconds()
                     closing_times.append(time_diff)
             except Exception as e:
-                print(f"Error processing issue {issue.get('key', 'unknown')}: {e}")
+                logger.warning(f"Error processing issue {issue.get('key', 'unknown')}: {e}")
 
         # Calculate state durations
         all_states_aggregated = {}
@@ -419,7 +425,7 @@ class JiraMetricsCalculator:
 
         jql_stories = " AND ".join(jql_stories_parts)
 
-        print(f"\n[DEBUG] Story query JQL: {jql_stories}\n")
+        logger.debug(f"Story query JQL: {jql_stories}")
 
         story_data = self.fetch_jira_data(jql_stories, max_results=1)
         total_stories = story_data.get("total", 0) if story_data else 0

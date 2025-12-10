@@ -34,6 +34,7 @@ Setup (Recommended - Manual Spreadsheet):
 import os
 import sys
 import argparse
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -312,8 +313,6 @@ Note:
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ Error: {e}", file=sys.stderr)
-        import traceback
-
         traceback.print_exc(file=sys.stderr)
         sys.exit(1)
 

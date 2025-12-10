@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
 from datetime import datetime
 
-from impactlens.utils.logger import Colors
+from impactlens.utils.logger import Colors, set_log_level
 
 
 def get_project_root() -> Path:
@@ -281,6 +281,12 @@ def load_config_file(
         config_value = project_settings.get(config_key)
         if config_value:  # Config has value, override environment variable
             os.environ[env_var] = str(config_value)
+
+    # Apply log_level from config if specified
+    log_level = config.get("log_level")
+    if log_level:
+        set_log_level(log_level)
+        print(f"[INFO] Log level set to: {log_level}")
 
     return phases, default_assignee, output_dir, project_settings
 

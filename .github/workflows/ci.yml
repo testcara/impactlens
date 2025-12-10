@@ -156,7 +156,8 @@ jobs:
 
           python -m impactlens.cli jira full \
             --config config/test/jira_report_config.yaml \
-            --no-upload
+            --no-upload \
+            --hide-individual-names
 
           echo ""
           echo "✓ Jira integration test completed"
@@ -176,7 +177,8 @@ jobs:
           python -m impactlens.cli pr full \
             --config config/test/pr_report_config.yaml \
             --no-upload \
-            --incremental
+            --incremental \
+            --hide-individual-names
 
           echo ""
           echo "✓ PR integration test completed"

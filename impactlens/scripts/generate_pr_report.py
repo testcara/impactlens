@@ -24,7 +24,11 @@ from impactlens.utils.workflow_utils import (
     load_team_members,
     load_and_resolve_config,
 )
-from impactlens.utils.report_utils import normalize_username
+from impactlens.utils.report_utils import (
+    normalize_username,
+    combine_comparison_reports,
+    get_identifier_for_display,
+)
 
 
 def print_header(title: str, subtitle: Optional[str] = None) -> None:
@@ -44,6 +48,7 @@ def generate_phase_metrics(
     author: Optional[str] = None,
     incremental: bool = False,
     output_dir: Optional[str] = None,
+    hide_individual_names: bool = False,
 ) -> bool:
     """Generate PR metrics for a single phase."""
     args = [
@@ -65,6 +70,9 @@ def generate_phase_metrics(
     if output_dir:
         args.extend(["--output-dir", str(output_dir)])
 
+    if hide_individual_names:
+        args.append("--hide-individual-names")
+
     try:
         subprocess.run(args, check=True)
         return True
@@ -76,6 +84,7 @@ def generate_comparison_report(
     author: Optional[str] = None,
     output_dir: Optional[str] = None,
     config_file: Optional[Path] = None,
+    hide_individual_names: bool = False,
 ) -> bool:
     """Generate comparison report from phase metrics."""
     args = [
@@ -93,6 +102,9 @@ def generate_comparison_report(
     if config_file:
         args.extend(["--config", str(config_file)])
 
+    if hide_individual_names:
+        args.append("--hide-individual-names")
+
     try:
         subprocess.run(args, check=True)
         return True
@@ -106,6 +118,7 @@ def generate_all_members_reports(
     no_upload: bool = False,
     upload_members: bool = False,
     config_file: Optional[Path] = None,
+    hide_individual_names: bool = False,
 ) -> int:
     """
     Generate reports for all team members.
@@ -116,6 +129,7 @@ def generate_all_members_reports(
         no_upload: If True, skip all uploads
         upload_members: If True, upload member reports (default: False, only team report is uploaded)
         config_file: Optional custom config file path
+        hide_individual_names: If True, anonymize individual names in reports
     """
     print_header("Generating reports for all team members")
 
@@ -132,6 +146,8 @@ def generate_all_members_reports(
         cmd.extend(["--config", str(config_file)])
     if no_upload:
         cmd.append("--no-upload")
+    if hide_individual_names:
+        cmd.append("--hide-individual-names")
     result = subprocess.run(cmd)
     if result.returncode != 0:
         print(f"{Colors.RED}  ✗ Failed to generate team report{Colors.NC}")
@@ -143,7 +159,9 @@ def generate_all_members_reports(
     # Only upload if --upload-members is specified (and --no-upload is not set)
     failed_members = []
     for member in members:
-        print(f"{Colors.BLUE}>>> Generating Report for: {member}{Colors.NC}")
+        # Get display identifier for member
+        display_member = get_identifier_for_display(member, hide_individual_names)
+        print(f"{Colors.BLUE}>>> Generating Report for: {display_member}{Colors.NC}")
         print()
         cmd = [sys.executable, "-m", script_name, member]
         if config_file:
@@ -151,6 +169,8 @@ def generate_all_members_reports(
         # Skip upload for member reports unless --upload-members is specified
         if no_upload or not upload_members:
             cmd.append("--no-upload")
+        if hide_individual_names:
+            cmd.append("--hide-individual-names")
         result = subprocess.run(cmd)
         if result.returncode != 0:
             failed_members.append(member)
@@ -222,6 +242,11 @@ Examples:
         help="Upload individual member reports to Google Sheets (default: only team and combined reports)",
     )
     parser.add_argument(
+        "--hide-individual-names",
+        action="store_true",
+        help="Anonymize individual names in combined reports (Developer-A3F2, etc.)",
+    )
+    parser.add_argument(
         "--config",
         type=str,
         help="Path to custom config file (default: config/pr_report_config.yaml)",
@@ -246,15 +271,22 @@ Examples:
 
     # Handle --combine-only flag
     if args.combine_only:
-        from impactlens.utils.report_utils import combine_comparison_reports
-
         print_header("Combining Existing GitHub PR Reports")
+
+        # Clean up old combined reports before generating new one
+        # Note: Only clean combined reports, not comparison reports (which are needed as input)
+        print(f"{Colors.YELLOW}Cleaning up old combined reports...{Colors.NC}")
+        for old_combined in Path(reports_dir).glob("combined_pr_report_*.tsv"):
+            old_combined.unlink()
+            print(f"{Colors.GREEN}  ✓ Removed {old_combined.name}{Colors.NC}")
+        print()
 
         try:
             output_file = combine_comparison_reports(
                 reports_dir=str(reports_dir),
                 report_type="pr",
                 title="GitHub PR AI Impact Analysis - Combined Report (Grouped by Metric)",
+                hide_individual_names=args.hide_individual_names,
             )
             print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
             print()
@@ -280,13 +312,16 @@ Examples:
             no_upload=args.no_upload,
             upload_members=args.upload_members,
             config_file=config_file,
+            hide_individual_names=args.hide_individual_names,
         )
 
     # Determine author
     author = args.author or default_author or None
 
     if author:
-        print_header("GitHub PR Analysis Report Generator", f"Author: {author}")
+        # Get display identifier for author
+        display_author = get_identifier_for_display(author, args.hide_individual_names)
+        print_header("GitHub PR Analysis Report Generator", f"Author: {display_author}")
     else:
         print_header("GitHub PR Analysis Report Generator", "Team Overall Report")
 
@@ -313,6 +348,7 @@ Examples:
             author=author,
             incremental=args.incremental,
             output_dir=str(reports_dir),
+            hide_individual_names=args.hide_individual_names,
         )
 
         if success:
@@ -327,7 +363,10 @@ Examples:
     # Generate comparison report
     print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
     if not generate_comparison_report(
-        author=author, output_dir=str(reports_dir), config_file=config_file
+        author=author,
+        output_dir=str(reports_dir),
+        config_file=config_file,
+        hide_individual_names=args.hide_individual_names,
     ):
         print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")
         return 1

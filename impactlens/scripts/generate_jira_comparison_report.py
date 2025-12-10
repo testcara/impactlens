@@ -13,7 +13,11 @@ from datetime import datetime
 from pathlib import Path
 
 from impactlens.core.jira_report_generator import JiraReportGenerator
-from impactlens.utils.report_utils import normalize_username, generate_comparison_report
+from impactlens.utils.report_utils import (
+    normalize_username,
+    generate_comparison_report,
+    get_identifier_for_file,
+)
 from impactlens.utils.workflow_utils import (
     load_config_file,
     get_project_root,
@@ -22,7 +26,7 @@ from impactlens.utils.workflow_utils import (
 )
 
 
-def find_reports(assignee=None, reports_dir="reports/jira"):
+def find_reports(assignee=None, reports_dir="reports/jira", hide_individual_names=False):
     """Find all matching Jira report files."""
     if not os.path.exists(reports_dir):
         return []
@@ -35,8 +39,9 @@ def find_reports(assignee=None, reports_dir="reports/jira"):
             continue
 
         if assignee:
-            username = normalize_username(assignee)
-            if f"jira_report_{username}_" in filename:
+            # Get file identifier (normalized and optionally anonymized)
+            identifier = get_identifier_for_file(assignee, hide_individual_names)
+            if f"jira_report_{identifier}_" in filename:
                 files.append(os.path.join(reports_dir, filename))
         else:
             if "jira_report_general_" in filename:
@@ -74,6 +79,11 @@ def main():
         help="Path to custom config YAML file",
         default=None,
     )
+    parser.add_argument(
+        "--hide-individual-names",
+        action="store_true",
+        help="Look for anonymized report files (Developer-XXXX)",
+    )
     args = parser.parse_args()
 
     # Load phase configuration to get phase names
@@ -101,7 +111,11 @@ def main():
                 print(f"Resolved '{args.assignee}' to '{email}'")
 
     # Find matching reports using resolved assignee
-    report_files = find_reports(resolved_assignee, reports_dir=args.reports_dir)
+    report_files = find_reports(
+        resolved_assignee,
+        reports_dir=args.reports_dir,
+        hide_individual_names=args.hide_individual_names,
+    )
 
     if len(report_files) == 0:
         if args.assignee:
@@ -110,8 +124,8 @@ def main():
             print("Error: No general reports found")
         print("\nLooking for files matching pattern:")
         if args.assignee:
-            username = normalize_username(args.assignee)
-            print(f"  {args.reports_dir}/jira_report_{username}_*.txt")
+            identifier = get_identifier_for_file(args.assignee, args.hide_individual_names)
+            print(f"  {args.reports_dir}/jira_report_{identifier}_*.txt")
         else:
             print(f"  {args.reports_dir}/jira_report_general_*.txt")
         return 1
@@ -146,7 +160,13 @@ def main():
 
     # Generate comparison report using shared utility
     report_gen = JiraReportGenerator()
-    identifier = normalize_username(resolved_assignee) if resolved_assignee else None
+
+    # Get identifier for filename (normalized and optionally anonymized)
+    identifier = (
+        get_identifier_for_file(resolved_assignee, args.hide_individual_names)
+        if resolved_assignee
+        else None
+    )
 
     generate_comparison_report(
         report_files=report_files,
@@ -157,6 +177,7 @@ def main():
         output_file=args.output,
         report_type="jira",
         phase_configs=phases,
+        hide_individual_names=args.hide_individual_names,
     )
 
     return 0

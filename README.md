@@ -143,14 +143,11 @@ impactlens/
 
 ## Quick Start
 
-### ⚡ Option 1: GitHub Actions CI (Recommended)
+### ⚡ GitHub Actions CI (Recommended - Zero Config)
 
-**Perfect for:** Teams wanting automated reports with zero local setup.
-
-**Prerequisites:** GitHub repository access only - CI pre-configured!
+**Perfect for:** Teams wanting automated reports with zero local setup and privacy protection.
 
 1. **Clone & create team config**:
-
    ```bash
    git clone https://github.com/testcara/impactlens.git
    cd impactlens
@@ -160,33 +157,25 @@ impactlens/
    ```
 
 2. **Generate reports via PR**:
-
    ```bash
    git checkout -b report/my-team-2024-12
-   git add -f config/my-team/  # -f forces adding ignored config files
+   git add -f config/my-team/
    git commit -m "chore: generate AI impact report for my-team"
    git push origin report/my-team-2024-12
    # Create PR → CI auto-generates reports → View in PR comments
    ```
 
-3. **View reports**:
-   - Auto-uploads to [Default Google Sheet](https://docs.google.com/spreadsheets/d/1AnX3zGoVOv9QXgx3ck2IH8ksRnBoW2V4Uk4o-KoyV0k/edit?gid=0#gid=0)
-   - Download from workflow artifacts
-   - **Manually close PR** after reviewing (DO NOT MERGE config-only PRs)
+3. **View anonymized reports**: Auto-uploaded to [Default Google Sheet](https://docs.google.com/spreadsheets/d/1AnX3zGoVOv9QXgx3ck2IH8ksRnBoW2V4Uk4o-KoyV0k/edit?gid=0#gid=0) or download from workflow artifacts
 
-> **Note:** Uses default credentials and default Google Sheet.
+> 🔒 **Privacy Protection**: CI automatically anonymizes individual data (names → Developer-A3F2, hides emails/leave_days/capacity). For full data, run locally.
 >
-> **For custom Google Sheets**: Add your spreadsheet ID to config, then **grant Editor access** to CI service account: `cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com`
->
-> 🔒 **Privacy**: This service account can only access sheets you explicitly share with it. No access to your other Google Drive files.
->
-> For detailed setup, see [Configuration Guide](docs/CONFIGURATION.md)
+> **For custom Google Sheets**: Grant Editor access to `cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com`
 
 ---
 
-### 💻 Option 2: Local Development (Docker or CLI)
+### 💻 Local Development (Full Data Access)
 
-**For local development and testing**:
+For detailed individual data, run locally with Docker or CLI:
 
 ```bash
 git clone https://github.com/testcara/impactlens.git
@@ -201,7 +190,7 @@ pip install -e . && cp .env.example .env && source .env
 impactlens full
 ```
 
-➡️ **For detailed local setup, multi-team configuration, and Google Sheets integration**, see **[Configuration Guide](docs/CONFIGURATION.md)**
+➡️ **For detailed configuration and advanced features**, see **[Configuration Guide](docs/CONFIGURATION.md)**
 
 ## Configuration
 
@@ -296,6 +285,11 @@ impactlens pr member alice-github            # PR for one member (GitHub usernam
 **Advanced usage with options:**
 
 ```bash
+# Privacy protection (anonymize individual names in combined reports)
+impactlens full --hide-individual-names              # Names → Developer-A3F2, Developer-B7E1, etc.
+impactlens jira full --hide-individual-names         # Also hides leave_days and capacity
+impactlens pr full --hide-individual-names
+
 # Upload control
 impactlens full --upload-members                     # Upload ALL reports including members
 impactlens jira full --no-upload                     # Skip all uploads
