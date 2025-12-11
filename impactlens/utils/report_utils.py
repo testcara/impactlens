@@ -392,19 +392,18 @@ def combine_comparison_reports(
     phase_names = None
 
     for report_file in sorted(report_files):
-        # Extract member name from filename
-        # Pattern: jira_comparison_MEMBER_TIMESTAMP.tsv or pr_comparison_MEMBER_TIMESTAMP.tsv
+        # Extract member identifier from filename
+        # Pattern: jira_comparison_IDENTIFIER_TIMESTAMP.tsv or pr_comparison_IDENTIFIER_TIMESTAMP.tsv
+        # IDENTIFIER can be: "general", "Developer-XXXX" (anonymized), or "username" (non-anonymized)
         basename = os.path.basename(report_file)
         parts = basename.split("_")
         if len(parts) >= 3:
-            original_member_name = parts[2]  # e.g., "wlin", "sbudhwar", "general"
+            member_identifier = parts[2]  # e.g., "general", "Developer-1AC5", "wlin"
         else:
             continue
 
-        # Get display identifier for member
-        display_member_name = get_identifier_for_display(
-            original_member_name, hide_individual_names
-        )
+        # Use the identifier from filename directly (already in correct format)
+        display_member_name = member_identifier
 
         print(f"  Processing {display_member_name}...")
 
