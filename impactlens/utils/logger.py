@@ -37,13 +37,13 @@ def print_section(title: str) -> None:
     print(f"{Colors.YELLOW}{title}...{Colors.NC}")
 
 
-def setup_logger(name, level=logging.INFO):
+def setup_logger(name, level=logging.WARNING):
     """
     Set up a logger with consistent formatting.
 
     Args:
         name: Logger name
-        level: Logging level
+        level: Logging level (default: WARNING to avoid leaking sensitive info)
 
     Returns:
         Configured logger instance
@@ -65,5 +65,20 @@ def setup_logger(name, level=logging.INFO):
     return logger
 
 
-# Default logger instance for the package
+def set_log_level(level):
+    """
+    Set the logging level for the global logger instance.
+
+    Args:
+        level: Logging level (can be string like 'INFO', 'DEBUG', 'WARNING', 'ERROR' or int)
+    """
+    if isinstance(level, str):
+        level = getattr(logging, level.upper(), logging.WARNING)
+
+    logger.setLevel(level)
+    for handler in logger.handlers:
+        handler.setLevel(level)
+
+
+# Default logger instance for the package (WARNING level by default)
 logger = setup_logger("ai_analysis")

@@ -8,9 +8,11 @@ impactlens.core.jira_metrics_calculator
 
 import argparse
 import sys
+from pathlib import Path
 
 from impactlens.core.jira_metrics_calculator import JiraMetricsCalculator
 from impactlens.core.jira_report_generator import JiraReportGenerator
+from impactlens.utils.workflow_utils import get_project_root, load_team_members_from_yaml
 
 
 def main():
@@ -55,26 +57,23 @@ def main():
         help="Output directory for reports (default: reports/jira)",
         default="reports/jira",
     )
+    parser.add_argument(
+        "--hide-individual-names",
+        action="store_true",
+        help="Anonymize individual names in filenames (Developer-A3F2, etc.)",
+    )
 
     args = parser.parse_args()
 
     # Load config if specified (will be merged with defaults)
     team_members_file = None
     if args.config:
-        from pathlib import Path
-
         team_members_file = Path(args.config)
         if not team_members_file.exists():
             print(f"Error: Config file not found: {args.config}")
             return 1
 
     # Determine which config file to use for leave_days lookup
-    from pathlib import Path
-    from impactlens.utils.workflow_utils import (
-        get_project_root,
-        load_team_members_from_yaml,
-    )
-
     project_root = get_project_root()
     default_config_path = project_root / "config" / "jira_report_config.yaml"
     config_path = team_members_file if team_members_file else default_config_path
@@ -111,7 +110,11 @@ def main():
         status=args.status,
     )
 
-    print(f"\nUsing JQL query: {jql_query}\n")
+    # Only print JQL query if not hiding individual names
+    if not args.hide_individual_names:
+        print(f"\nUsing JQL query: {jql_query}\n")
+    else:
+        print(f"\nJQL query prepared (hidden for privacy)\n")
 
     # Fetch all issues
     all_issues = calculator.fetch_all_issues(jql_query)
@@ -134,16 +137,25 @@ def main():
         end_date=args.end,
         leave_days=leave_days,
         capacity=capacity,
+        hide_individual_names=args.hide_individual_names,
     )
 
-    # Print report to console
+    # Display report (assignee and JQL already anonymized if needed)
     print(report_text)
 
     # Save text report
     report_filename = report_gen.save_text_report(
-        report_text, assignee=args.assignee, output_dir=args.output_dir
+        report_text,
+        args.start,
+        args.end,
+        assignee=args.assignee,
+        output_dir=args.output_dir,
+        hide_individual_names=args.hide_individual_names,
     )
-    print(f"\nReport saved to: {report_filename}")
+    if not args.hide_individual_names:
+        print(f"\nReport saved to: {report_filename}")
+    else:
+        print(f"\nReport saved (filename hidden for privacy)")
 
     # Generate and save JSON output (if dates are provided)
     if args.start and args.end:
@@ -152,6 +164,7 @@ def main():
             args.project or calculator.project_key, start_date=args.start, end_date=args.end
         )
 
+        # Velocity stats contain no personal information, safe to display
         print("\n--- Velocity Calculation (Based on Story Points) ---")
         print(f"Completed Stories Count: {velocity_stats['total_stories']}")
         print(f"Stories with Story Points: {velocity_stats['stories_with_points']}")
@@ -172,9 +185,17 @@ def main():
 
         # Save JSON output
         json_filename = report_gen.save_json_output(
-            json_output, args.start, args.end, assignee=args.assignee, output_dir=args.output_dir
+            json_output,
+            args.start,
+            args.end,
+            assignee=args.assignee,
+            output_dir=args.output_dir,
+            hide_individual_names=args.hide_individual_names,
         )
-        print(f"Analysis results saved to: {json_filename}")
+        if not args.hide_individual_names:
+            print(f"Analysis results saved to: {json_filename}")
+        else:
+            print(f"Analysis results saved (filename hidden for privacy)")
 
     return 0
 

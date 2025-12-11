@@ -15,6 +15,8 @@ from impactlens.utils.report_utils import (
     calculate_percentage_change,
     format_metric_changes,
     add_metric_change,
+    get_identifier_for_file,
+    get_identifier_for_display,
 )
 from impactlens.utils.core_utils import calculate_days_between
 
@@ -32,6 +34,7 @@ class JiraReportGenerator:
         end_date=None,
         leave_days=0,
         capacity=1.0,
+        hide_individual_names=False,
     ):
         """
         Generate human-readable text report from metrics.
@@ -45,6 +48,7 @@ class JiraReportGenerator:
             end_date: Phase end date (YYYY-MM-DD) for Data Span calculation
             leave_days: Number of leave days
             capacity: Work capacity (0.0 to 1.0, default 1.0 = full time)
+            hide_individual_names: If True, anonymize assignee and hide JQL query
 
         Returns:
             String report
@@ -52,15 +56,20 @@ class JiraReportGenerator:
         report_lines = []
         report_lines.append("=" * 100)
         if assignee:
-            report_lines.append(f"JIRA Data Analysis Report - {assignee}")
+            display_assignee = get_identifier_for_display(assignee, hide_individual_names)
+            report_lines.append(f"JIRA Data Analysis Report - {display_assignee}")
         else:
             report_lines.append("JIRA Data Analysis Report")
         report_lines.append("=" * 100)
         report_lines.append(f"\nGenerated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         report_lines.append(f"Project: {project_key}")
         if assignee:
-            report_lines.append(f"Assignee: {assignee}")
-        report_lines.append(f"JQL Query: {jql_query}\n")
+            display_assignee = get_identifier_for_display(assignee, hide_individual_names)
+            report_lines.append(f"Assignee: {display_assignee}")
+        if not hide_individual_names:
+            report_lines.append(f"JQL Query: {jql_query}\n")
+        else:
+            report_lines.append("")  # Empty line to maintain formatting
 
         # Data Time Range
         report_lines.append("\n--- Data Time Range ---")
@@ -261,47 +270,25 @@ class JiraReportGenerator:
 
         return output_data
 
-    def save_text_report(self, report_text, assignee=None, output_dir="reports/jira"):
+    def save_text_report(
+        self,
+        report_text,
+        start_date,
+        end_date,
+        assignee=None,
+        output_dir="reports/jira",
+        hide_individual_names=False,
+    ):
         """
         Save text report to file.
 
         Args:
             report_text: Report text content
-            assignee: Optional assignee (for filename)
-            output_dir: Output directory
-
-        Returns:
-            Output filename
-        """
-        os.makedirs(output_dir, exist_ok=True)
-
-        if assignee:
-            username = normalize_username(assignee)
-            filename = os.path.join(
-                output_dir, f'jira_report_{username}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
-            )
-        else:
-            filename = os.path.join(
-                output_dir, f'jira_report_general_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
-            )
-
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write(report_text)
-
-        return filename
-
-    def save_json_output(
-        self, output_data, start_date, end_date, assignee=None, output_dir="reports/jira"
-    ):
-        """
-        Save JSON output to file.
-
-        Args:
-            output_data: Data dictionary
             start_date: Start date (YYYY-MM-DD)
             end_date: End date (YYYY-MM-DD)
-            assignee: Optional assignee
+            assignee: Optional assignee (for filename)
             output_dir: Output directory
+            hide_individual_names: If True, anonymize the filename
 
         Returns:
             Output filename
@@ -312,7 +299,52 @@ class JiraReportGenerator:
         end_formatted = end_date.replace("-", "")
 
         if assignee:
-            identifier = normalize_username(assignee)
+            # Get file identifier (normalized and optionally anonymized)
+            identifier = get_identifier_for_file(assignee, hide_individual_names)
+            filename = os.path.join(
+                output_dir, f"jira_report_{identifier}_{start_formatted}_{end_formatted}.txt"
+            )
+        else:
+            filename = os.path.join(
+                output_dir, f"jira_report_general_{start_formatted}_{end_formatted}.txt"
+            )
+
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(report_text)
+
+        return filename
+
+    def save_json_output(
+        self,
+        output_data,
+        start_date,
+        end_date,
+        assignee=None,
+        output_dir="reports/jira",
+        hide_individual_names=False,
+    ):
+        """
+        Save JSON output to file.
+
+        Args:
+            output_data: Data dictionary
+            start_date: Start date (YYYY-MM-DD)
+            end_date: End date (YYYY-MM-DD)
+            assignee: Optional assignee
+            output_dir: Output directory
+            hide_individual_names: If True, anonymize the filename
+
+        Returns:
+            Output filename
+        """
+        os.makedirs(output_dir, exist_ok=True)
+
+        start_formatted = start_date.replace("-", "")
+        end_formatted = end_date.replace("-", "")
+
+        if assignee:
+            # Get file identifier (normalized and optionally anonymized)
+            identifier = get_identifier_for_file(assignee, hide_individual_names)
         else:
             identifier = "general"
 

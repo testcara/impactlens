@@ -3,14 +3,23 @@
 import requests
 import os
 
+from impactlens.utils.logger import logger
+
 
 class JiraClient:
     """Client for interacting with Jira REST API."""
 
     def __init__(self, jira_url=None, api_token=None):
-        """Initialize Jira client with URL and API token."""
+        """
+        Initialize Jira client with URL and API token.
+
+        Args:
+            jira_url: Jira server URL
+            api_token: API token for authentication
+        """
         self.jira_url = jira_url or os.getenv("JIRA_URL", "https://issues.redhat.com")
         self.api_token = api_token or os.getenv("JIRA_API_TOKEN")
+        # Debug logging is disabled by default to avoid leaking sensitive info in CI logs
 
         self.headers = {"Accept": "application/json", "authorization": f"Bearer {self.api_token}"}
 
@@ -39,30 +48,31 @@ class JiraClient:
         if expand:
             params["expand"] = expand
 
-        print("\n[DEBUG] === Jira API Request ===")
-        print(f"[DEBUG] URL: {url}")
-        print(f"[DEBUG] JQL Query: {jql_query}")
-        print("[DEBUG] Parameters:")
+        logger.debug("=== Jira API Request ===")
+        logger.debug(f"URL: {url}")
+        logger.debug(f"JQL Query: {jql_query}")
+        logger.debug("Parameters:")
         for key, value in params.items():
-            print(f"[DEBUG]   {key}: {value}")
-        print("[DEBUG] =========================\n")
+            logger.debug(f"  {key}: {value}")
+        logger.debug("=========================")
 
         try:
             response = requests.get(url, headers=self.headers, params=params)
 
-            print(f"[DEBUG] Response Status Code: {response.status_code}")
-            print(f"[DEBUG] Response URL: {response.url}")
+            logger.debug(f"Response Status Code: {response.status_code}")
+            logger.debug(f"Response URL: {response.url}")
 
             if not response.ok:
-                print(f"[DEBUG] Error Response: {response.text}")
+                logger.warning(f"Jira API request failed with status {response.status_code}")
+                logger.debug(f"Error Response: {response.text}")
 
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching Jira data: {e}")
-            print(f"[DEBUG] Request failed with exception: {type(e).__name__}")
+            logger.error(f"Error fetching Jira data: {e}")
+            logger.debug(f"Request failed with exception: {type(e).__name__}")
             if hasattr(e, "response") and e.response is not None:
-                print(f"[DEBUG] Response text: {e.response.text}")
+                logger.debug(f"Response text: {e.response.text}")
             return None
 
     def fetch_all_issues(self, jql_query, batch_size=50, expand=None):
@@ -80,12 +90,12 @@ class JiraClient:
         initial_data = self.fetch_jira_data(jql_query, max_results=1)
         total_issues = initial_data.get("total", 0) if initial_data else 0
 
-        print(f"Total issues found: {total_issues}")
+        logger.info(f"Total issues found: {total_issues}")
 
         all_issues = []
         if total_issues > 0:
             for start_at in range(0, total_issues, batch_size):
-                print(
+                logger.debug(
                     f"Fetching issues {start_at} to {min(start_at + batch_size, total_issues)}..."
                 )
                 data = self.fetch_jira_data(
@@ -94,7 +104,7 @@ class JiraClient:
                 if data and "issues" in data:
                     all_issues.extend(data["issues"])
                 else:
-                    print(f"Failed to fetch batch starting at {start_at}")
+                    logger.warning(f"Failed to fetch batch starting at {start_at}")
                     break
 
         return all_issues

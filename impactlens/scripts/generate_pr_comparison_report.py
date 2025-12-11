@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from impactlens.core.pr_report_generator import PRReportGenerator
-from impactlens.utils.report_utils import generate_comparison_report
+from impactlens.utils.report_utils import generate_comparison_report, get_identifier_for_file
 from impactlens.utils.workflow_utils import load_config_file, get_project_root
 
 
@@ -58,7 +58,7 @@ def parse_phase_config(config_path="config/github_phases.conf"):
     return phases
 
 
-def find_reports(author=None, reports_dir="reports/github"):
+def find_reports(author=None, reports_dir="reports/github", hide_individual_names=False):
     """Find all matching PR report files."""
     if not os.path.exists(reports_dir):
         return []
@@ -71,7 +71,9 @@ def find_reports(author=None, reports_dir="reports/github"):
             continue
 
         if author:
-            if f"pr_metrics_{author}_" in filename:
+            # Get file identifier (normalized and optionally anonymized)
+            identifier = get_identifier_for_file(author, hide_individual_names)
+            if f"pr_metrics_{identifier}_" in filename:
                 files.append(os.path.join(reports_dir, filename))
         else:
             if "pr_metrics_general_" in filename:
@@ -109,6 +111,11 @@ def main():
         help="Path to custom config YAML file",
         default=None,
     )
+    parser.add_argument(
+        "--hide-individual-names",
+        action="store_true",
+        help="Look for anonymized report files (Developer-XXXX)",
+    )
 
     args = parser.parse_args()
 
@@ -125,7 +132,9 @@ def main():
         phase_names = []
 
     # Find matching reports
-    report_files = find_reports(args.author, reports_dir=args.reports_dir)
+    report_files = find_reports(
+        args.author, reports_dir=args.reports_dir, hide_individual_names=args.hide_individual_names
+    )
 
     if len(report_files) == 0:
         if args.author:
@@ -134,7 +143,8 @@ def main():
             print("Error: No general reports found")
         print("\nLooking for files matching pattern:")
         if args.author:
-            print(f"  {args.reports_dir}/pr_metrics_{args.author}_*.json")
+            identifier = get_identifier_for_file(args.author, args.hide_individual_names)
+            print(f"  {args.reports_dir}/pr_metrics_{identifier}_*.json")
         else:
             print(f"  {args.reports_dir}/pr_metrics_general_*.json")
         return 1
@@ -170,14 +180,20 @@ def main():
     # Generate comparison report using shared utility
     report_gen = PRReportGenerator()
 
+    # Get identifier for filename (normalized and optionally anonymized)
+    identifier = (
+        get_identifier_for_file(args.author, args.hide_individual_names) if args.author else None
+    )
+
     generate_comparison_report(
         report_files=report_files,
         report_generator=report_gen,
         phase_names=phase_names,
-        identifier=args.author,
+        identifier=identifier,
         output_dir=args.reports_dir,
         output_file=args.output,
         report_type="pr",
+        hide_individual_names=args.hide_individual_names,
     )
 
     return 0

@@ -16,6 +16,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from impactlens.utils.logger import set_log_level
+
 # Main app
 app = typer.Typer(
     name="impactlens",
@@ -276,6 +278,11 @@ def jira_full(
         "--upload-members",
         help="Upload individual member reports (default: only team/combined)",
     ),
+    hide_individual_names: bool = typer.Option(
+        False,
+        "--hide-individual-names",
+        help="Anonymize individual names in combined reports and hide sensitive fields",
+    ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
     ),
@@ -319,6 +326,8 @@ def jira_full(
         args.append("--no-upload")
     if upload_members:
         args.append("--upload-members")
+    if hide_individual_names:
+        args.append("--hide-individual-names")
 
     if run_script("impactlens.scripts.generate_jira_report", args, "Jira all reports") != 0:
         failed_steps.append("Jira all reports")
@@ -330,6 +339,8 @@ def jira_full(
         args.extend(["--config", str(config_file_path)])
     if no_upload:
         args.append("--no-upload")
+    if hide_individual_names:
+        args.append("--hide-individual-names")
 
     if run_script("impactlens.scripts.generate_jira_report", args, "Jira combine") != 0:
         failed_steps.append("Jira combine")
@@ -539,6 +550,11 @@ def pr_full(
         "--upload-members",
         help="Upload individual member reports (default: only team/combined)",
     ),
+    hide_individual_names: bool = typer.Option(
+        False,
+        "--hide-individual-names",
+        help="Anonymize individual names in combined reports and hide sensitive fields",
+    ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
     ),
@@ -584,6 +600,8 @@ def pr_full(
         args.append("--no-upload")
     if upload_members:
         args.append("--upload-members")
+    if hide_individual_names:
+        args.append("--hide-individual-names")
 
     if run_script("impactlens.scripts.generate_pr_report", args, "PR all reports") != 0:
         failed_steps.append("PR all reports")
@@ -595,6 +613,8 @@ def pr_full(
         args.extend(["--config", str(config_file_path)])
     if no_upload:
         args.append("--no-upload")
+    if hide_individual_names:
+        args.append("--hide-individual-names")
 
     if run_script("impactlens.scripts.generate_pr_report", args, "PR combine") != 0:
         failed_steps.append("PR combine")
@@ -659,6 +679,11 @@ def full_workflow(
         "--upload-members",
         help="Upload individual member reports (default: only team/combined)",
     ),
+    hide_individual_names: bool = typer.Option(
+        False,
+        "--hide-individual-names",
+        help="Anonymize individual names in combined reports (Developer-1, Developer-2, etc.)",
+    ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
     ),
@@ -667,6 +692,11 @@ def full_workflow(
         False,
         "--claude-api-mode",
         help="Use Anthropic API instead of Claude Code CLI (requires ANTHROPIC_API_KEY)",
+    ),
+    log_level: str = typer.Option(
+        "WARNING",
+        "--log-level",
+        help="Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING)",
     ),
 ):
     """
@@ -679,6 +709,9 @@ def full_workflow(
     - Directory: config/team-a (auto-finds both jira_report_config.yaml and pr_report_config.yaml)
     - Specific file: Uses for both workflows
     """
+    # Set log level early
+    set_log_level(log_level)
+
     console.print(
         Panel.fit(
             "[bold white]Complete AI Impact Analysis[/bold white]\n"
@@ -702,6 +735,8 @@ def full_workflow(
         jira_args.append("--no-upload")
     if upload_members:
         jira_args.append("--upload-members")
+    if hide_individual_names:
+        jira_args.append("--hide-individual-names")
     if jira_config_path:
         jira_args.extend(["--config", str(jira_config_path)])
 
@@ -713,6 +748,8 @@ def full_workflow(
     jira_combine_args = ["--combine-only"]
     if no_upload:
         jira_combine_args.append("--no-upload")
+    if hide_individual_names:
+        jira_combine_args.append("--hide-individual-names")
     if jira_config_path:
         jira_combine_args.extend(["--config", str(jira_config_path)])
 
@@ -761,6 +798,8 @@ def full_workflow(
         pr_args.append("--no-upload")
     if upload_members:
         pr_args.append("--upload-members")
+    if hide_individual_names:
+        pr_args.append("--hide-individual-names")
     if pr_config_path:
         pr_args.extend(["--config", str(pr_config_path)])
 
@@ -772,6 +811,8 @@ def full_workflow(
     pr_combine_args = ["--combine-only"]
     if no_upload:
         pr_combine_args.append("--no-upload")
+    if hide_individual_names:
+        pr_combine_args.append("--hide-individual-names")
     if pr_config_path:
         pr_combine_args.extend(["--config", str(pr_config_path)])
 

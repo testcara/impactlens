@@ -168,9 +168,10 @@ jobs:
           CONFIG_PATH="${{ steps.config.outputs.config_dir }}/jira_report_config.yaml"
           if [ -f "$CONFIG_PATH" ]; then
             echo "Generating Jira report with config: $CONFIG_PATH"
-            echo "Running command: python -m impactlens.cli jira full --config \"$CONFIG_PATH\""
+            echo "Running command: python -m impactlens.cli jira full --config \"$CONFIG_PATH\" --hide-individual-names"
             python -m impactlens.cli jira full \
-              --config "$CONFIG_PATH"
+              --config "$CONFIG_PATH" \
+              --hide-individual-names
           else
             echo "Jira config not found at $CONFIG_PATH, skipping"
           fi
@@ -184,10 +185,11 @@ jobs:
           CONFIG_PATH="${{ steps.config.outputs.config_dir }}/pr_report_config.yaml"
           if [ -f "$CONFIG_PATH" ]; then
             echo "Generating PR report with config: $CONFIG_PATH"
-            echo "Running command: python -m impactlens.cli pr full --config \"$CONFIG_PATH\" --incremental"
+            echo "Running command: python -m impactlens.cli pr full --config \"$CONFIG_PATH\" --incremental --hide-individual-names"
             python -m impactlens.cli pr full \
               --config "$CONFIG_PATH" \
-              --incremental
+              --incremental \
+              --hide-individual-names
           else
             echo "PR config not found at $CONFIG_PATH, skipping"
           fi

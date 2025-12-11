@@ -6,9 +6,11 @@ This is a thin wrapper around the core business logic in
 impactlens.core.pr_metrics_calculator
 """
 
+import json
 import os
 import sys
 import argparse
+import traceback
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -17,6 +19,7 @@ from impactlens.clients.github_client_graphql import GitHubGraphQLClient
 from impactlens.core.pr_metrics_calculator import PRMetricsCalculator
 from impactlens.core.pr_report_generator import PRReportGenerator
 from impactlens.utils.logger import logger
+from impactlens.utils.report_utils import get_identifier_for_display
 
 
 def main():
@@ -80,6 +83,11 @@ Examples:
         help="Output directory for reports (default: reports/github)",
         default="reports/github",
     )
+    parser.add_argument(
+        "--hide-individual-names",
+        action="store_true",
+        help="Anonymize individual names in filenames (Developer-A3F2, etc.)",
+    )
 
     args = parser.parse_args()
 
@@ -94,7 +102,8 @@ Examples:
     print("\n📊 Collecting GitHub PR metrics...")
     print(f"Period: {args.start} to {args.end}")
     if args.author:
-        print(f"Author: {args.author}")
+        display_author = get_identifier_for_display(args.author, args.hide_individual_names)
+        print(f"Author: {display_author}")
 
     # Determine which client to use
     use_rest = args.use_rest
@@ -189,8 +198,6 @@ Examples:
             print(f"\n✓ Successfully analyzed {len(prs_with_metrics)}/{len(prs)} PRs")
     except Exception as e:
         print(f"Error fetching PRs: {e}")
-        import traceback
-
         traceback.print_exc()
         return 1
 
@@ -213,6 +220,7 @@ Examples:
         client.repo_owner,
         client.repo_name,
         args.author,
+        hide_individual_names=args.hide_individual_names,
     )
 
     # Prepare JSON output
@@ -230,25 +238,36 @@ Examples:
     if args.output:
         json_file = args.output
         with open(json_file, "w", encoding="utf-8") as f:
-            import json
-
             json.dump(output_data, f, indent=2, ensure_ascii=False)
         txt_file = None
     else:
         json_file = report_gen.save_json_output(
-            output_data, args.start, args.end, args.author, output_dir=args.output_dir
+            output_data,
+            args.start,
+            args.end,
+            args.author,
+            output_dir=args.output_dir,
+            hide_individual_names=args.hide_individual_names,
         )
         txt_file = report_gen.save_text_report(
-            text_report, args.start, args.end, args.author, output_dir=args.output_dir
+            text_report,
+            args.start,
+            args.end,
+            args.author,
+            output_dir=args.output_dir,
+            hide_individual_names=args.hide_individual_names,
         )
 
-    # Display report
+    # Display report (author already anonymized if needed)
     print("\n" + text_report)
 
     print("\n✅ Analysis complete!")
-    print(f"📄 JSON output: {json_file}")
-    if txt_file:
-        print(f"📄 Text report: {txt_file}")
+    if not args.hide_individual_names:
+        print(f"📄 JSON output: {json_file}")
+        if txt_file:
+            print(f"📄 Text report: {txt_file}")
+    else:
+        print(f"📄 Reports saved (filenames hidden for privacy)")
 
     return 0
 

@@ -16,6 +16,13 @@ from impactlens.utils.workflow_utils import (
     find_latest_comparison_report,
     load_team_members,
 )
+from impactlens.utils.anonymization import (
+    NameAnonymizer,
+    anonymize_names_in_list,
+    anonymize_member_data,
+    get_display_member_info,
+    should_include_sensitive_fields,
+)
 
 __all__ = [
     "logger",
@@ -30,4 +37,9 @@ __all__ = [
     "upload_to_google_sheets",
     "find_latest_comparison_report",
     "load_team_members",
+    "NameAnonymizer",
+    "anonymize_names_in_list",
+    "anonymize_member_data",
+    "get_display_member_info",
+    "should_include_sensitive_fields",
 ]

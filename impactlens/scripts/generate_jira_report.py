@@ -12,6 +12,7 @@ This script orchestrates the complete Jira report generation workflow:
 import sys
 import argparse
 import subprocess
+import traceback
 from pathlib import Path
 from typing import List, Optional
 
@@ -23,8 +24,13 @@ from impactlens.utils.workflow_utils import (
     find_latest_comparison_report,
     load_team_members,
     load_and_resolve_config,
+    load_team_members_from_yaml,
 )
-from impactlens.utils.report_utils import normalize_username
+from impactlens.utils.report_utils import (
+    normalize_username,
+    combine_comparison_reports,
+    get_identifier_for_display,
+)
 
 
 def print_header(title: str, subtitle: Optional[str] = None) -> None:
@@ -46,6 +52,7 @@ def generate_phase_report(
     leave_days: int = 0,
     capacity: float = 1.0,
     output_dir: Optional[str] = None,
+    hide_individual_names: bool = False,
 ) -> bool:
     """Generate report for a single phase."""
     args = [
@@ -72,6 +79,9 @@ def generate_phase_report(
     if output_dir:
         args.extend(["--output-dir", str(output_dir)])
 
+    if hide_individual_names:
+        args.append("--hide-individual-names")
+
     try:
         subprocess.run(args, check=True)
         return True
@@ -83,6 +93,7 @@ def generate_comparison_report(
     assignee: Optional[str] = None,
     output_dir: Optional[str] = None,
     config_file: Optional[Path] = None,
+    hide_individual_names: bool = False,
 ) -> bool:
     """Generate comparison report from phase reports."""
     args = [
@@ -100,6 +111,9 @@ def generate_comparison_report(
     if config_file:
         args.extend(["--config", str(config_file)])
 
+    if hide_individual_names:
+        args.append("--hide-individual-names")
+
     try:
         subprocess.run(args, check=True)
         return True
@@ -113,6 +127,7 @@ def generate_all_members_reports(
     no_upload: bool = False,
     upload_members: bool = False,
     config_file: Optional[Path] = None,
+    hide_individual_names: bool = False,
 ) -> int:
     """
     Generate reports for all team members.
@@ -123,6 +138,7 @@ def generate_all_members_reports(
         no_upload: If True, skip all uploads
         upload_members: If True, upload member reports (default: False, only team report is uploaded)
         config_file: Optional custom config file to pass to subcommands
+        hide_individual_names: If True, anonymize individual names in reports
     """
     print_header("Generating reports for all team members")
 
@@ -139,6 +155,8 @@ def generate_all_members_reports(
         cmd.extend(["--config", str(config_file)])
     if no_upload:
         cmd.append("--no-upload")
+    if hide_individual_names:
+        cmd.append("--hide-individual-names")
     result = subprocess.run(cmd)
     if result.returncode != 0:
         print(f"{Colors.RED}  ✗ Failed to generate team report{Colors.NC}")
@@ -150,7 +168,9 @@ def generate_all_members_reports(
     # Only upload if --upload-members is specified (and --no-upload is not set)
     failed_members = []
     for member in members:
-        print(f"{Colors.BLUE}>>> Generating Report for: {member}{Colors.NC}")
+        # Get display identifier for member
+        display_member = get_identifier_for_display(member, hide_individual_names)
+        print(f"{Colors.BLUE}>>> Generating Report for: {display_member}{Colors.NC}")
         print()
         cmd = [sys.executable, "-m", script_name, member]
         if config_file:
@@ -158,6 +178,8 @@ def generate_all_members_reports(
         # Skip upload for member reports unless --upload-members is specified
         if no_upload or not upload_members:
             cmd.append("--no-upload")
+        if hide_individual_names:
+            cmd.append("--hide-individual-names")
         result = subprocess.run(cmd)
         if result.returncode != 0:
             failed_members.append(member)
@@ -223,6 +245,11 @@ Examples:
         help="Upload individual member reports to Google Sheets (default: only team and combined reports)",
     )
     parser.add_argument(
+        "--hide-individual-names",
+        action="store_true",
+        help="Anonymize individual names in combined reports (Developer-A3F2, etc.) and hide sensitive fields (leave_days, capacity)",
+    )
+    parser.add_argument(
         "--config",
         type=str,
         help="Path to custom config YAML file. Settings override defaults from config/jira_report_config.yaml",
@@ -248,9 +275,15 @@ Examples:
 
     # Handle --combine-only flag
     if args.combine_only:
-        from impactlens.utils.report_utils import combine_comparison_reports
-
         print_header("Combining Existing Jira Reports")
+
+        # Clean up old combined reports before generating new one
+        # Note: Only clean combined reports, not comparison reports (which are needed as input)
+        print(f"{Colors.YELLOW}Cleaning up old combined reports...{Colors.NC}")
+        for old_combined in Path(reports_dir).glob("combined_jira_report_*.tsv"):
+            old_combined.unlink()
+            print(f"{Colors.GREEN}  ✓ Removed {old_combined.name}{Colors.NC}")
+        print()
 
         # Get project prefix from config
         project_prefix = project_settings.get("jira_project_key")
@@ -261,15 +294,14 @@ Examples:
                 report_type="jira",
                 title="Jira AI Impact Analysis - Combined Report (Grouped by Metric)",
                 project_prefix=project_prefix,
+                hide_individual_names=args.hide_individual_names,
             )
             print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
             print()
             upload_to_google_sheets(output_file, skip_upload=args.no_upload)
         except Exception as e:
             print(f"{Colors.RED}Error combining reports: {e}{Colors.NC}")
-            import traceback
-
-            traceback.print_exc()
+            traceback.logger.debug_exc()
             return 1
 
         return 0
@@ -282,13 +314,16 @@ Examples:
             no_upload=args.no_upload,
             upload_members=args.upload_members,
             config_file=config_file,
+            hide_individual_names=args.hide_individual_names,
         )
 
     # Determine assignee
     assignee = args.assignee or default_assignee or None
 
     if assignee:
-        print_header("AI Impact Analysis Report Generator", f"Assignee: {assignee}")
+        # Get display identifier for assignee
+        display_assignee = get_identifier_for_display(assignee, args.hide_individual_names)
+        print_header("AI Impact Analysis Report Generator", f"Assignee: {display_assignee}")
     else:
         print_header("AI Impact Analysis Report Generator", "Team Overall Report")
 
@@ -308,8 +343,6 @@ Examples:
     # Load leave_days and capacity
     leave_days_list = None
     capacity_list = None
-    from impactlens.utils.workflow_utils import load_team_members_from_yaml
-
     team_members_details = load_team_members_from_yaml(config_file, detailed=True)
 
     if assignee:
@@ -385,6 +418,7 @@ Examples:
             leave_days=phase_leave_days,
             capacity=phase_capacity,
             output_dir=str(reports_dir),
+            hide_individual_names=args.hide_individual_names,
         )
 
         if success:
@@ -399,7 +433,10 @@ Examples:
     # Generate comparison report
     print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
     if not generate_comparison_report(
-        assignee=assignee, output_dir=str(reports_dir), config_file=config_file
+        assignee=assignee,
+        output_dir=str(reports_dir),
+        config_file=config_file,
+        hide_individual_names=args.hide_individual_names,
     ):
         print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")
         return 1
