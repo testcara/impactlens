@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+"""
+CLI script to fetch and analyze Jira metrics.
+
+This is a thin wrapper around the core business logic in
+impactlens.core.jira_metrics_calculator
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+from impactlens.core.jira_metrics_calculator import JiraMetricsCalculator
+from impactlens.core.jira_report_generator import JiraReportGenerator
+from impactlens.utils.workflow_utils import get_project_root, load_team_members_from_yaml
+
+
+def main():
+    """Main entry point for Jira metrics CLI."""
+    parser = argparse.ArgumentParser(
+        description="Analyze Jira issue state transitions and closure time"
+    )
+    parser.add_argument(
+        "--start", type=str, help="Start date (format: YYYY-MM-DD)", required=False, default=None
+    )
+    parser.add_argument(
+        "--end", type=str, help="End date (format: YYYY-MM-DD)", required=False, default=None
+    )
+    parser.add_argument("--status", type=str, help="Issue status (default: Done)", default="Done")
+    parser.add_argument(
+        "--project", type=str, help="Project key (overrides PROJECT_KEY in config)", default=None
+    )
+    parser.add_argument(
+        "--assignee", type=str, help="Specify assignee (username or email)", default=None
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        help="Path to custom config YAML file. Settings from this file override defaults from config/jira_report_config.yaml",
+        default=None,
+    )
+    parser.add_argument(
+        "--leave-days",
+        type=str,
+        help="Number of leave days for this phase (e.g., '26' or '11.5')",
+        default=None,
+    )
+    parser.add_argument(
+        "--capacity",
+        type=str,
+        help="Work capacity for this member (0.0 to 1.0, e.g., '0.8' for 80%% time)",
+        default=None,
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        help="Output directory for reports (default: reports/jira)",
+        default="reports/jira",
+    )
+    parser.add_argument(
+        "--hide-individual-names",
+        action="store_true",
+        help="Anonymize individual names in filenames (Developer-A3F2, etc.)",
+    )
+
+    args = parser.parse_args()
+
+    # Load config if specified (will be merged with defaults)
+    team_members_file = None
+    if args.config:
+        team_members_file = Path(args.config)
+        if not team_members_file.exists():
+            print(f"Error: Config file not found: {args.config}")
+            return 1
+
+    # Determine which config file to use for leave_days lookup
+    project_root = get_project_root()
+    default_config_path = project_root / "config" / "jira_report_config.yaml"
+    config_path = team_members_file if team_members_file else default_config_path
+
+    # Get leave_days from command line argument
+    leave_days = 0
+    if args.leave_days is not None:
+        try:
+            leave_days = float(args.leave_days)
+        except ValueError:
+            print(f"Error: --leave-days must be a number, got '{args.leave_days}'")
+            return 1
+
+    # Get capacity from command line argument
+    capacity = 1.0
+    if args.capacity is not None:
+        try:
+            capacity = float(args.capacity)
+        except ValueError:
+            print(f"Error: --capacity must be a number, got '{args.capacity}'")
+            return 1
+
+    # Initialize calculator and report generator
+    calculator = JiraMetricsCalculator(project_key=args.project)
+    report_gen = JiraReportGenerator()
+
+    # Build JQL query
+    jql_query, team_members = calculator.build_jql_query(
+        project_key=args.project,
+        assignee=args.assignee,
+        team_members_file=team_members_file,
+        start_date=args.start,
+        end_date=args.end,
+        status=args.status,
+    )
+
+    # Only print JQL query if not hiding individual names
+    if not args.hide_individual_names:
+        print(f"\nUsing JQL query: {jql_query}\n")
+    else:
+        print(f"\nJQL query prepared (hidden for privacy)\n")
+
+    # Fetch all issues
+    all_issues = calculator.fetch_all_issues(jql_query)
+
+    if not all_issues:
+        print("No issues found matching the criteria.")
+        # Generate empty report
+        metrics = calculator._empty_metrics()
+    else:
+        # Calculate metrics
+        metrics = calculator.calculate_metrics(all_issues)
+
+    # Generate text report
+    report_text = report_gen.generate_text_report(
+        metrics,
+        jql_query,
+        args.project or calculator.project_key,
+        assignee=args.assignee,
+        start_date=args.start,
+        end_date=args.end,
+        leave_days=leave_days,
+        capacity=capacity,
+        hide_individual_names=args.hide_individual_names,
+    )
+
+    # Display report (assignee and JQL already anonymized if needed)
+    print(report_text)
+
+    # Save text report
+    report_filename = report_gen.save_text_report(
+        report_text,
+        args.start,
+        args.end,
+        assignee=args.assignee,
+        output_dir=args.output_dir,
+        hide_individual_names=args.hide_individual_names,
+    )
+    if not args.hide_individual_names:
+        print(f"\nReport saved to: {report_filename}")
+    else:
+        print(f"\nReport saved (filename hidden for privacy)")
+
+    # Generate and save JSON output (if dates are provided)
+    if args.start and args.end:
+        # Calculate velocity
+        velocity_stats = calculator.calculate_velocity(
+            args.project or calculator.project_key, start_date=args.start, end_date=args.end
+        )
+
+        # Velocity stats contain no personal information, safe to display
+        print("\n--- Velocity Calculation (Based on Story Points) ---")
+        print(f"Completed Stories Count: {velocity_stats['total_stories']}")
+        print(f"Stories with Story Points: {velocity_stats['stories_with_points']}")
+        print(f"Total Story Points: {velocity_stats['total_story_points']}")
+        if velocity_stats["stories_with_points"] > 0:
+            print(f"Average Points per Story: {velocity_stats['avg_points_per_story']:.2f}")
+
+        # Generate JSON output
+        json_output = report_gen.generate_json_output(
+            metrics,
+            jql_query,
+            args.project or calculator.project_key,
+            args.start,
+            args.end,
+            assignee=args.assignee,
+            velocity_stats=velocity_stats,
+        )
+
+        # Save JSON output
+        json_filename = report_gen.save_json_output(
+            json_output,
+            args.start,
+            args.end,
+            assignee=args.assignee,
+            output_dir=args.output_dir,
+            hide_individual_names=args.hide_individual_names,
+        )
+        if not args.hide_individual_names:
+            print(f"Analysis results saved to: {json_filename}")
+        else:
+            print(f"Analysis results saved (filename hidden for privacy)")
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

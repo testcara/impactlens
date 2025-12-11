@@ -3,20 +3,8 @@ name: CI
 on:
   push:
     branches: [ master ]
-    paths:
-      - '**.py'
-      - 'pyproject.toml'
-      - 'requirements.txt'
-      - 'config/test/**'
-      - '.github/workflows/ci.yml'
   pull_request:
     branches: [ master ]
-    paths:
-      - '**.py'
-      - 'pyproject.toml'
-      - 'requirements.txt'
-      - 'config/test/**'
-      - '.github/workflows/ci.yml'
 
 jobs:
   test:
@@ -27,39 +15,69 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check if only docs changed
+      id: docs_check
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          echo "Changed files:"
+          echo "$FILES"
+
+          # Check if only docs/config files changed
+          if echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore)$'; then
+            echo "code_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "code_changed=false" >> $GITHUB_OUTPUT
+            echo "Only documentation/config files changed, skipping tests"
+          fi
+        else
+          echo "code_changed=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Skip tests (docs only)
+      if: steps.docs_check.outputs.code_changed == 'false'
+      run: |
+        echo "✓ Skipping tests - only documentation files changed"
+        exit 0
 
     - name: Set up Python ${{ matrix.python-version }}
+      if: steps.docs_check.outputs.code_changed == 'true'
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Install tox
+      if: steps.docs_check.outputs.code_changed == 'true'
       run: |
         python -m pip install --upgrade pip
         pip install tox tox-gh-actions
 
     - name: Run tests with tox
+      if: steps.docs_check.outputs.code_changed == 'true'
       run: |
         tox -e py$(echo "${{ matrix.python-version }}" | tr -d '.')
 
     - name: Run lint checks
-      if: matrix.python-version == '3.11'
+      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
       run: |
         tox -e lint
 
     - name: Run type checking
-      if: matrix.python-version == '3.11'
+      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
       continue-on-error: true
       run: |
         tox -e type
 
     - name: Run coverage
-      if: matrix.python-version == '3.11'
+      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
       run: |
         tox -e coverage
 
     - name: Upload coverage reports
-      if: matrix.python-version == '3.11'
+      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
       uses: codecov/codecov-action@v4
       with:
         fail_ci_if_error: false
@@ -75,18 +93,44 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if only docs changed
+        id: docs_check
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+            if echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore)$'; then
+              echo "code_changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "code_changed=false" >> $GITHUB_OUTPUT
+              echo "Only documentation/config files changed, skipping integration tests"
+            fi
+          else
+            echo "code_changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip integration tests (docs only)
+        if: steps.docs_check.outputs.code_changed == 'false'
+        run: |
+          echo "✓ Skipping integration tests - only documentation files changed"
+          exit 0
 
       - name: Set up Python
+        if: steps.docs_check.outputs.code_changed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install dependencies
+        if: steps.docs_check.outputs.code_changed == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -e .
 
       - name: Restore GitHub PR cache
+        if: steps.docs_check.outputs.code_changed == 'true'
         uses: actions/cache@v4
         with:
           path: .cache/github
@@ -96,6 +140,7 @@ jobs:
             integration-test-pr-cache-
 
       - name: Run integration test - Jira reports
+        if: steps.docs_check.outputs.code_changed == 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
@@ -109,35 +154,38 @@ jobs:
           echo "Running Jira Integration Test"
           echo "=========================================="
 
-          python -m ai_impact_analysis.cli jira full \
+          python -m impactlens.cli jira full \
             --config config/test/jira_report_config.yaml \
-            --no-upload
+            --no-upload \
+            --hide-individual-names
 
           echo ""
           echo "✓ Jira integration test completed"
           ls -lh reports/test/jira/ || echo "No reports generated"
 
       - name: Run integration test - PR reports
+        if: steps.docs_check.outputs.code_changed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "=========================================="
           echo "Running PR Integration Test"
           echo "=========================================="
-          echo "Command: python -m ai_impact_analysis.cli pr full --config config/test/pr_report_config.yaml --no-upload --incremental"
+          echo "Command: python -m impactlens.cli pr full --config config/test/pr_report_config.yaml --no-upload --incremental"
           echo ""
 
-          python -m ai_impact_analysis.cli pr full \
+          python -m impactlens.cli pr full \
             --config config/test/pr_report_config.yaml \
             --no-upload \
-            --incremental
+            --incremental \
+            --hide-individual-names
 
           echo ""
           echo "✓ PR integration test completed"
           ls -lh reports/test/github/ || echo "No reports generated"
 
       - name: Upload test reports as artifacts
-        if: always()
+        if: steps.docs_check.outputs.code_changed == 'true' && always()
         uses: actions/upload-artifact@v4
         with:
           name: integration-test-reports
@@ -145,7 +193,7 @@ jobs:
           retention-days: 7
 
       - name: Integration test summary
-        if: always()
+        if: steps.docs_check.outputs.code_changed == 'true' && always()
         run: |
           echo "=========================================="
           echo "Integration Test Summary"

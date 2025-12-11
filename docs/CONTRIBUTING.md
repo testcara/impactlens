@@ -18,8 +18,8 @@ Thank you for your interest in contributing to AI Impact Analysis! This guide wi
 
 ```bash
 # Fork the repository on GitHub, then clone your fork
-git clone https://github.com/YOUR_USERNAME/ai_impact_analysis.git
-cd ai_impact_analysis
+git clone https://github.com/YOUR_USERNAME/impactlens.git
+cd impactlens
 ```
 
 ### 2. Set Up Environment
@@ -86,11 +86,11 @@ pre-commit install --hook-type commit-msg --hook-type pre-commit
 tox -e unittest --develop
 
 # Verify CLI is working
-ai-impact-analysis --help
+impactlens --help
 
 # Test basic commands
-ai-impact-analysis verify
-ai-impact-analysis jira team
+impactlens verify
+impactlens jira team
 ```
 
 > **Note:** Docker images are automatically built from the `master` branch via Quay.io Build Triggers. You only need to test the CLI locally - once you push to master, the Docker image will be built automatically.
@@ -254,11 +254,11 @@ When you commit Python code changes, CI automatically runs integration tests usi
 # - pr_report_config.yaml: 2-week test period, 2 members
 
 # You can run the same tests locally:
-python -m ai_impact_analysis.cli jira full \
+python -m impactlens.cli jira full \
   --config config/test/jira_report_config.yaml \
   --no-upload
 
-python -m ai_impact_analysis.cli pr full \
+python -m impactlens.cli pr full \
   --config config/test/pr_report_config.yaml \
   --no-upload
 ```
@@ -276,16 +276,16 @@ This validates the full pipeline executes correctly with real API calls.
 
 ```bash
 # Verify setup
-ai-impact-analysis verify
+impactlens verify
 
 # Test Jira workflow
-ai-impact-analysis jira team
+impactlens jira team
 
 # Test PR workflow
-ai-impact-analysis pr team
+impactlens pr team
 
 # Test full workflow
-ai-impact-analysis full
+impactlens full
 ```
 
 **Test with custom config:**
@@ -300,7 +300,7 @@ phases:
 EOF
 
 # Run with custom config
-ai-impact-analysis jira team --config test-config.yaml
+impactlens jira team --config test-config.yaml
 ```
 
 ## Code Quality
@@ -368,9 +368,9 @@ When adding features or changing behavior:
 
 ## Getting Help
 
-- **Questions**: Open a [Discussion](https://github.com/testcara/ai_impact_analysis/discussions)
-- **Bug Reports**: Open an [Issue](https://github.com/testcara/ai_impact_analysis/issues)
-- **Feature Requests**: Open an [Issue](https://github.com/testcara/ai_impact_analysis/issues) with `enhancement` label
+- **Questions**: Open a [Discussion](https://github.com/testcara/impactlens/discussions)
+- **Bug Reports**: Open an [Issue](https://github.com/testcara/impactlens/issues)
+- **Feature Requests**: Open an [Issue](https://github.com/testcara/impactlens/issues) with `enhancement` label
 
 ## Pull Request Checklist
 
@@ -416,7 +416,7 @@ open htmlcov/index.html
 ```python
 # tests/test_new_feature.py
 import pytest
-from ai_impact_analysis.core.new_feature import calculate_metric
+from impactlens.core.new_feature import calculate_metric
 
 def test_calculate_metric():
     """Test metric calculation."""
@@ -437,7 +437,7 @@ import os
 )
 def test_fetch_issues():
     """Test fetching real Jira issues."""
-    from ai_impact_analysis.clients.jira_client import JiraClient
+    from impactlens.clients.jira_client import JiraClient
 
     client = JiraClient()
     issues = client.fetch_issues(start_date="2024-01-01", end_date="2024-01-31")

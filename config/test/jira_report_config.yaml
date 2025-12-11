@@ -7,11 +7,11 @@ project:
 
 phases:
   - name: "Test Period 1"
-    start: "2024-11-11"
-    end: "2024-11-14"
+    start: "2025-10-01"
+    end: "2025-10-31"
   - name: "Test Period 2"
-    start: "2024-11-15"
-    end: "2024-11-18"
+    start: "2025-11-01"
+    end: "2025-11-30"
 
 default_assignee: "" # "" represent team
 
@@ -27,3 +27,6 @@ team_members:
 
 # Use test output directory to avoid polluting main reports
 output_dir: "reports/test/jira"
+
+# Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
+log_level: "WARNING"

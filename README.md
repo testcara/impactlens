@@ -1,6 +1,6 @@
-# AI Impact Analysis
+# ImpactLens
 
-**A data-driven tool to quantify the impact of AI coding assistants on development efficiency through Jira and GitHub metrics.**
+A data-driven tool that delivers actionable insights for measuring AI coding assistant ROI and enabling objective performance reviews through Jira and GitHub metrics analysis.
 
 ## Table of Contents
 
@@ -17,21 +17,22 @@
 
 ## Overview
 
-A Python tool that quantifies the impact of AI coding assistants through objective, data-driven metrics from Jira and GitHub.
+ImpactLens helps engineering leaders and teams measure the real-world impact of AI coding assistants by analyzing development metrics from Jira and GitHub. Get objective insights into productivity changes, team performance, and AI tool ROI.
 
 **Business Value:**
 
 - **Measure AI ROI**: Compare development efficiency before and after AI tool adoption
-- **Data-Driven Decisions**: Use objective metrics (closure time, merge time, throughput) to evaluate AI effectiveness
-- **Team & Individual Insights**: Understand AI impact at organization and contributor levels
-- **Enterprise-Ready**: Multi-team support with isolated configs and reports for large organizations
+- **Performance Reviews**: Objective metrics for evaluating team and individual performance
+- **Data-Driven Insights**: Track closure time, merge time, throughput, and more to help making informed decisions
+- **Multi-Team Support**: Isolated configs and reports for multiple teams
 - **Automated Reporting**: Generate comprehensive reports with one command
-- **Shareable Results**: Auto-upload to Google Sheets for stakeholder visibility
+- **Easy Sharing**: Auto-upload to Google Sheets for stakeholder visibility
 
 **Use Cases:**
 
 - Engineering leaders evaluating AI tool investments
 - Teams measuring productivity improvements
+- Managers conducting objective performance reviews for teams and individuals
 - Researchers studying AI coding assistant effectiveness
 - Organizations tracking developer efficiency over time
 
@@ -42,7 +43,7 @@ A Python tool that quantifies the impact of AI coding assistants through objecti
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         CLI Interface                            │
-│                      (ai-impact-analysis)                        │
+│                         (impactlens)                             │
 └──────────────┬──────────────────────────────┬───────────────────┘
                │                              │
        ┌───────▼────────┐            ┌────────▼──────────┐
@@ -84,8 +85,8 @@ A Python tool that quantifies the impact of AI coding assistants through objecti
 ### Directory Structure
 
 ```
-ai-impact-analysis/
-├── ai_impact_analysis/           # Core library
+impactlens/
+├── impactlens/           # Core library
 │   ├── cli.py                    # CLI entry point
 │   ├── clients/                  # API clients
 │   │   ├── jira_client.py        # Jira REST/GraphQL API
@@ -142,16 +143,14 @@ ai-impact-analysis/
 
 ## Quick Start
 
-### ⚡ Option 1: GitHub Actions CI (Recommended)
+### ⚡ GitHub Actions CI (Recommended - Zero Config)
 
-**Perfect for:** Teams wanting automated reports with zero local setup.
-
-**Prerequisites:** GitHub repository access only - CI pre-configured!
+**Perfect for:** Teams wanting automated reports with zero local setup and privacy protection.
 
 1. **Clone & create team config**:
    ```bash
-   git clone https://github.com/testcara/ai_impact_analysis.git
-   cd ai_impact_analysis
+   git clone https://github.com/testcara/impactlens.git
+   cd impactlens
    mkdir -p config/my-team
    cp config/*_config.yaml.example config/my-team/
    # Edit configs with your team settings
@@ -160,39 +159,38 @@ ai-impact-analysis/
 2. **Generate reports via PR**:
    ```bash
    git checkout -b report/my-team-2024-12
-   git add -f config/my-team/  # -f forces adding ignored config files
+   git add -f config/my-team/
    git commit -m "chore: generate AI impact report for my-team"
    git push origin report/my-team-2024-12
    # Create PR → CI auto-generates reports → View in PR comments
    ```
 
-3. **View reports**:
-   - Auto-uploads to [Default Google Sheet](https://docs.google.com/spreadsheets/d/1AnX3zGoVOv9QXgx3ck2IH8ksRnBoW2V4Uk4o-KoyV0k/edit?gid=0#gid=0)
-   - Download from workflow artifacts
-   - **Manually close PR** after reviewing (DO NOT MERGE config-only PRs)
+3. **View anonymized reports**: Auto-uploaded to [Default Google Sheet](https://docs.google.com/spreadsheets/d/1AnX3zGoVOv9QXgx3ck2IH8ksRnBoW2V4Uk4o-KoyV0k/edit?gid=0#gid=0) or download from workflow artifacts
 
-> **Note:** Uses default credentials. For custom credentials/sheets, see [Configuration Guide](docs/CONFIGURATION.md)
+> 🔒 **Privacy Protection**: CI automatically anonymizes individual data (names → Developer-A3F2, hides emails/leave_days/capacity). For full data, run locally.
+>
+> **For custom Google Sheets**: Grant Editor access to `cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com`
 
 ---
 
-### 💻 Option 2: Local Development (Docker or CLI)
+### 💻 Local Development (Full Data Access)
 
-**For local development and testing**:
+For detailed individual data, run locally with Docker or CLI:
 
 ```bash
-git clone https://github.com/testcara/ai_impact_analysis.git
-cd ai_impact_analysis
+git clone https://github.com/testcara/impactlens.git
+cd impactlens
 
 # Docker (no Python needed)
 cp .env.example .env && vim .env
-docker-compose run ai-impact-analysis full
+docker-compose run impactlens full
 
 # CLI (Python developers)
 pip install -e . && cp .env.example .env && source .env
-ai-impact-analysis full
+impactlens full
 ```
 
-➡️ **For detailed local setup, multi-team configuration, and Google Sheets integration**, see **[Configuration Guide](docs/CONFIGURATION.md)**
+➡️ **For detailed configuration and advanced features**, see **[Configuration Guide](docs/CONFIGURATION.md)**
 
 ## Configuration
 
@@ -203,6 +201,7 @@ ai-impact-analysis full
 **Essential setup**:
 
 1. **Project Settings** (YAML) - Define project/repo to analyze:
+
    ```yaml
    # Jira config (config/jira_report_config.yaml)
    project:
@@ -216,6 +215,7 @@ ai-impact-analysis full
    ```
 
 2. **Phases** (YAML) - Define before/after AI periods:
+
    ```yaml
    phases:
      - name: "Before AI"
@@ -227,6 +227,7 @@ ai-impact-analysis full
    ```
 
 3. **Team Members** (YAML) - Define team scope for filtering:
+
    ```yaml
    # Jira: Only issues assigned to these members
    team_members:
@@ -238,6 +239,7 @@ ai-impact-analysis full
      - name: alice-github
      - name: bob-github
    ```
+
    Team reports aggregate only these members' data. Individual reports also generated.
 
 4. **Credentials** (.env) - API tokens and passwords:
@@ -247,6 +249,7 @@ ai-impact-analysis full
    ```
 
 ➡️ **For complete configuration reference including:**
+
 - Multi-team setup & isolation
 - Google Sheets integration
 - Custom config paths
@@ -264,52 +267,57 @@ ai-impact-analysis full
 **Verify setup:**
 
 ```bash
-ai-impact-analysis verify
+impactlens verify
 ```
 
 **Generate reports:**
 
 ```bash
-ai-impact-analysis full                              # ALL reports (Jira + PR)
-ai-impact-analysis jira full                         # Jira: Team + Members + Combined
-ai-impact-analysis pr full                           # PR: Team + Members + Combined
-ai-impact-analysis jira team                         # Jira team report only
-ai-impact-analysis pr team                           # PR team report only
-ai-impact-analysis jira member alice@company.com     # Jira for one member
-ai-impact-analysis pr member alice-github            # PR for one member (GitHub username)
+impactlens full                              # ALL reports (Jira + PR)
+impactlens jira full                         # Jira: Team + Members + Combined
+impactlens pr full                           # PR: Team + Members + Combined
+impactlens jira team                         # Jira team report only
+impactlens pr team                           # PR team report only
+impactlens jira member alice@company.com     # Jira for one member
+impactlens pr member alice-github            # PR for one member (GitHub username)
 ```
 
 **Advanced usage with options:**
 
 ```bash
+# Privacy protection (anonymize individual names in combined reports)
+impactlens full --hide-individual-names              # Names → Developer-A3F2, Developer-B7E1, etc.
+impactlens jira full --hide-individual-names         # Also hides leave_days and capacity
+impactlens pr full --hide-individual-names
+
 # Upload control
-ai-impact-analysis full --upload-members                     # Upload ALL reports including members
-ai-impact-analysis jira full --no-upload                     # Skip all uploads
-ai-impact-analysis pr full --upload-members                  # Upload PR members reports
+impactlens full --upload-members                     # Upload ALL reports including members
+impactlens jira full --no-upload                     # Skip all uploads
+impactlens pr full --upload-members                  # Upload PR members reports
 
 # With Claude insights
-ai-impact-analysis full --with-claude-insights --claude-api-mode
+impactlens full --with-claude-insights --claude-api-mode
 
 # Incremental PR fetching
-ai-impact-analysis pr team --incremental
-ai-impact-analysis pr member testcara --incremental --no-upload
+impactlens pr team --incremental
+impactlens pr member testcara --incremental --no-upload
 
 # With custom config files (all commands support --config)
-ai-impact-analysis jira full --config config/team-a/jira_report_config.yaml
-ai-impact-analysis pr full --config config/team-a/pr_report_config.yaml --upload-members
-ai-impact-analysis pr team --config config/team-a/pr_report_config.yaml --no-upload
-ai-impact-analysis pr member alice --config config/my-team/pr_report_config.yaml
+impactlens jira full --config config/team-a/jira_report_config.yaml
+impactlens pr full --config config/team-a/pr_report_config.yaml --upload-members
+impactlens pr team --config config/team-a/pr_report_config.yaml --no-upload
+impactlens pr member alice --config config/my-team/pr_report_config.yaml
 ```
 
 **Docker usage:**
 
 ```bash
-# Just prefix CLI commands with "docker-compose run ai-impact-analysis"
-docker-compose run ai-impact-analysis verify
-docker-compose run ai-impact-analysis full
-docker-compose run ai-impact-analysis full --upload-members              # Upload all including members
-docker-compose run ai-impact-analysis jira full --no-upload
-docker-compose run ai-impact-analysis pr member testcara --incremental
+# Just prefix CLI commands with "docker-compose run impactlens"
+docker-compose run impactlens verify
+docker-compose run impactlens full
+docker-compose run impactlens full --upload-members              # Upload all including members
+docker-compose run impactlens jira full --no-upload
+docker-compose run impactlens pr member testcara --incremental
 ```
 
 **Workflow:**
@@ -323,6 +331,7 @@ The `full` command workflow: Get metrics → Generate reports → Upload reports
 - `--rest-api` - Use REST API instead of GraphQL for Jira metrics (default: GraphQL, ~30% faster)
 
 **Upload Behavior:**
+
 - **Default**: Only team and combined reports are uploaded to Google Sheets
 - **Member reports**: Not uploaded by default (to save quota), use `--upload-members` to enable
 
@@ -341,6 +350,7 @@ The `full` command workflow: Get metrics → Generate reports → Upload reports
 - `{project}_combined_pr_report_*.tsv` - Combined view (all members grouped by metric)
 
 **Note:**
+
 - `{project}` prefix is added when `jira_project_key` or `github_repo_name` is configured
 - AI-powered analysis reports are listed separately in the [AI-Powered Analysis](#ai-powered-analysis-experimental) section
 
@@ -387,21 +397,21 @@ source .env
 
 ```bash
 # Requires Claude Code CLI installation (see Prerequisites)
-ai-impact-analysis jira full --with-claude-insights
-ai-impact-analysis pr full --with-claude-insights
-ai-impact-analysis full --with-claude-insights
+impactlens jira full --with-claude-insights
+impactlens pr full --with-claude-insights
+impactlens full --with-claude-insights
 ```
 
 **With Anthropic API (CLI or Docker):**
 
 ```bash
 # CLI - Requires ANTHROPIC_API_KEY in .env
-ai-impact-analysis full --with-claude-insights --claude-api-mode
-ai-impact-analysis jira full --with-claude-insights --claude-api-mode
-ai-impact-analysis pr full --with-claude-insights --claude-api-mode
+impactlens full --with-claude-insights --claude-api-mode
+impactlens jira full --with-claude-insights --claude-api-mode
+impactlens pr full --with-claude-insights --claude-api-mode
 
 # Docker - Same commands, just add prefix
-docker-compose run ai-impact-analysis full --with-claude-insights --claude-api-mode
+docker-compose run impactlens full --with-claude-insights --claude-api-mode
 ```
 
 #### Manual Script Execution (For existing reports)
@@ -410,10 +420,10 @@ docker-compose run ai-impact-analysis full --with-claude-insights --claude-api-m
 
 ```bash
 # Analyze existing reports (requires Claude Code CLI installed)
-python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+python -m impactlens.scripts.analyze_with_claude_code \
   --report "reports/jira/combined_jira_report_*.tsv"
 
-python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+python -m impactlens.scripts.analyze_with_claude_code \
   --report "reports/github/combined_pr_report_*.tsv"
 ```
 
@@ -421,13 +431,13 @@ python -m ai_impact_analysis.scripts.analyze_with_claude_code \
 
 ```bash
 # CLI
-python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+python -m impactlens.scripts.analyze_with_claude_code \
   --report "reports/jira/combined_jira_report_*.tsv" \
   --claude-api-mode
 
 # Docker - Same command, just add prefix
-docker-compose run ai-impact-analysis \
-  python -m ai_impact_analysis.scripts.analyze_with_claude_code \
+docker-compose run impactlens \
+  python -m impactlens.scripts.analyze_with_claude_code \
   --report "reports/jira/combined_jira_report_*.tsv" \
   --claude-api-mode
 ```
@@ -494,13 +504,21 @@ Edit `config/analysis_prompt_template.yaml` to customize sections, output format
 
 - **[Contributing Guide](docs/CONTRIBUTING.md)** - Development setup, commit guidelines, testing, code quality, pull requests
 
+## Next Steps
+
+- **Validation & Testing**: Expand usage with diverse teams/organizations to validate product value
+- **Unified Data Platform**: Migrate to centralized data warehouse (e.g., Snowflake) to consolidate metrics from multiple sources (Jira, GitHub, GitLab, Slacks, etc.)
+- **Enhanced Metrics**: Add more metrics and industry benchmarks and percentile rankings for peer comparison
+- **AI-Powered Insights**: Expand beyond Claude to support multiple AI providers (OpenAI, Gemini, etc.), customizable analysis templates, and interactive analysis interface
+- **Visualization**: Build interactive dashboard for better insights and executive reporting
+
 ## Support
 
 **Get help:**
 
-- Issues: https://github.com/testcara/ai_impact_analysis/issues
+- Issues: https://github.com/testcara/impactlens/issues
 - Documentation: See `docs/` directory
-- Command help: `ai-impact-analysis --help`
+- Command help: `impactlens --help`
 
 ## License
 
