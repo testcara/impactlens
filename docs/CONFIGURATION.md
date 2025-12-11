@@ -86,8 +86,24 @@ team_members:
 ```yaml
 team_members:
   - name: alice-github
+    email: alice@company.com  # Optional: use same email as Jira for consistent anonymization
   - name: bob-github
+    email: bob@company.com    # Optional: ensures same hash in both Jira and PR reports
 ```
+
+**🔒 Privacy & Anonymization:**
+
+When using `--hide-individual-names`, adding the `email` field to PR config ensures consistent anonymous identifiers across both Jira and PR reports:
+
+- **Without email mapping**: Same person gets different hashes
+  - Jira (`alice@company.com`) → `Developer-1AC5`
+  - PR (`alice-github`) → `Developer-3FB7`
+
+- **With email mapping**: Same person gets the same hash
+  - Jira (`alice@company.com`) → `Developer-1AC5`
+  - PR with `email: alice@company.com` → `Developer-1AC5` ✅
+
+This is optional but recommended for cross-system analysis.
 
 **Leave Days & Capacity Metrics:**
 
