@@ -225,7 +225,7 @@ jobs:
         if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: ai-impact-reports
+          name: impactlens-reports
           path: |
             reports/**/*.tsv
             reports/**/*.json

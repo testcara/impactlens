@@ -29,14 +29,30 @@ phases:
 default_author: "" # "" represent team
 
 team_members:
+  # For consistent anonymization across Jira and PR reports:
+  # - Add 'email' field with the same email used in Jira config
+  # - This ensures the same person gets the same anonymous hash in both reports
+  # - The 'name' field is the GitHub username
+
   - name: sahil143
+    email: sbudhwar@redhat.com  # Same email as in Jira config
   - name: testcara
+    email: wlin@redhat.com  # Same email as in Jira config
   - name: rrosatti
+    email: rgalvao@redhat.com  # Same email as in Jira config
   - name: marcin-michal
+    email: mmarcin@redhat.com  # Same email as in Jira config
   - name: StanislavJochman
+    email: sjochman@redhat.com  # Same email as in Jira config
   - name: JoaoPedroPP
+    email: jpolonip@redhat.com  # Same email as in Jira config
   - name: janaki29
+    email: djanaki@redhat.com  # Same email as in Jira config
   - name: rakshett
+    email: rakshett@redhat.com  # Same email as in Jira config
   - name: milantaky
+    email: mtakac@redhat.com  # Same email as in Jira config
   - name: abhinandan13jan
+    email: abhindas@redhat.com  # Same email as in Jira config
   - name: Katka92
+    email: kkanova@redhat.com  # Same email as in Jira config
