@@ -17,7 +17,9 @@ default_author: "" # "" represent team
 
 team_members:
   - name: testcara
+    email: wlin@redhat.com
   - name: sahil143
+    email: sbudhwar@redhat.com
 
 # Use test output directory to avoid polluting main reports
 output_dir: "reports/test/github"

@@ -353,10 +353,14 @@ def load_team_members_from_yaml(config_path: Path, detailed: bool = False):
         for member in config["team_members"]:
             if isinstance(member, dict):
                 # Support both 'email' (Jira) and 'name' (GitHub)
-                if "email" in member:
-                    members.append(member["email"])
-                elif "name" in member:
+                # For PR config: prioritize 'name' (GitHub username) over 'email'
+                # For Jira config: prioritize 'email' over 'name'
+                if "name" in member:
+                    # GitHub config: use 'name' (GitHub username) for API queries
                     members.append(member["name"])
+                elif "email" in member:
+                    # Jira config: use 'email' for API queries
+                    members.append(member["email"])
             elif isinstance(member, str):
                 members.append(member)
         return members
