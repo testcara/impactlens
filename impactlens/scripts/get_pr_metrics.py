@@ -12,6 +12,7 @@ import sys
 import argparse
 import traceback
 from datetime import datetime
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from impactlens.clients.github_client import GitHubClient
@@ -20,6 +21,7 @@ from impactlens.core.pr_metrics_calculator import PRMetricsCalculator
 from impactlens.core.pr_report_generator import PRReportGenerator
 from impactlens.utils.logger import logger
 from impactlens.utils.report_utils import get_identifier_for_display
+from impactlens.utils.workflow_utils import load_team_members_from_yaml
 
 
 def main():
@@ -88,6 +90,11 @@ Examples:
         action="store_true",
         help="Anonymize individual names in filenames (Developer-A3F2, etc.)",
     )
+    parser.add_argument(
+        "--config",
+        type=str,
+        help="Path to config file (for email lookup when anonymizing)",
+    )
 
     args = parser.parse_args()
 
@@ -99,10 +106,27 @@ Examples:
         print("Error: Dates must be in YYYY-MM-DD format")
         return 1
 
+    # For anonymization consistency: use email if available, otherwise use author
+    # This ensures the same person gets the same hash in both Jira and PR reports
+    anonymization_identifier = args.author
+    if args.author and args.config:
+        # Try to find email for this author from config
+        config_path = Path(args.config)
+        if config_path.exists():
+            members_detailed = load_team_members_from_yaml(config_path, detailed=True)
+            for member_id, member_info in members_detailed.items():
+                if member_info.get("name") == args.author:
+                    # Found the member, use email for anonymization if available
+                    if member_info.get("email"):
+                        anonymization_identifier = member_info.get("email")
+                    break
+
     print("\n📊 Collecting GitHub PR metrics...")
     print(f"Period: {args.start} to {args.end}")
     if args.author:
-        display_author = get_identifier_for_display(args.author, args.hide_individual_names)
+        display_author = get_identifier_for_display(
+            anonymization_identifier, args.hide_individual_names
+        )
         print(f"Author: {display_author}")
 
     # Determine which client to use
@@ -212,6 +236,7 @@ Examples:
 
     # Generate reports using core logic
     report_gen = PRReportGenerator()
+    # Use anonymization_identifier for consistent hash generation
     text_report = report_gen.generate_text_report(
         stats,
         prs_with_metrics,
@@ -219,11 +244,12 @@ Examples:
         args.end,
         client.repo_owner,
         client.repo_name,
-        args.author,
+        anonymization_identifier,
         hide_individual_names=args.hide_individual_names,
     )
 
     # Prepare JSON output
+    # Use anonymization_identifier for consistent hash generation
     output_data = report_gen.generate_json_output(
         stats,
         prs_with_metrics,
@@ -231,7 +257,7 @@ Examples:
         args.end,
         client.repo_owner,
         client.repo_name,
-        args.author,
+        anonymization_identifier,
         hide_individual_names=args.hide_individual_names,
     )
 
@@ -242,11 +268,12 @@ Examples:
             json.dump(output_data, f, indent=2, ensure_ascii=False)
         txt_file = None
     else:
+        # Use anonymization_identifier for consistent file naming
         json_file = report_gen.save_json_output(
             output_data,
             args.start,
             args.end,
-            args.author,
+            anonymization_identifier,
             output_dir=args.output_dir,
             hide_individual_names=args.hide_individual_names,
         )
@@ -254,7 +281,7 @@ Examples:
             text_report,
             args.start,
             args.end,
-            args.author,
+            anonymization_identifier,
             output_dir=args.output_dir,
             hide_individual_names=args.hide_individual_names,
         )

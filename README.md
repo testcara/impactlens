@@ -24,6 +24,7 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 - **Measure AI ROI**: Compare development efficiency before and after AI tool adoption
 - **Performance Reviews**: Objective metrics for evaluating team and individual performance
 - **Data-Driven Insights**: Track closure time, merge time, throughput, and more to help making informed decisions
+- **Privacy Protection**: Optional anonymization for sharing reports while protecting individual privacy
 - **Multi-Team Support**: Isolated configs and reports for multiple teams
 - **Automated Reporting**: Generate comprehensive reports with one command
 - **Easy Sharing**: Auto-upload to Google Sheets for stakeholder visibility
@@ -108,6 +109,7 @@ impactlens/
 │   │   ├── upload_to_sheets.py
 │   │   └── verify_setup.py
 │   └── utils/                    # Shared utilities
+│       ├── anonymization.py      # Privacy & anonymization utilities
 │       ├── workflow_utils.py     # Config loading & workflow helpers
 │       └── report_utils.py       # Report generation utilities
 ├── .github/workflows/            # GitHub Actions CI
@@ -235,12 +237,17 @@ impactlens full
        email: alice@company.com
 
    # PR: Only PRs authored by these members
+   # Add 'email' field to match Jira for consistent anonymization
    team_members:
      - name: alice-github
+       email: alice@company.com  # Same email as Jira for consistent hashing
      - name: bob-github
+       email: bob@company.com
    ```
 
    Team reports aggregate only these members' data. Individual reports also generated.
+
+   **💡 Privacy Tip**: Add `email` to PR config using the same email as Jira config. This ensures the same person gets the same anonymous hash (`Developer-XXXX`) in both Jira and PR reports when using `--hide-individual-names`.
 
 4. **Credentials** (.env) - API tokens and passwords:
    ```bash

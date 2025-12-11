@@ -22,6 +22,7 @@ from impactlens.utils.workflow_utils import (
     upload_to_google_sheets,
     find_latest_comparison_report,
     load_team_members,
+    load_team_members_from_yaml,
     load_and_resolve_config,
 )
 from impactlens.utils.report_utils import (
@@ -49,6 +50,7 @@ def generate_phase_metrics(
     incremental: bool = False,
     output_dir: Optional[str] = None,
     hide_individual_names: bool = False,
+    config_file: Optional[Path] = None,
 ) -> bool:
     """Generate PR metrics for a single phase."""
     args = [
@@ -72,6 +74,9 @@ def generate_phase_metrics(
 
     if hide_individual_names:
         args.append("--hide-individual-names")
+
+    if config_file:
+        args.extend(["--config", str(config_file)])
 
     try:
         subprocess.run(args, check=True)
@@ -133,8 +138,9 @@ def generate_all_members_reports(
     """
     print_header("Generating reports for all team members")
 
-    members = load_team_members(team_members_file)
-    if not members:
+    # Load detailed member information (includes both name and email)
+    members_detailed = load_team_members_from_yaml(team_members_file, detailed=True)
+    if not members_detailed:
         print(f"{Colors.RED}Error: No team members found in {team_members_file}{Colors.NC}")
         return 1
 
@@ -158,12 +164,21 @@ def generate_all_members_reports(
     # Generate individual reports for each member
     # Only upload if --upload-members is specified (and --no-upload is not set)
     failed_members = []
-    for member in members:
-        # Get display identifier for member
-        display_member = get_identifier_for_display(member, hide_individual_names)
+    for member_id, member_info in members_detailed.items():
+        # Use 'name' (GitHub username) for API query
+        # The script will automatically look up email from config for anonymization
+        github_username = member_info.get("name") or member_id
+        member_email = member_info.get("email")
+
+        # Get display identifier for member (use email for anonymization if available)
+        display_identifier = member_email if member_email else github_username
+        display_member = get_identifier_for_display(display_identifier, hide_individual_names)
         print(f"{Colors.BLUE}>>> Generating Report for: {display_member}{Colors.NC}")
         print()
-        cmd = [sys.executable, "-m", script_name, member]
+
+        # Pass GitHub username for API query
+        # The script will find the corresponding email from config automatically
+        cmd = [sys.executable, "-m", script_name, github_username]
         if config_file:
             cmd.extend(["--config", str(config_file)])
         # Skip upload for member reports unless --upload-members is specified
@@ -173,7 +188,7 @@ def generate_all_members_reports(
             cmd.append("--hide-individual-names")
         result = subprocess.run(cmd)
         if result.returncode != 0:
-            failed_members.append(member)
+            failed_members.append(github_username)
         print()
         print()
 
@@ -318,9 +333,24 @@ Examples:
     # Determine author
     author = args.author or default_author or None
 
+    # For anonymization consistency: use email if available, otherwise use author
+    # This ensures the same person gets the same hash in both Jira and PR reports
+    anonymization_identifier = author
     if author:
-        # Get display identifier for author
-        display_author = get_identifier_for_display(author, args.hide_individual_names)
+        # Try to find email for this author from config
+        members_detailed = load_team_members_from_yaml(config_file, detailed=True)
+        for member_id, member_info in members_detailed.items():
+            if member_info.get("name") == author:
+                # Found the member, use email for anonymization if available
+                if member_info.get("email"):
+                    anonymization_identifier = member_info.get("email")
+                break
+
+    if author:
+        # Get display identifier for author (use anonymization_identifier for consistent hash)
+        display_author = get_identifier_for_display(
+            anonymization_identifier, args.hide_individual_names
+        )
         print_header("GitHub PR Analysis Report Generator", f"Author: {display_author}")
     else:
         print_header("GitHub PR Analysis Report Generator", "Team Overall Report")
@@ -329,7 +359,10 @@ Examples:
 
     # Step 1: Cleanup old reports
     print(f"{Colors.YELLOW}Step 1: Cleaning up old files...{Colors.NC}")
-    identifier = normalize_username(author) if author else "general"
+    # Use anonymization_identifier for consistent file naming
+    identifier = (
+        normalize_username(anonymization_identifier) if anonymization_identifier else "general"
+    )
     cleanup_old_reports(reports_dir, identifier, "pr")
     print()
 
@@ -349,6 +382,7 @@ Examples:
             incremental=args.incremental,
             output_dir=str(reports_dir),
             hide_individual_names=args.hide_individual_names,
+            config_file=config_file,
         )
 
         if success:

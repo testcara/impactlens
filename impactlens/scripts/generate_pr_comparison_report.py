@@ -15,7 +15,11 @@ from pathlib import Path
 
 from impactlens.core.pr_report_generator import PRReportGenerator
 from impactlens.utils.report_utils import generate_comparison_report, get_identifier_for_file
-from impactlens.utils.workflow_utils import load_config_file, get_project_root
+from impactlens.utils.workflow_utils import (
+    load_config_file,
+    get_project_root,
+    load_team_members_from_yaml,
+)
 
 
 def parse_phase_config(config_path="config/github_phases.conf"):
@@ -131,9 +135,27 @@ def main():
         print(f"Warning: Could not load phase names from config: {e}")
         phase_names = []
 
+    # For anonymization consistency: use email if available, otherwise use author
+    # This ensures the same person gets the same hash in both Jira and PR reports
+    anonymization_identifier = args.author
+    if args.author:
+        # Try to find email for this author from config
+        config_file = custom_config_file if custom_config_file else default_config_file
+        if config_file.exists():
+            members_detailed = load_team_members_from_yaml(config_file, detailed=True)
+            for member_id, member_info in members_detailed.items():
+                if member_info.get("name") == args.author:
+                    # Found the member, use email for anonymization if available
+                    if member_info.get("email"):
+                        anonymization_identifier = member_info.get("email")
+                    break
+
     # Find matching reports
+    # Use anonymization_identifier for file lookup (must match file naming convention)
     report_files = find_reports(
-        args.author, reports_dir=args.reports_dir, hide_individual_names=args.hide_individual_names
+        anonymization_identifier,
+        reports_dir=args.reports_dir,
+        hide_individual_names=args.hide_individual_names,
     )
 
     if len(report_files) == 0:
@@ -143,7 +165,9 @@ def main():
             print("Error: No general reports found")
         print("\nLooking for files matching pattern:")
         if args.author:
-            identifier = get_identifier_for_file(args.author, args.hide_individual_names)
+            identifier = get_identifier_for_file(
+                anonymization_identifier, args.hide_individual_names
+            )
             print(f"  {args.reports_dir}/pr_metrics_{identifier}_*.json")
         else:
             print(f"  {args.reports_dir}/pr_metrics_general_*.json")
@@ -181,8 +205,11 @@ def main():
     report_gen = PRReportGenerator()
 
     # Get identifier for filename (normalized and optionally anonymized)
+    # Use anonymization_identifier for consistent file naming
     identifier = (
-        get_identifier_for_file(args.author, args.hide_individual_names) if args.author else None
+        get_identifier_for_file(anonymization_identifier, args.hide_individual_names)
+        if args.author
+        else None
     )
 
     generate_comparison_report(
