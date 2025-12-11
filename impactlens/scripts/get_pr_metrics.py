@@ -232,6 +232,7 @@ Examples:
         client.repo_owner,
         client.repo_name,
         args.author,
+        hide_individual_names=args.hide_individual_names,
     )
 
     # Save outputs

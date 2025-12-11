@@ -208,6 +208,7 @@ class JiraReportGenerator:
         end_date,
         assignee=None,
         velocity_stats=None,
+        hide_individual_names=False,
     ):
         """
         Generate JSON output from metrics.
@@ -220,11 +221,17 @@ class JiraReportGenerator:
             end_date: End date string
             assignee: Optional assignee
             velocity_stats: Optional velocity statistics
+            hide_individual_names: If True, anonymize assignee and hide JQL
 
         Returns:
             Dictionary suitable for JSON serialization
         """
         closing_times = metrics.get("closing_times", [])
+
+        # Anonymize assignee if needed (keep JQL for reproducibility)
+        display_assignee = (
+            get_identifier_for_display(assignee, hide_individual_names) if assignee else None
+        )
 
         output_data = {
             "analysis_date": datetime.now().isoformat(),
@@ -232,12 +239,12 @@ class JiraReportGenerator:
             "query_parameters": {
                 "start_date": start_date,
                 "end_date": end_date,
-                "assignee": assignee,
+                "assignee": display_assignee,  # Anonymized
             },
             "jql_queries": {
-                "main_analysis": jql_query,
+                "main_analysis": jql_query,  # Keep original for reproducibility
             },
-            "jql_query": jql_query,
+            "jql_query": jql_query,  # Keep original for reproducibility
             "total_issues_analyzed": metrics.get("total_issues", 0),
             "closing_time_stats": {},
             "state_statistics": {},

@@ -145,7 +145,15 @@ class PRReportGenerator:
         return "\n".join(lines)
 
     def generate_json_output(
-        self, stats, prs_with_metrics, start_date, end_date, repo_owner, repo_name, author=None
+        self,
+        stats,
+        prs_with_metrics,
+        start_date,
+        end_date,
+        repo_owner,
+        repo_name,
+        author=None,
+        hide_individual_names=False,
     ):
         """
         Generate JSON output.
@@ -158,12 +166,30 @@ class PRReportGenerator:
             repo_owner: Repository owner
             repo_name: Repository name
             author: Optional author filter
+            hide_individual_names: If True, anonymize author names in JSON
 
         Returns:
             Dictionary suitable for JSON serialization
         """
         # Calculate span_days for the period
         span_days = calculate_days_between(start_date, end_date, inclusive=True)
+
+        # Anonymize author if needed
+        display_author = (
+            get_identifier_for_display(author, hide_individual_names) if author else None
+        )
+
+        # Anonymize PR authors if needed
+        anonymized_prs = prs_with_metrics
+        if hide_individual_names and prs_with_metrics:
+            anonymized_prs = []
+            for pr in prs_with_metrics:
+                pr_copy = pr.copy()
+                if "author" in pr_copy:
+                    pr_copy["author"] = get_identifier_for_display(
+                        pr_copy["author"], hide_individual_names
+                    )
+                anonymized_prs.append(pr_copy)
 
         return {
             "analysis_date": datetime.now().isoformat(),
@@ -173,9 +199,9 @@ class PRReportGenerator:
                 "span_days": span_days,
             },
             "repository": {"owner": repo_owner, "name": repo_name},
-            "filter": {"author": author},
+            "filter": {"author": display_author},
             "statistics": stats,
-            "prs": prs_with_metrics,
+            "prs": anonymized_prs,
         }
 
     def save_json_output(
