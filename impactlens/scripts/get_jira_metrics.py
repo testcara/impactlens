@@ -181,6 +181,7 @@ def main():
             args.end,
             assignee=args.assignee,
             velocity_stats=velocity_stats,
+            hide_individual_names=args.hide_individual_names,
         )
 
         # Save JSON output
