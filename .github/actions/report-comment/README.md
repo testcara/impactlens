@@ -38,6 +38,8 @@ A reusable composite action that collects report statistics and posts a detailed
 | `combined_count` | Number of combined reports |
 | `total_tsv` | Total TSV files |
 | `prompt_count` | Number of analysis prompt files |
+| `phase_report_count` | Number of detailed phase report files |
+| `total_txt` | Total TXT files |
 
 ## Example PR Comment
 
@@ -45,12 +47,13 @@ A reusable composite action that collects report statistics and posts a detailed
 ## ✅ Reports Generated Successfully
 
 📊 **Report Summary**:
-- **Team Reports**: 2 comparison reports
-- **Individual Reports**: 22 member reports
-- **Combined Reports**: 2 aggregated views
-- **Total TSV Files**: 26
-
-🤖 **AI Analysis**: 2 prompt file(s) ready for instant insights
+- **Total Reports**: 98 files (26 TSV + 72 TXT)
+  - Team comparison: 2 TSV (Jira team + PR team)
+  - Individual comparison: 22 TSV (11 Jira members + 11 PR members)
+  - Combined views: 2 TSV (Jira combined + PR combined)
+  - Detailed phase reports: 72 TXT (per-phase breakdowns for all members)
+- **AI Analysis Prompts**: 2 files (Jira prompt + PR prompt)
+- **Raw Metrics Data**: 72 JSON files (raw API responses)
 
 📥 **Access Reports**: [View in Google Sheets] | [Download All Files]
 

@@ -33,6 +33,12 @@ outputs:
   prompt_count:
     description: 'Number of analysis prompt files'
     value: ${{ steps.stats.outputs.prompt_count }}
+  phase_report_count:
+    description: 'Number of detailed phase report files'
+    value: ${{ steps.stats.outputs.phase_report_count }}
+  total_txt:
+    description: 'Total TXT files'
+    value: ${{ steps.stats.outputs.total_txt }}
 
 runs:
   using: "composite"
@@ -63,6 +69,12 @@ runs:
         # Analysis prompts
         PROMPT_COUNT=$(find "$REPORTS_DIR" -name "analysis_prompt_*.txt" -type f 2>/dev/null | wc -l)
 
+        # Detailed phase reports (all .txt files excluding analysis prompts)
+        PHASE_REPORT_COUNT=$(find "$REPORTS_DIR" -name "*.txt" -type f 2>/dev/null | grep -v "analysis_prompt" | wc -l)
+
+        # Total text files
+        TOTAL_TXT=$(find "$REPORTS_DIR" -name "*.txt" -type f 2>/dev/null | wc -l)
+
         # Export to GitHub output
         echo "json_count=$JSON_COUNT" >> $GITHUB_OUTPUT
         echo "team_comparison_count=$TEAM_COMPARISON_COUNT" >> $GITHUB_OUTPUT
@@ -70,6 +82,8 @@ runs:
         echo "combined_count=$COMBINED_COUNT" >> $GITHUB_OUTPUT
         echo "total_tsv=$TOTAL_TSV" >> $GITHUB_OUTPUT
         echo "prompt_count=$PROMPT_COUNT" >> $GITHUB_OUTPUT
+        echo "phase_report_count=$PHASE_REPORT_COUNT" >> $GITHUB_OUTPUT
+        echo "total_txt=$TOTAL_TXT" >> $GITHUB_OUTPUT
 
         echo "📊 Report Statistics:"
         echo "  Reports directory: $REPORTS_DIR"
@@ -77,7 +91,9 @@ runs:
         echo "  Member comparison reports: $MEMBER_COMPARISON_COUNT"
         echo "  Combined reports: $COMBINED_COUNT"
         echo "  Total TSV files: $TOTAL_TSV"
+        echo "  Detailed phase reports: $PHASE_REPORT_COUNT"
         echo "  Analysis prompts: $PROMPT_COUNT"
+        echo "  Total TXT files: $TOTAL_TXT"
 
     - name: Comment on PR - Success
       if: github.event_name == 'pull_request' && success()
@@ -96,22 +112,36 @@ runs:
           const combinedCount = '${{ steps.stats.outputs.combined_count }}' || '0';
           const totalTsv = '${{ steps.stats.outputs.total_tsv }}' || '0';
           const promptCount = '${{ steps.stats.outputs.prompt_count }}' || '0';
+          const phaseReportCount = '${{ steps.stats.outputs.phase_report_count }}' || '0';
+          const totalTxt = '${{ steps.stats.outputs.total_txt }}' || '0';
+          const jsonCount = '${{ steps.stats.outputs.json_count }}' || '0';
 
           const artifactsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
+          // Calculate total reports and breakdown
+          const totalReports = parseInt(totalTsv) + parseInt(totalTxt);
+
+          // Calculate individual members count (total - team reports - combined reports)
+          const individualMembersCount = parseInt(memberCount) / 2; // Divide by 2 (Jira + PR)
+
           let body = '## ✅ Reports Generated Successfully\n\n';
 
-          // File statistics - detailed breakdown
+          // File statistics - detailed breakdown (Option 2 format)
           body += '📊 **Report Summary**:\n';
-          body += `- **Team Reports**: ${teamCount} comparison reports\n`;
-          body += `- **Individual Reports**: ${memberCount} member reports\n`;
-          body += `- **Combined Reports**: ${combinedCount} aggregated views\n`;
-          body += `- **Total TSV Files**: ${totalTsv}\n\n`;
-
-          // AI Analysis prompts
-          if (parseInt(promptCount) > 0) {
-            body += `🤖 **AI Analysis**: ${promptCount} prompt file(s) ready for instant insights\n\n`;
+          body += `- **Total Reports**: ${totalReports} files (${totalTsv} TSV + ${totalTxt} TXT)\n`;
+          body += `  - Team comparison: ${teamCount} TSV (Jira team + PR team)\n`;
+          body += `  - Individual comparison: ${memberCount} TSV (${individualMembersCount} Jira members + ${individualMembersCount} PR members)\n`;
+          body += `  - Combined views: ${combinedCount} TSV (Jira combined + PR combined)\n`;
+          if (parseInt(phaseReportCount) > 0) {
+            body += `  - Detailed phase reports: ${phaseReportCount} TXT (per-phase breakdowns for all members)\n`;
           }
+          if (parseInt(promptCount) > 0) {
+            body += `- **AI Analysis Prompts**: ${promptCount} files (Jira prompt + PR prompt)\n`;
+          }
+          if (parseInt(jsonCount) > 0) {
+            body += `- **Raw Metrics Data**: ${jsonCount} JSON files (raw API responses)\n`;
+          }
+          body += '\n';
 
           // Links
           body += '📥 **Access Reports**: ';
