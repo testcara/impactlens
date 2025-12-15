@@ -445,7 +445,7 @@ class PRReportGenerator:
                 throughputs_skip_leave.append("N/A")
         lines.append("Daily Throughput (skip leave days)\t" + "\t".join(throughputs_skip_leave))
 
-        # Variant 2: Based on capacity
+        # Variant 2: Average per capacity
         throughputs_capacity = []
         for r in reports:
             throughput = r.get("daily_throughput_capacity")
@@ -453,9 +453,9 @@ class PRReportGenerator:
                 throughputs_capacity.append(f"{throughput:.2f}/d")
             else:
                 throughputs_capacity.append("N/A")
-        lines.append("Daily Throughput (based on capacity)\t" + "\t".join(throughputs_capacity))
+        lines.append("Daily Throughput (average per capacity)\t" + "\t".join(throughputs_capacity))
 
-        # Variant 3: Both leave days + capacity
+        # Variant 3: Average per capacity, excluding leave days
         throughputs_both = []
         for r in reports:
             throughput = r.get("daily_throughput_both")
@@ -463,7 +463,9 @@ class PRReportGenerator:
                 throughputs_both.append(f"{throughput:.2f}/d")
             else:
                 throughputs_both.append("N/A")
-        lines.append("Daily Throughput (leave + capacity)\t" + "\t".join(throughputs_both))
+        lines.append(
+            "Daily Throughput (average per capacity, excl. leave)\t" + "\t".join(throughputs_both)
+        )
 
         # Variant 4: Baseline (no adjustments) - placed last like Jira
         daily_throughputs = []
