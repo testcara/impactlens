@@ -285,15 +285,11 @@ Examples:
             print(f"{Colors.GREEN}  ✓ Removed {old_combined.name}{Colors.NC}")
         print()
 
-        # Get project prefix from config
-        project_prefix = project_settings.get("jira_project_key")
-
         try:
             output_file = combine_comparison_reports(
                 reports_dir=str(reports_dir),
                 report_type="jira",
                 title="Jira AI Impact Analysis - Combined Report (Grouped by Metric)",
-                project_prefix=project_prefix,
                 hide_individual_names=args.hide_individual_names,
             )
             print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
