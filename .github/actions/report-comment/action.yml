@@ -152,9 +152,10 @@ runs:
 
           // AI Analysis tip
           if (parseInt(promptCount) > 0) {
+            const repoUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`;
             body += '> 💡 **AI Analysis Options**:\n';
             body += '> - **Quick & Manual**: Download prompt files from artifacts → paste into Claude/ChatGPT/Gemini\n';
-            body += '> - **Automated & Local**: Use Claude CLI or API to generate reports from combined TSV files → See [AI-Powered Analysis](README.md#ai-powered-analysis-experimental)\n\n';
+            body += `> - **Automated & Local**: Use Claude CLI or API to generate reports from combined TSV files → See [AI-Powered Analysis](${repoUrl}/blob/master/README.md#ai-powered-analysis-experimental)\n\n`;
           }
 
           body += '---\n\n';
