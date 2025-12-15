@@ -192,6 +192,13 @@ jobs:
           path: reports/test/
           retention-days: 7
 
+      - name: Report Statistics and PR Comment
+        if: steps.docs_check.outputs.code_changed == 'true' && always()
+        uses: ./.github/actions/report-comment
+        with:
+          reports_dir: 'reports/test'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Integration test summary
         if: steps.docs_check.outputs.code_changed == 'true' && always()
         run: |
@@ -204,15 +211,5 @@ jobs:
           echo "  - PR: config/test/pr_report_config.yaml"
           echo ""
           echo "Reports generated in: reports/test/"
-          echo ""
-          if [ -d "reports/test/jira" ]; then
-            echo "Jira reports:"
-            find reports/test/jira -type f -name "*.tsv" -o -name "*.txt" | head -5
-          fi
-          echo ""
-          if [ -d "reports/test/github" ]; then
-            echo "PR reports:"
-            find reports/test/github -type f -name "*.tsv" -o -name "*.txt" | head -5
-          fi
           echo ""
           echo "✓ Integration test pipeline completed successfully"

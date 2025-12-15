@@ -1,0 +1,136 @@
+name: 'Report Statistics and PR Comment'
+description: 'Collect report statistics and post PR comment with summary'
+
+inputs:
+  reports_dir:
+    description: 'Directory containing reports'
+    required: false
+    default: 'reports'
+  google_spreadsheet_id:
+    description: 'Google Spreadsheet ID for sharing link'
+    required: false
+    default: ''
+  github_token:
+    description: 'GitHub token for PR comments'
+    required: true
+
+outputs:
+  json_count:
+    description: 'Number of JSON files'
+    value: ${{ steps.stats.outputs.json_count }}
+  team_comparison_count:
+    description: 'Number of team comparison reports'
+    value: ${{ steps.stats.outputs.team_comparison_count }}
+  member_comparison_count:
+    description: 'Number of member comparison reports'
+    value: ${{ steps.stats.outputs.member_comparison_count }}
+  combined_count:
+    description: 'Number of combined reports'
+    value: ${{ steps.stats.outputs.combined_count }}
+  total_tsv:
+    description: 'Total TSV files'
+    value: ${{ steps.stats.outputs.total_tsv }}
+  prompt_count:
+    description: 'Number of analysis prompt files'
+    value: ${{ steps.stats.outputs.prompt_count }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Collect Report Statistics
+      id: stats
+      shell: bash
+      run: |
+        REPORTS_DIR="${{ inputs.reports_dir }}"
+
+        # Count different types of files with detailed breakdown
+
+        # JSON files (raw metrics data)
+        JSON_COUNT=$(find "$REPORTS_DIR" -name "*.json" -type f 2>/dev/null | wc -l)
+
+        # TSV Reports - Team reports (general)
+        TEAM_COMPARISON_COUNT=$(find "$REPORTS_DIR" -name "*comparison_general_*.tsv" -type f 2>/dev/null | wc -l)
+
+        # TSV Reports - Individual member reports (exclude general and combined)
+        MEMBER_COMPARISON_COUNT=$(find "$REPORTS_DIR" -name "*comparison_*.tsv" -type f 2>/dev/null | grep -v "general" | wc -l)
+
+        # Combined reports
+        COMBINED_COUNT=$(find "$REPORTS_DIR" -name "*combined*report*.tsv" -type f 2>/dev/null | wc -l)
+
+        # Total TSV files
+        TOTAL_TSV=$(find "$REPORTS_DIR" -name "*.tsv" -type f 2>/dev/null | wc -l)
+
+        # Analysis prompts
+        PROMPT_COUNT=$(find "$REPORTS_DIR" -name "analysis_prompt_*.txt" -type f 2>/dev/null | wc -l)
+
+        # Export to GitHub output
+        echo "json_count=$JSON_COUNT" >> $GITHUB_OUTPUT
+        echo "team_comparison_count=$TEAM_COMPARISON_COUNT" >> $GITHUB_OUTPUT
+        echo "member_comparison_count=$MEMBER_COMPARISON_COUNT" >> $GITHUB_OUTPUT
+        echo "combined_count=$COMBINED_COUNT" >> $GITHUB_OUTPUT
+        echo "total_tsv=$TOTAL_TSV" >> $GITHUB_OUTPUT
+        echo "prompt_count=$PROMPT_COUNT" >> $GITHUB_OUTPUT
+
+        echo "📊 Report Statistics:"
+        echo "  Reports directory: $REPORTS_DIR"
+        echo "  Team comparison reports: $TEAM_COMPARISON_COUNT"
+        echo "  Member comparison reports: $MEMBER_COMPARISON_COUNT"
+        echo "  Combined reports: $COMBINED_COUNT"
+        echo "  Total TSV files: $TOTAL_TSV"
+        echo "  Analysis prompts: $PROMPT_COUNT"
+
+    - name: Comment on PR - Success
+      if: github.event_name == 'pull_request' && success()
+      continue-on-error: true
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github_token }}
+        script: |
+          const spreadsheetId = '${{ inputs.google_spreadsheet_id }}';
+          const sheetsUrl = spreadsheetId
+            ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}`
+            : null;
+
+          const teamCount = '${{ steps.stats.outputs.team_comparison_count }}' || '0';
+          const memberCount = '${{ steps.stats.outputs.member_comparison_count }}' || '0';
+          const combinedCount = '${{ steps.stats.outputs.combined_count }}' || '0';
+          const totalTsv = '${{ steps.stats.outputs.total_tsv }}' || '0';
+          const promptCount = '${{ steps.stats.outputs.prompt_count }}' || '0';
+
+          const artifactsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+          let body = '## ✅ Reports Generated Successfully\n\n';
+
+          // File statistics - detailed breakdown
+          body += '📊 **Report Summary**:\n';
+          body += `- **Team Reports**: ${teamCount} comparison reports\n`;
+          body += `- **Individual Reports**: ${memberCount} member reports\n`;
+          body += `- **Combined Reports**: ${combinedCount} aggregated views\n`;
+          body += `- **Total TSV Files**: ${totalTsv}\n\n`;
+
+          // AI Analysis prompts
+          if (parseInt(promptCount) > 0) {
+            body += `🤖 **AI Analysis**: ${promptCount} prompt file(s) ready for instant insights\n\n`;
+          }
+
+          // Links
+          body += '📥 **Access Reports**: ';
+          if (sheetsUrl) {
+            body += `[View in Google Sheets](${sheetsUrl}) | `;
+          }
+          body += `[Download All Files](${artifactsUrl})\n\n`;
+
+          // AI Analysis tip
+          if (parseInt(promptCount) > 0) {
+            body += '> 💡 **Quick Tip**: Download prompt files from artifacts and paste into Claude/ChatGPT/Gemini for automated analysis!\n\n';
+          }
+
+          body += '---\n\n';
+          body += '⚠️ **Important**: ❌ DO NOT MERGE - 🔒 Manually close this PR after reviewing reports\n';
+
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
