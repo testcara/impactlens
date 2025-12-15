@@ -287,8 +287,11 @@ def convert_markdown_to_plain_text(text):
     text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
 
     # Remove italic: *text* or _text_ -> text
+    # For asterisk italics
     text = re.sub(r"\*(.+?)\*", r"\1", text)
-    text = re.sub(r"_(.+?)_", r"\1", text)
+    # For underscore italics - only match if surrounded by whitespace or boundaries
+    # to avoid matching underscores in filenames like combined_pr_report_20251215.tsv
+    text = re.sub(r"(?<!\w)_([^_\s]+?)_(?!\w)", r"\1", text)
 
     # Remove headers: ### text -> text
     text = re.sub(r"^#{1,6}\s+", "", text)

@@ -1,6 +1,6 @@
 # ImpactLens
 
-A data-driven tool that delivers actionable insights for measuring AI coding assistant ROI and enabling objective performance reviews through Jira and GitHub metrics analysis.
+A data-driven tool that delivers actionable insights for measuring AI coding assistant impact and enabling objective performance reviews through Jira and GitHub metrics analysis.
 
 ## Table of Contents
 
@@ -17,11 +17,11 @@ A data-driven tool that delivers actionable insights for measuring AI coding ass
 
 ## Overview
 
-ImpactLens helps engineering leaders and teams measure the real-world impact of AI coding assistants by analyzing development metrics from Jira and GitHub. Get objective insights into productivity changes, team performance, and AI tool ROI.
+ImpactLens helps engineering leaders and teams measure the real-world impact of AI coding assistants by analyzing development metrics from Jira and GitHub. Get objective insights into productivity changes, team performance, and AI tool effectiveness.
 
 **Business Value:**
 
-- **Measure AI ROI**: Compare development efficiency before and after AI tool adoption
+- **Track AI Productivity Impact**: Compare development efficiency before and after AI tool adoption
 - **Performance Reviews**: Objective metrics for evaluating team and individual performance
 - **Data-Driven Insights**: Track closure time, merge time, throughput, and more to help making informed decisions
 - **Privacy Protection**: Optional anonymization for sharing reports while protecting individual privacy
@@ -188,6 +188,7 @@ cp .env.example .env && vim .env
 docker-compose run impactlens full
 
 # CLI (Python developers)
+python3 -m venv venv && source venv/bin/activate
 pip install -e . && cp .env.example .env && source .env
 impactlens full
 ```
@@ -390,7 +391,8 @@ claude login
 # 2. Add to .env file
 echo "ANTHROPIC_API_KEY=sk-ant-your_api_key_here" >> .env
 
-# 3. For CLI: reload environment
+# 3. For CLI: activate venv (if using) and reload environment
+source venv/bin/activate  # If using virtual environment
 source .env
 
 # 4. For Docker: environment is auto-loaded from .env
@@ -462,7 +464,7 @@ AI analysis generates the following reports:
 - **Key Trends**: 3-5 insights on metric changes
 - **Bottlenecks & Risks**: Critical issues and patterns
 - **Actionable Recommendations**: Concrete steps with measurable goals
-- **AI Tool Impact**: ROI evaluation and effectiveness
+- **AI Tool Impact**: Productivity impact assessment and effectiveness analysis
 - **Auto-upload**: Results to Google Sheets (optional with `--no-upload`)
 
 **Customize analysis:**
