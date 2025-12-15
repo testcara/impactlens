@@ -199,42 +199,22 @@ jobs:
         run: |
           echo "Generating AI analysis prompts for combined reports..."
 
-          # Find and generate prompts for Jira combined reports
-          for report in reports/**/combined_jira_report_*.tsv; do
-            if [ -f "$report" ]; then
-              echo "Generating prompt for: $report"
+          # Generate prompts for both Jira and PR combined reports
+          for pattern in "combined_jira_report" "combined_pr_report"; do
+            for report in reports/**/${pattern}_*.tsv; do
+              if [ -f "$report" ]; then
+                echo "Generating prompt for: $report"
 
-              # Extract directory from report path and determine output directory
-              # e.g., reports/jira/combined_jira_report_*.tsv -> reports/prompts
-              # e.g., reports/team-a/jira/combined_jira_report_*.tsv -> reports/team-a/prompts
-              report_dir=$(dirname "$report")
-              output_dir="${report_dir%/*}/prompts"  # Remove last component (jira) and add prompts
+                # Extract directory and determine output: reports/*/jira -> reports/*/prompts
+                output_dir="$(dirname "$report" | sed 's|/[^/]*$|/prompts|')"
 
-              echo "  Output directory: $output_dir"
-              python -m impactlens.scripts.analyze_with_claude_code \
-                --report "$report" \
-                --prompt-only \
-                --output-dir "$output_dir" || echo "Warning: Failed to generate prompt for $report"
-            fi
-          done
-
-          # Find and generate prompts for PR combined reports
-          for report in reports/**/combined_pr_report_*.tsv; do
-            if [ -f "$report" ]; then
-              echo "Generating prompt for: $report"
-
-              # Extract directory from report path and determine output directory
-              # e.g., reports/github/combined_pr_report_*.tsv -> reports/prompts
-              # e.g., reports/team-a/github/combined_pr_report_*.tsv -> reports/team-a/prompts
-              report_dir=$(dirname "$report")
-              output_dir="${report_dir%/*}/prompts"  # Remove last component (github) and add prompts
-
-              echo "  Output directory: $output_dir"
-              python -m impactlens.scripts.analyze_with_claude_code \
-                --report "$report" \
-                --prompt-only \
-                --output-dir "$output_dir" || echo "Warning: Failed to generate prompt for $report"
-            fi
+                echo "  Output directory: $output_dir"
+                python -m impactlens.scripts.analyze_with_claude_code \
+                  --report "$report" \
+                  --prompt-only \
+                  --output-dir "$output_dir" || echo "Warning: Failed to generate prompt for $report"
+              fi
+            done
           done
 
           echo "✓ Analysis prompts generated"
