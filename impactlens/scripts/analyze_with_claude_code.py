@@ -51,7 +51,24 @@ def find_latest_report(report_pattern: str) -> str:
     matches = glob(report_pattern)
 
     if not matches:
-        raise FileNotFoundError(f"No reports found matching: {report_pattern}")
+        # Provide helpful error message with suggestions
+        logger.error(f"❌ No reports found matching: {report_pattern}")
+        logger.error("")
+        logger.error("💡 Troubleshooting:")
+        logger.error("   1. Check if the report file exists in the specified directory")
+        logger.error("   2. Verify the file path is correct (use absolute or relative path)")
+        logger.error("   3. If using wildcards (*), ensure at least one matching file exists")
+        logger.error("")
+        logger.error("📋 Common report locations:")
+        logger.error("   - reports/combined_jira_report_*.tsv")
+        logger.error("   - reports/combined_pr_report_*.tsv")
+        logger.error("   - /path/to/downloaded/reports/combined_jira_report_*.tsv")
+        logger.error("")
+        logger.error("💡 To generate reports first, run:")
+        logger.error("   impactlens jira full")
+        logger.error("   impactlens pr full")
+        logger.error("")
+        sys.exit(1)
 
     # Sort by modification time (most recent first)
     matches.sort(key=os.path.getmtime, reverse=True)

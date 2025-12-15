@@ -152,7 +152,9 @@ runs:
 
           // AI Analysis tip
           if (parseInt(promptCount) > 0) {
-            body += '> 💡 **Quick Tip**: Download prompt files from artifacts and paste into Claude/ChatGPT/Gemini for automated analysis!\n\n';
+            body += '> 💡 **AI Analysis Options**:\n';
+            body += '> - **Quick & Manual**: Download prompt files from artifacts → paste into Claude/ChatGPT/Gemini\n';
+            body += '> - **Automated & Local**: Use Claude CLI or API to generate reports from combined TSV files → See [AI-Powered Analysis](README.md#ai-powered-analysis-experimental)\n\n';
           }
 
           body += '---\n\n';

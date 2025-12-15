@@ -5,8 +5,8 @@ Upload Jira comparison reports to Google Sheets.
 This script uploads TSV/CSV comparison reports to Google Sheets for easy sharing and visualization.
 
 Usage:
-    python3 bin/upload_to_sheets.py --report reports/comparison_report_wlin_*.tsv
-    python3 bin/upload_to_sheets.py --report reports/comparison_report_general_*.tsv --sheet-name "Team Report"
+    python3 -m impactlens.scripts.upload_to_sheets --report reports/comparison_report_wlin_*.tsv
+    python3 -m impactlens.scripts.upload_to_sheets --report reports/comparison_report_general_*.tsv --sheet-name "Team Report"
 
 Requirements:
     pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
@@ -71,20 +71,20 @@ def main():
         epilog="""
 Examples:
   # First time: Upload to new spreadsheet (creates new file)
-  python3 bin/upload_to_sheets.py --report reports/comparison_report_wlin_20251022.tsv
+  python3 -m impactlens.scripts.upload_to_sheets --report reports/comparison_report_wlin_20251022.tsv
   # Output will show: Spreadsheet ID: 1ABCdef...
 
   # Set environment variable for subsequent uploads
   export GOOGLE_SPREADSHEET_ID="1ABCdef..."
 
   # Future uploads: automatically append to same spreadsheet
-  python3 bin/upload_to_sheets.py --report reports/comparison_report_wlin_20251024.tsv
+  python3 -m impactlens.scripts.upload_to_sheets --report reports/comparison_report_wlin_20251024.tsv
 
   # Override env var with specific spreadsheet ID
-  python3 bin/upload_to_sheets.py --report report.tsv --spreadsheet-id "1XYZ..."
+  python3 -m impactlens.scripts.upload_to_sheets --report report.tsv --spreadsheet-id "1XYZ..."
 
   # Upload with custom sheet name
-  python3 bin/upload_to_sheets.py --report reports/comparison_report_general.tsv --sheet-name "Team Report"
+  python3 -m impactlens.scripts.upload_to_sheets --report reports/comparison_report_general.tsv --sheet-name "Team Report"
 
 Environment Variables:
   GOOGLE_CREDENTIALS_FILE - Path to Google credentials JSON file
@@ -266,7 +266,7 @@ Note:
             print(f'   export GOOGLE_SPREADSHEET_ID="{spreadsheet_id}"')
             print("\n   Or use --spreadsheet-id flag each time:")
             print(
-                f'   python3 bin/upload_to_sheets.py --report ... --spreadsheet-id "{spreadsheet_id}"'
+                f'   python3 -m impactlens.scripts.upload_to_sheets --report ... --spreadsheet-id "{spreadsheet_id}"'
             )
 
     except HttpError as error:
