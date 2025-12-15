@@ -199,7 +199,11 @@ jobs:
         run: |
           echo "Generating AI analysis prompts for combined reports..."
 
+          # Enable recursive globbing
+          shopt -s globstar nullglob
+
           # Generate prompts for both Jira and PR combined reports
+          PROMPT_GENERATED=0
           for pattern in "combined_jira_report" "combined_pr_report"; do
             for report in reports/**/${pattern}_*.tsv; do
               if [ -f "$report" ]; then
@@ -213,11 +217,17 @@ jobs:
                   --report "$report" \
                   --prompt-only \
                   --output-dir "$output_dir" || echo "Warning: Failed to generate prompt for $report"
+
+                PROMPT_GENERATED=1
               fi
             done
           done
 
-          echo "✓ Analysis prompts generated"
+          if [ $PROMPT_GENERATED -eq 1 ]; then
+            echo "✓ Analysis prompts generated"
+          else
+            echo "⚠️  No combined reports found, skipping prompt generation"
+          fi
 
       - name: Upload Reports as Artifacts
         if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
