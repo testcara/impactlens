@@ -1,0 +1,86 @@
+# Project configuration (non-sensitive settings)
+# These settings can be safely version-controlled
+project:
+  # Jira project settings
+  jira_url: "https://issues.redhat.com"  # Jira instance URL
+  jira_project_key: "RELEASE"  # Jira project key or name
+
+  # Google Sheets settings (optional)
+  # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
+  # If you do not set, would upload to the default google-sheet.
+  # IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com
+
+# Output directory for reports (optional, for multi-team isolation)
+# If not specified, defaults to "reports/jira"
+# Example for team-specific isolation: "reports/team-a/jira"
+# output_dir: "reports/team-a/jira"
+
+phases:
+  - name: "No AI Period"
+    start: "2024-12-16"
+    end: "2025-06-20"
+  - name: "AI Period"
+    start: "2025-06-20" # This is the first time Cursor was mentioned in a commit in RSC (by shebert)
+    end: "2025-12-16"
+
+default_assignee: "" # "" represent team
+
+team_members:
+  - member: David
+    email: damoreno@redhat.com
+    leave_days: 0
+    capacity: 1
+  - member: Elena
+    email: elgerman@redhat.com
+    leave_days: 0
+    capacity:
+      - 0
+      - 0.58
+  - member: Fitz
+    email: fnikolov@redhat.com
+    leave_days: 0
+    capacity:
+      - 0
+      - 1
+  - member: Happy
+    email: hbhati@redhat.com
+    leave_days: 0
+    capacity: 1
+  - member: Jindirch
+    email: jluza@redhat.com
+    leave_days: 0
+    capacity:
+      - 0
+      - 0.33
+  - member: Jing
+    email: jinqi@redhat.com
+    leave_days: 0
+    capacity: 1
+  - member: Johnny
+    email: jbieren@redhat.com
+    leave_days: 0
+    capacity: 1
+  - member: Leandro
+    email: lmendes@redhat.com
+    leave_days: 0
+    capacity: 1
+  - member: Lubo
+    email: lgallovi@redhat.com
+    leave_days: 0
+    capacity:
+      - 0
+      - 0.33
+  - member: Martin
+    email: mmalina@redhat.com
+    leave_days: 0
+    capacity: 1
+  - member: Scott
+    email: swickers@redhat.com
+    leave_days: 0
+    capacity:
+      - 0
+      - 0.33
+  - member: Sean
+    email: sconroy@redhat.com
+    leave_days: 0
+    capacity: 1
