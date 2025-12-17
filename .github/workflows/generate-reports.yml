@@ -7,6 +7,7 @@ on:
     paths:
       - 'config/**/jira_report_config.yaml'
       - 'config/**/pr_report_config.yaml'
+      - 'config/**/aggregation_config.yaml'
       - '.github/workflows/generate-reports.yml'
 
   # Allow manual trigger with team selection
@@ -125,26 +126,38 @@ jobs:
             echo "Changed files:"
             echo "$CHANGED_FILES"
 
-            # Extract config directory from changed files
-            # Handle nested directories like config/test-aggregation-ci/test-ci-team1/
-            CHANGED_CONFIG=$(echo "$CHANGED_FILES" | grep -E '^config/.*\.(yaml|yml)$' | head -1)
+            # Check if aggregation_config.yaml changed (aggregation mode)
+            AGGREGATION_CONFIG=$(echo "$CHANGED_FILES" | grep -E '^config/.*/aggregation_config\.yaml$' | head -1)
 
-            if [ -n "$CHANGED_CONFIG" ]; then
-              # Get the directory containing the config file
-              CONFIG_DIR=$(dirname "$CHANGED_CONFIG")
-              echo "Detected config file: $CHANGED_CONFIG"
+            if [ -n "$AGGREGATION_CONFIG" ]; then
+              # Aggregation mode: use the directory containing aggregation_config.yaml
+              CONFIG_DIR=$(dirname "$AGGREGATION_CONFIG")
+              echo "Detected aggregation config: $AGGREGATION_CONFIG"
+              echo "is_aggregation=true" >> $GITHUB_OUTPUT
             else
-              # If no config file found, try to extract config directory
-              CONFIG_DIR=$(echo "$CHANGED_FILES" | grep -E '^config/[^/]+/' | head -1 | cut -d/ -f1,2)
-            fi
+              # Single team mode: extract config directory from changed files
+              # Handle nested directories like config/test-aggregation-ci/test-ci-team1/
+              CHANGED_CONFIG=$(echo "$CHANGED_FILES" | grep -E '^config/.*\.(yaml|yml)$' | head -1)
 
-            # If no team-specific config changed, use root config
-            if [ -z "$CONFIG_DIR" ] || [ "$CONFIG_DIR" = "config" ]; then
-              CONFIG_DIR="config"
+              if [ -n "$CHANGED_CONFIG" ]; then
+                # Get the directory containing the config file
+                CONFIG_DIR=$(dirname "$CHANGED_CONFIG")
+                echo "Detected config file: $CHANGED_CONFIG"
+              else
+                # If no config file found, try to extract config directory
+                CONFIG_DIR=$(echo "$CHANGED_FILES" | grep -E '^config/[^/]+/' | head -1 | cut -d/ -f1,2)
+              fi
+
+              # If no team-specific config changed, use root config
+              if [ -z "$CONFIG_DIR" ] || [ "$CONFIG_DIR" = "config" ]; then
+                CONFIG_DIR="config"
+              fi
+              echo "is_aggregation=false" >> $GITHUB_OUTPUT
             fi
           else
             # Default to root config
             CONFIG_DIR="config"
+            echo "is_aggregation=false" >> $GITHUB_OUTPUT
           fi
 
           echo "config_dir=$CONFIG_DIR" >> $GITHUB_OUTPUT
@@ -176,8 +189,48 @@ jobs:
           echo "Google Sheets ID: $([ -n "$GOOGLE_SPREADSHEET_ID" ] && echo '✓ Set' || echo '✗ Not set')"
           echo "=========================================="
 
+      - name: Generate Aggregated Reports
+        if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && steps.config.outputs.is_aggregation == 'true'
+        env:
+          JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+        run: |
+          AGGREGATION_CONFIG="${{ steps.config.outputs.config_dir }}/aggregation_config.yaml"
+          if [ -f "$AGGREGATION_CONFIG" ]; then
+            echo "=========================================="
+            echo "Generating aggregated reports"
+            echo "=========================================="
+            echo "Config: $AGGREGATION_CONFIG"
+
+            # Determine report type based on input or default to both
+            REPORT_TYPE="${{ github.event.inputs.report_type }}"
+            if [ -z "$REPORT_TYPE" ] || [ "$REPORT_TYPE" = "both" ]; then
+              echo "Running command: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\" --hide-individual-names"
+              python -m impactlens.cli aggregate \
+                --config "$AGGREGATION_CONFIG" \
+                --hide-individual-names
+            elif [ "$REPORT_TYPE" = "jira" ]; then
+              echo "Running command: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\" --jira-only --hide-individual-names"
+              python -m impactlens.cli aggregate \
+                --config "$AGGREGATION_CONFIG" \
+                --jira-only \
+                --hide-individual-names
+            elif [ "$REPORT_TYPE" = "pr" ]; then
+              echo "Running command: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\" --pr-only --hide-individual-names"
+              python -m impactlens.cli aggregate \
+                --config "$AGGREGATION_CONFIG" \
+                --pr-only \
+                --hide-individual-names
+            fi
+          else
+            echo "⚠️  Aggregation config not found at $AGGREGATION_CONFIG"
+            exit 1
+          fi
+
       - name: Generate Jira Report
-        if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && (github.event.inputs.report_type == 'jira' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
+        if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && steps.config.outputs.is_aggregation != 'true' && (github.event.inputs.report_type == 'jira' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
@@ -195,7 +248,7 @@ jobs:
           fi
 
       - name: Generate PR Report
-        if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && (github.event.inputs.report_type == 'pr' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
+        if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && steps.config.outputs.is_aggregation != 'true' && (github.event.inputs.report_type == 'pr' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
