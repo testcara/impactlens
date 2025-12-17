@@ -1,0 +1,34 @@
+# Test configuration for CI integration testing
+# This config uses a small date range and minimal team members for fast testing
+
+project:
+  jira_url: "https://issues.redhat.com"
+  jira_project_key: "Trusted Artifact Signer"
+
+phases:
+  - name: "No AI Period"
+    start: "2025-01-01"
+    end: "2025-05-31"
+  - name: "Cursor Period"
+    start: "2025-06-01"
+    end: "2025-07-31"
+  - name: "Full AI Period"
+    start: "2025-08-01"
+    end: "2025-12-04"
+
+default_assignee: "" # "" represent team
+
+team_members:
+  - member: abhindas
+    email: abhindas@redhat.com
+    leave_days: 0
+    capacity:
+      - 0.0
+      - 0.5
+      - 1.0
+
+# Use test output directory to avoid polluting main reports
+output_dir: "reports/securesign/jira"
+
+# Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
+log_level: "WARNING"

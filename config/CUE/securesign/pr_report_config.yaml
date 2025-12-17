@@ -1,0 +1,34 @@
+# Test configuration for CI integration testing
+# This config uses a small date range and minimal team members for fast testing
+
+project:
+  github_url: "https://github.com"
+  github_repo_owner: "securesign"
+  github_repo_name: "rhtas-console-ui"
+
+phases:
+  - name: "No AI Period"
+    start: "2025-01-01"
+    end: "2025-05-31"
+  - name: "Cursor Period"
+    start: "2025-06-01"
+    end: "2025-07-31"
+  - name: "Full AI Period"
+    start: "2025-08-01"
+    end: "2025-12-04"
+
+default_author: "" # "" represent team
+
+team_members:
+  - name: abhinandan13jan
+    email: abhindas@redhat.com
+    capacity:
+      - 0.0
+      - 0.5
+      - 1.0
+
+# Use test output directory to avoid polluting main reports
+output_dir: "reports/securesign/github"
+
+# Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
+log_level: "WARNING"
