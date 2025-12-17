@@ -59,14 +59,19 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
                │                              │
                └──────────┬───────────────────┘
                           │
-                 ┌────────▼──────────┐
+                 ┌────────▼───────────┐
                  │  Metrics           │
                  │  Calculators       │
                  └────────┬───────────┘
                           │
-                 ┌────────▼──────────┐
+                 ┌────────▼───────────┐
                  │  Report            │
                  │  Generators        │
+                 └────────┬───────────┘
+                          │
+                 ┌────────▼───────────┐
+                 │  Report            │
+                 │  Aggregators       │
                  └────────┬───────────┘
                           │
           ┌───────────────┼───────────────┐
@@ -139,9 +144,6 @@ impactlens/
 │   ├── METRICS_GUIDE.md          # Metrics explanations & formulas
 │   └── CONTRIBUTING.md           # Contribution guidelines
 ├── tests/                        # Test suite
-├── reports/                      # Generated reports (gitignored)
-│   ├── jira/                     # Jira reports
-│   └── github/                   # PR reports
 ├── .env.example                  # Environment variables template
 ├── docker-compose.yml            # Docker Compose setup
 ├── Dockerfile                    # Docker build configuration
@@ -156,6 +158,7 @@ impactlens/
 **Perfect for:** Teams wanting automated reports with zero local setup and privacy protection.
 
 1. **Clone & create team config**:
+
    ```bash
    git clone https://github.com/testcara/impactlens.git
    cd impactlens
@@ -165,6 +168,7 @@ impactlens/
    ```
 
 2. **Generate reports via PR**:
+
    ```bash
    git checkout -b report/my-team-2024-12
    git add -f config/my-team/
@@ -205,9 +209,9 @@ impactlens full
 
 ImpactLens supports two configuration scenarios:
 
-| Scenario | Team Structure | Reports Generated |
-|----------|---------------|-------------------|
-| **Simple** | Single project/repo | TEAM + COMBINED |
+| Scenario    | Team Structure          | Reports Generated            |
+| ----------- | ----------------------- | ---------------------------- |
+| **Simple**  | Single project/repo     | TEAM + COMBINED              |
 | **Complex** | Multiple projects/repos | TEAM + COMBINED + AGGREGATED |
 
 **Quick Setup (Simple Scenario):**
@@ -220,6 +224,7 @@ ImpactLens supports two configuration scenarios:
 3. Submit via PR → CI auto-generates reports
 
 **For complete configuration guide including:**
+
 - Detailed configuration examples for both scenarios
 - Multi-repo aggregation setup
 - Privacy & anonymization
@@ -228,224 +233,61 @@ ImpactLens supports two configuration scenarios:
 
 **➡️ See [Configuration Guide](docs/CONFIGURATION.md)**
 
-## Usage Examples
+## AI-Powered Analysis (Optional)
 
-**⚠️ Complete [Configuration](#configuration) section first.**
+> **💡 OPTIONAL** - Get actionable insights from your metrics reports using AI
+>
+> **⚠️ CURRENT LIMITATION**: AI analysis prompts currently support **simple scenarios only** (single project/repo). Aggregated reports from complex scenarios (multi-project/repos) are not yet supported.
 
-### Basic Commands
-
-**Verify setup:**
-
-```bash
-impactlens verify
-```
-
-**Generate reports:**
-
-```bash
-# Complete workflows
-impactlens full                              # ALL reports (Jira + PR + Auto-aggregate if config exists)
-impactlens jira full                         # Jira: Team + Members + Combined
-impactlens pr full                           # PR: Team + Members + Combined
-
-# Individual reports
-impactlens jira team                         # Jira team report only
-impactlens pr team                           # PR team report only
-impactlens jira member alice@company.com     # Jira for one member
-impactlens pr member alice-github            # PR for one member (GitHub username)
-
-# Multi-repo aggregation (combine reports from multiple repositories/projects)
-impactlens aggregate --config config/aggregation_config.yaml      # Aggregate both Jira and PR
-impactlens agg --config config/aggregation_config.yaml            # Short alias
-impactlens aggregate --config config/aggregation_config.yaml --jira-only   # Jira only
-impactlens aggregate --config config/aggregation_config.yaml --pr-only     # PR only
-```
-
-**Advanced usage with options:**
-
-```bash
-# Privacy protection (anonymize individual names in combined reports)
-impactlens full --hide-individual-names              # Names → Developer-A3F2, Developer-B7E1, etc.
-impactlens jira full --hide-individual-names         # Also hides leave_days and capacity
-impactlens pr full --hide-individual-names
-
-# Upload control
-impactlens full --upload-members                     # Upload ALL reports including members
-impactlens jira full --no-upload                     # Skip all uploads
-impactlens pr full --upload-members                  # Upload PR members reports
-
-# With Claude insights
-impactlens full --with-claude-insights --claude-api-mode
-
-# Incremental PR fetching
-impactlens pr team --incremental
-impactlens pr member testcara --incremental --no-upload
-
-# With custom config files (all commands support --config)
-impactlens jira full --config config/team-a/jira_report_config.yaml
-impactlens pr full --config config/team-a/pr_report_config.yaml --upload-members
-impactlens pr team --config config/team-a/pr_report_config.yaml --no-upload
-impactlens pr member alice --config config/my-team/pr_report_config.yaml
-```
-
-**Docker usage:**
-
-```bash
-# Just prefix CLI commands with "docker-compose run impactlens"
-docker-compose run impactlens verify
-docker-compose run impactlens full
-docker-compose run impactlens full --upload-members              # Upload all including members
-docker-compose run impactlens jira full --no-upload
-docker-compose run impactlens pr member testcara --incremental
-```
-
-**Workflow:**
-
-The `full` command workflow: Get metrics → Generate reports → Upload reports
-
-- When `jira` or `pr` is specified, the workflow applies only to that report type
-- `--no-upload` - Skip all Google Sheets uploads
-- `--upload-members` - Upload individual member reports (default: only team and combined reports are uploaded)
-- `--incremental` - Fetch only new PRs (cache enabled by default for performance, PR reports only)
-- `--rest-api` - Use REST API instead of GraphQL for Jira metrics (default: GraphQL, ~30% faster)
-
-**Upload Behavior:**
-
-- **Default**: Only team and combined reports are uploaded to Google Sheets
-- **Member reports**: Not uploaded by default (to save quota), use `--upload-members` to enable
-
-### Output Files
-
-**Jira Reports** (in `reports/jira/` or custom `output_dir`):
-
-- `jira_report_general_*.txt` - Phase reports (detailed metrics)
-- `jira_comparison_general_*.tsv` - Comparison table (phases side-by-side)
-- `{project}_combined_jira_report_*.tsv` - Combined view (all members grouped by metric)
-
-**PR Reports** (in `reports/github/` or custom `output_dir`):
-
-- `pr_report_general_*.txt` - Phase reports (detailed metrics)
-- `pr_comparison_general_*.tsv` - Comparison table (phases side-by-side)
-- `{project}_combined_pr_report_*.tsv` - Combined view (all members grouped by metric)
-
-**Aggregated Reports** (in custom `output_dir` from aggregation config, for multi-repo teams):
-
-- `aggregated_jira_report_*.tsv` - Unified Jira metrics across all repositories
-- `aggregated_pr_report_*.tsv` - Unified PR metrics across all repositories
-
-**Note:**
-
-- `{project}` prefix is added when `jira_project_key` or `github_repo_name` is configured
-- Aggregated reports are generated only when `aggregation_config.yaml` is present
-- AI-powered analysis reports are listed separately in the [AI-Powered Analysis](#ai-powered-analysis-experimental) section
-
-## AI-Powered Analysis (Experimental)
-
-> **⚠️ EXPERIMENTAL** - Optional feature for automated insights generation
-
-Analyze your TSV reports with Claude to extract insights, trends, and actionable recommendations.
-
-### Prerequisites & Setup
-
-Choose **ONE** of the following methods:
-
-#### Option 1: Claude Code CLI (CLI only, NOT Docker)
-
-```bash
-# Install Claude Code CLI (one-time setup)
-curl -fsSL https://claude.ai/install.sh | bash
-
-# Login to authenticate (interactive, requires browser)
-claude login
-```
-
-**Note:** Claude Code CLI cannot be used inside Docker containers due to interactive authentication requirements.
-
-#### Option 2: Anthropic API (Works with Docker & CLI)
-
-```bash
-# 1. Get API key from https://console.anthropic.com/
-# 2. Add to .env file
-echo "ANTHROPIC_API_KEY=sk-ant-your_api_key_here" >> .env
-
-# 3. For CLI: activate venv (if using) and reload environment
-source venv/bin/activate  # If using virtual environment
-source .env
-
-# 4. For Docker: environment is auto-loaded from .env
-```
-
-### Usage
-
-#### Automatic with Full Workflow (Recommended)
-
-**With Claude Code CLI (CLI only):**
-
-```bash
-# Requires Claude Code CLI installation (see Prerequisites)
-impactlens jira full --with-claude-insights
-impactlens pr full --with-claude-insights
-impactlens full --with-claude-insights
-```
-
-**With Anthropic API (CLI or Docker):**
-
-```bash
-# CLI - Requires ANTHROPIC_API_KEY in .env
-impactlens full --with-claude-insights --claude-api-mode
-impactlens jira full --with-claude-insights --claude-api-mode
-impactlens pr full --with-claude-insights --claude-api-mode
-
-# Docker - Same commands, just add prefix
-docker-compose run impactlens full --with-claude-insights --claude-api-mode
-```
-
-#### Manual Script Execution (For existing reports)
-
-**With Claude Code CLI (CLI only):**
-
-```bash
-# Analyze existing reports (requires Claude Code CLI installed)
-python -m impactlens.scripts.analyze_with_claude_code \
-  --report "reports/jira/combined_jira_report_*.tsv"
-
-python -m impactlens.scripts.analyze_with_claude_code \
-  --report "reports/github/combined_pr_report_*.tsv"
-```
-
-**With Anthropic API (CLI or Docker):**
-
-```bash
-# CLI
-python -m impactlens.scripts.analyze_with_claude_code \
-  --report "reports/jira/combined_jira_report_*.tsv" \
-  --claude-api-mode
-
-# Docker - Same command, just add prefix
-docker-compose run impactlens \
-  python -m impactlens.scripts.analyze_with_claude_code \
-  --report "reports/jira/combined_jira_report_*.tsv" \
-  --claude-api-mode
-```
-
-### Output Files
-
-AI analysis generates the following reports:
-
-- `reports/ai_analysis_jira_*.txt` - AI insights for Jira metrics
-- `reports/ai_analysis_pr_*.txt` - AI insights for PR metrics
+Use AI to analyze your generated reports and extract insights on trends, bottlenecks, and actionable recommendations.
 
 ### What You Get
 
-- **Executive Summary**: Overall AI impact assessment
-- **Key Trends**: 3-5 insights on metric changes
-- **Bottlenecks & Risks**: Critical issues and patterns
-- **Actionable Recommendations**: Concrete steps with measurable goals
-- **AI Tool Impact**: Productivity impact assessment and effectiveness analysis
-- **Auto-upload**: Results to Google Sheets (optional with `--no-upload`)
+- **Executive Summary** - Overall AI impact assessment
+- **Key Trends** - 3-5 critical insights on metric changes
+- **Bottlenecks & Risks** - Issues and patterns requiring attention
+- **Actionable Recommendations** - Concrete steps with measurable goals
+- **AI Tool Impact** - Productivity assessment and effectiveness analysis
 
-**Customize analysis:**
-Edit `config/analysis_prompt_template.yaml` to customize sections, output format, and focus areas.
+### Usage Options (Pick One)
+
+**Option 1: Use Generated Prompts (Easiest - No Setup)**
+
+Reports are generated with ready-to-use AI analysis prompts:
+
+1. Download prompt files from PR artifacts or `reports/` folder:
+   - `ai_analysis_jira_prompt_*.txt` - Jira analysis prompt
+   - `ai_analysis_pr_prompt_*.txt` - PR analysis prompt
+2. Copy prompt content and paste into any AI:
+   - Claude (https://claude.ai)
+   - ChatGPT (https://chat.openai.com)
+   - Gemini (https://gemini.google.com)
+3. Get instant insights - no need to write your own prompts!
+
+**Option 2: Claude Code CLI (Interactive - Recommended for Deep Analysis)**
+
+```bash
+# Install Claude Code CLI (one-time)
+curl -fsSL https://claude.ai/install.sh | bash
+claude login
+
+# Generate reports with interactive AI analysis
+impactlens full --with-claude-insights
+```
+
+Benefits: Interactive discussion, iterative refinement, project-specific customization
+
+**Option 3: Anthropic API (Automated)**
+
+```bash
+# Configure API key in .env
+echo "ANTHROPIC_API_KEY=sk-ant-..." >> .env
+
+# Generate reports with automated AI analysis
+impactlens full --with-claude-insights --claude-api-mode
+```
+
+**➡️ For detailed setup and advanced options, see [Local Development Guide - AI Analysis](docs/LOCAL_DEVELOPMENT.md#ai-powered-analysis)**
 
 ## Understanding Metrics
 
@@ -485,6 +327,7 @@ Edit `config/analysis_prompt_template.yaml` to customize sections, output format
 
 - **[Configuration Guide](docs/CONFIGURATION.md)** - Complete configuration reference including Google Sheets, custom configs, multi-team setup, environment variables, and best practices
 - **[Metrics Guide](docs/METRICS_GUIDE.md)** - Detailed metric explanations, calculation formulas, interpretation guidelines
+- **[Local Development Guide](docs/LOCAL_DEVELOPMENT.md)** - CLI usage, Docker commands, advanced options for local development
 
 ### For Contributors
 
