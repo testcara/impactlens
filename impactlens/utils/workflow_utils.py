@@ -407,8 +407,70 @@ def cleanup_old_reports(reports_dir: Path, identifier: str, report_type: str) ->
     print(f"{Colors.GREEN}  ✓ Removed {removed_count} old report files for {identifier}{Colors.NC}")
 
 
+def extract_sheet_prefix(config_path: Optional[Path]) -> str:
+    """
+    Extract Google Sheets prefix from config path for complex scenarios.
+
+    Returns the top-level directory name under config/ if it's a complex scenario
+    (has subdirectories). For simple scenarios, returns empty string.
+
+    Examples:
+        Simple scenarios (return ""):
+            config/konfluxui/jira_report_config.yaml → ""
+
+        Complex scenarios (return top-level dir):
+            config/cue/cue-konfluxui/jira_report_config.yaml → "cue"
+            config/cue/cue-rhtapui/jira_report_config.yaml → "cue"
+            config/cue/aggregation_config.yaml → "cue"
+
+    Args:
+        config_path: Path to config file or directory
+
+    Returns:
+        Sheet prefix string for complex scenarios, or empty string for simple scenarios
+    """
+    if not config_path:
+        return ""
+
+    # Convert to Path if string
+    if isinstance(config_path, str):
+        config_path = Path(config_path)
+
+    # Get absolute path and resolve
+    config_path = config_path.resolve()
+
+    # Find 'config' in path
+    parts = config_path.parts
+    try:
+        config_index = parts.index("config")
+
+        # Check if this is a complex scenario (has subdirectories or aggregation)
+        # Simple: config/{team}/file.yaml (config + 2 elements)
+        # Complex: config/{top-level}/{sub-project}/file.yaml (config + 3+ elements)
+        # Aggregation: config/{top-level}/aggregation_config.yaml (config + 2 elements, but has aggregation_config.yaml)
+
+        # Count elements after 'config'
+        elements_after_config = len(parts) - config_index - 1
+
+        # Check if it's an aggregation config
+        is_aggregation = parts[-1] == "aggregation_config.yaml"
+
+        # If there are 3+ elements after 'config', OR it's an aggregation config, it's complex
+        if elements_after_config >= 3 or (elements_after_config == 2 and is_aggregation):
+            # Return the top-level directory (first dir after config/)
+            return parts[config_index + 1]
+
+    except (ValueError, IndexError):
+        pass
+
+    return ""
+
+
 def upload_to_google_sheets(
-    report_file: Optional[Path], skip_upload: bool = False, show_manual_instructions: bool = True
+    report_file: Optional[Path],
+    skip_upload: bool = False,
+    show_manual_instructions: bool = True,
+    config_path: Optional[Path] = None,
 ) -> bool:
     """
     Upload report to Google Sheets if configured.
@@ -417,13 +479,14 @@ def upload_to_google_sheets(
         report_file: Path to report file to upload
         skip_upload: If True, skip upload and only show manual instructions (default: False)
         show_manual_instructions: If True, show manual upload instructions when needed (default: True)
+        config_path: Path to config file/directory (used to extract sheet prefix)
 
     Returns:
         True if upload succeeded or was skipped, False if upload failed
 
     Example:
         # Auto-upload (default behavior)
-        upload_to_google_sheets(report_file)
+        upload_to_google_sheets(report_file, config_path=config_path)
 
         # Skip upload with instructions
         upload_to_google_sheets(report_file, skip_upload=True)
@@ -449,15 +512,23 @@ def upload_to_google_sheets(
 
     if credentials and spreadsheet_id:
         print(f"{Colors.YELLOW}📤 Uploading to Google Sheets...{Colors.NC}")
+
+        # Build command with --config if provided
+        cmd = [
+            sys.executable,
+            "-m",
+            "impactlens.scripts.upload_to_sheets",
+            "--report",
+            str(report_file),
+        ]
+
+        # Add --config parameter if config_path is provided
+        if config_path:
+            cmd.extend(["--config", str(config_path)])
+
         try:
             result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "impactlens.scripts.upload_to_sheets",
-                    "--report",
-                    str(report_file),
-                ],
+                cmd,
                 check=True,
                 capture_output=True,
                 text=True,

@@ -1,57 +1,62 @@
-# Aggregation Configuration
-# Aggregates multiple report directories into unified team-wide reports.
-# Reads already-generated combined reports (no API calls needed).
+# Aggregation Configuration Example
+# Location: config/engineering/aggregation_config.yaml
+#
+# Aggregates multiple sub-project reports into unified reports.
+# Reads already-generated combined_*_report_*.tsv files (no API calls).
+#
+# Directory structure:
+#   config/engineering/
+#   ├── aggregation_config.yaml  ← This file
+#   ├── frontend/
+#   │   ├── jira_report_config.yaml
+#   │   └── pr_report_config.yaml
+#   ├── backend/
+#   │   ├── jira_report_config.yaml
+#   │   └── pr_report_config.yaml
+#   └── mobile/
+#       ├── jira_report_config.yaml
+#       └── pr_report_config.yaml
 
 aggregation:
   # Name for the aggregated report
-  name: "Platform Team"
+  name: "Engineering Team"
 
   # Output directory for aggregated reports
-  output_dir: "reports/platform-aggregated"
+  output_dir: "reports/engineering-aggregated"
 
-  # List of report directory names to aggregate
-  # These are directory names under reports/, not Jira projects or GitHub repos
-  # For each directory, the tool looks for:
-  # - reports/{directory}/jira/combined_jira_report_*.tsv
-  # - reports/{directory}/github/combined_pr_report_*.tsv
+  # List of subdirectory names to aggregate
+  # IMPORTANT: These are subdirectory names under config/engineering/,
+  # NOT Jira project keys or GitHub repo names
   #
-  # 💡 Google Sheets Tab Naming:
-  # When uploading to Google Sheets, tab names are automatically prefixed with
-  # the directory name to avoid conflicts.
-  #
-  # Example with same repo, different teams:
-  #   - "backend-team" analyzing konflux-ui → Sheet tab: "backend-team konflux-ui PR Report - Team"
-  #   - "frontend-team" analyzing konflux-ui → Sheet tab: "frontend-team konflux-ui PR Report - Team"
-  #
-  # This allows multiple teams to analyze the same repository without conflicts!
-  #
+  # The tool reads from:
+  #   - reports/frontend/jira/combined_jira_report_*.tsv
+  #   - reports/frontend/github/combined_pr_report_*.tsv
+  #   - reports/backend/jira/combined_jira_report_*.tsv
+  #   - reports/backend/github/combined_pr_report_*.tsv
+  #   - etc.
   projects:
-    - "backend"       # Aggregates reports from reports/backend/
-    - "frontend"      # Aggregates reports from reports/frontend/
-    # - "mobile"      # Add more report directories as needed
+    - "frontend"
+    - "backend"
+    - "mobile"
 
-  # Optional: Exclude specific directory/report-type combinations
-  # Format: "{directory-name}/{report-type}" where report-type is "jira" or "pr"
+  # Optional: Exclude specific project/report-type combinations
+  # Format: "{project-name}/{report-type}" where report-type is "jira" or "pr"
   exclude:
-    # - "docs/jira"      # Exclude Jira reports from reports/docs/
-    # - "mobile/pr"      # Exclude PR reports from reports/mobile/
+    # - "mobile/jira"    # Skip Jira reports from mobile project
+    # - "frontend/pr"    # Skip PR reports from frontend project
 
-  # Optional: Google Sheets settings for uploading aggregated reports
-  # If not set, falls back to GOOGLE_SPREADSHEET_ID environment variable
-  # If neither is set, upload will be skipped (unless you use --no-upload)
-  google_spreadsheet_id: ""  # Your Google Spreadsheet ID (optional)
+  # Optional: Override GOOGLE_SPREADSHEET_ID environment variable
+  # Leave empty to use environment variable
+  google_spreadsheet_id: ""
 
-# Advanced: Manually specify report files (local use only)
-# Use cases:
-#   - Aggregate specific historical reports (e.g., reports from different dates)
-#   - Aggregate reports from non-standard locations
-#   - Testing aggregation with specific report files
-# NOT recommended for CI (use 'projects' for standard workflow)
+# Advanced: Manual report file specification (uncommon)
+# Use only for special cases like aggregating historical reports
 # When specified, this overrides auto-discovery from 'projects'
+#
 # manual_reports:
 #   jira:
-#     - "reports/backend/jira/combined_jira_report_20241215_*.tsv"
-#     - "reports/old-reports/jira/combined_jira_report_20241101_*.tsv"
+#     - "reports/frontend/jira/combined_jira_report_20241201_*.tsv"
+#     - "reports/backend/jira/combined_jira_report_20241201_*.tsv"
 #   pr:
-#     - "reports/frontend/github/combined_pr_report_20241215_*.tsv"
-#     - "/path/to/archived/reports/combined_pr_report_*.tsv"
+#     - "reports/frontend/github/combined_pr_report_20241201_*.tsv"
+#     - "reports/backend/github/combined_pr_report_20241201_*.tsv"

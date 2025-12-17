@@ -102,11 +102,15 @@ Examples:
 
         # Upload Jira aggregated report
         if results.get("jira"):
-            upload_to_google_sheets(results["jira"], skip_upload=args.no_upload)
+            upload_to_google_sheets(
+                results["jira"], skip_upload=args.no_upload, config_path=config_path
+            )
 
         # Upload PR aggregated report
         if results.get("pr"):
-            upload_to_google_sheets(results["pr"], skip_upload=args.no_upload)
+            upload_to_google_sheets(
+                results["pr"], skip_upload=args.no_upload, config_path=config_path
+            )
 
         # Summary
         print(f"{Colors.GREEN}{'='*80}{Colors.NC}")

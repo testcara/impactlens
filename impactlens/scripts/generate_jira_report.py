@@ -300,7 +300,9 @@ Examples:
             )
             print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
             print()
-            upload_to_google_sheets(output_file, skip_upload=args.no_upload)
+            upload_to_google_sheets(
+                output_file, skip_upload=args.no_upload, config_path=custom_config_file
+            )
         except Exception as e:
             print(f"{Colors.RED}Error combining reports: {e}{Colors.NC}")
             traceback.print_exc()
@@ -478,7 +480,9 @@ Examples:
     if comparison_file:
         print(f"{Colors.GREEN}✓ Report generated: {comparison_file.name}{Colors.NC}")
         print()
-        upload_to_google_sheets(comparison_file, skip_upload=args.no_upload)
+        upload_to_google_sheets(
+            comparison_file, skip_upload=args.no_upload, config_path=custom_config_file
+        )
     else:
         print(f"No comparison file found!")
 
