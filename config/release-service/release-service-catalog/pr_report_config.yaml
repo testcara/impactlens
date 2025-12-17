@@ -1,0 +1,57 @@
+# Project configuration (non-sensitive settings)
+# These settings can be safely version-controlled
+project:
+  # GitHub repository settings
+  github_repo_owner: "konflux-ci"  # GitHub repository owner/organization
+  github_repo_name: "release-service-catalog"  # GitHub repository name
+
+  # Google Sheets settings (optional)
+  google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
+  # If you do not set, would upload to the default google-sheet.
+  # IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com
+
+# Output directory for reports (optional, for multi-team isolation)
+# If not specified, defaults to "reports/github"
+# Example for team-specific isolation: "reports/team-a/github"
+# output_dir: "reports/team-a/github"
+
+phases:
+  - name: "No AI Period"
+    start: "2024-12-16"
+    end: "2025-06-20"
+  - name: "AI Period"
+    start: "2025-06-20" # This is the first time Cursor was mentioned in a commit in RSC (by shebert)
+    end: "2025-12-16"
+
+default_author: "" # "" represent team
+
+team_members:
+  # For consistent anonymization across Jira and PR reports:
+  # - Add 'email' field with the same email used in Jira config
+  # - This ensures the same person gets the same anonymous hash in both reports
+  # - The 'name' field is the GitHub username
+
+  - name: davidmogar
+    email: damoreno@redhat.com
+  - name: elenagerman
+    email: elgerman@redhat.com
+  - name: FilipNikolovski
+    email: fnikolov@redhat.com
+  - name: happybhati
+    email: hbhati@redhat.com
+  - name: midnightercz
+    email: jluza@redhat.com
+  - name: jinqi7
+    email: jinqi@redhat.com
+  - name: johnbieren
+    email: jbieren@redhat.com
+  - name: theflockers
+    email: lmendes@redhat.com
+  - name: querti
+    email: lgallovi@redhat.com
+  - name: mmalina
+    email: mmalina@redhat.com
+  - name: swickersh
+    email: swickers@redhat.com
+  - name: seanconroy2021
+    email: sconroy@redhat.com
