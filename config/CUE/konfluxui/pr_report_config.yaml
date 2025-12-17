@@ -1,0 +1,47 @@
+# Project configuration (non-sensitive settings)
+project:
+  git_url: "https://github.com"
+  git_repo_owner: "konflux-ci"
+  git_repo_name: "konflux-ui"
+
+phases:
+  - name: "Jan"
+    start: "2026-01-01"
+    end: "2026-01-31"
+  - name: "Feb"
+    start: "2026-02-01"
+    end: "2026-02-28"
+  - name: "March"
+    start: "2026-03-01"
+    end: "2026-03-28"
+
+default_author: "" # "" represent team
+
+members:
+  - git_username: sahil143
+    email: sbudhwar@redhat.com
+  - git_username: testcara
+    email: wlin@redhat.com
+  - git_username: rrosatti
+    email: rgalvao@redhat.com
+  - git_username: marcin-michal
+    email: mmarcin@redhat.com
+  - git_username: StanislavJochman
+    email: sjochman@redhat.com
+  - git_username: JoaoPedroPP
+    email: jpolonip@redhat.com
+  - git_username: janaki29
+    email: djanaki@redhat.com
+  - git_username: rakshett
+    email: rakshett@redhat.com
+  - git_username: milantaky
+    email: mtakac@redhat.com
+  - git_username: abhinandan13jan
+    email: abhindas@redhat.com
+  - git_username: Katka92
+    email: kkanova@redhat.com
+
+output_dir: "reports/konfluxui/github"
+replace_existing_reports: true
+email_anonymous_id: false # Set to false to disable email notifications
+no_ai_analysis: true

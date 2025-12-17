@@ -1,0 +1,38 @@
+# Project configuration (non-sensitive settings)
+project:
+  jira_url: "https://redhat.atlassian.net"
+  jira_project_key: "KFLUXUI"
+
+phases:
+  - name: "Jan"
+    start: "2026-01-01"
+    end: "2026-01-31"
+  - name: "Feb"
+    start: "2026-02-01"
+    end: "2026-02-28"
+  - name: "March"
+    start: "2026-03-01"
+    end: "2026-03-28"
+
+default_assignee: "" # "" represent team
+
+members:
+  - email: sbudhwar@redhat.com
+  - email: wlin@redhat.com
+  - email: kkanova@redhat.com
+  - email: djanaki@redhat.com
+  - email: rakshett@redhat.com
+  - email: abhindas@redhat.com
+  - email: rgalvao@redhat.com
+  - email: sjochman@redhat.com
+  - email: mtakac@redhat.com
+  - email: jpolonip@redhat.com
+  - email: mmarcin@redhat.com
+
+output_dir: "reports/konfluxui/jira"
+
+# Email notification settings (optional)
+# When enabled, team members receive their anonymous ID via email
+email_anonymous_id: false
+replace_existing_reports: true
+no_ai_analysis: true
