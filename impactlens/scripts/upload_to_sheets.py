@@ -138,16 +138,21 @@ Note:
         # e.g., "combined_pr_report_20251022_111614" -> "PR Report - Combined"
         # e.g., "combined_jira_report_20251022_111614" -> "Jira Report - Combined"
 
+        # Check if it's an aggregated report
+        if filename.startswith("aggregated_jira_report"):
+            args.sheet_name = "Jira Report - Aggregated"
+        elif filename.startswith("aggregated_pr_report"):
+            args.sheet_name = "PR Report - Aggregated"
         # Check if it's an AI analysis report
-        if filename.startswith("ai_analysis_pr"):
+        elif filename.startswith("ai_analysis_pr"):
             args.sheet_name = "AI Analysis - PR"
         elif filename.startswith("ai_analysis_jira"):
             args.sheet_name = "AI Analysis - Jira"
-        # Check if it's a combined PR report (may have project prefix)
-        elif "combined_pr_report" in filename:
+        # Check if it's a combined PR report
+        elif filename.startswith("combined_pr_report"):
             args.sheet_name = "PR Report - Combined"
-        # Check if it's a combined Jira report (may have project prefix)
-        elif "combined_jira_report" in filename:
+        # Check if it's a combined Jira report
+        elif filename.startswith("combined_jira_report"):
             args.sheet_name = "Jira Report - Combined"
         # Check if it's a PR comparison report
         elif filename.startswith("pr_comparison_"):
@@ -174,7 +179,40 @@ Note:
                 normalized = normalize_username(parts[0])
                 args.sheet_name = f"Jira Report - {normalized}"
 
-    # Add project prefix to sheet name if available
+    # Extract team name from report path (for multi-team setups)
+    # Examples:
+    #   reports/team-a/jira/report.tsv → team name is "team-a"
+    #   reports/test-ci-aggregated/aggregated_jira_report.tsv → team name is "test-ci-aggregated"
+    report_path = Path(args.report)
+    team_name = None
+
+    # Check if report is in a subdirectory under reports/
+    # Path structures:
+    #   1. reports/{team-name}/{jira|github}/... (normal reports)
+    #   2. reports/{aggregation-dir}/aggregated_*_report_*.tsv (aggregated reports)
+    parts = report_path.parts
+    if "reports" in parts:
+        reports_index = parts.index("reports")
+        # Check if there's a directory between "reports" and the file
+        if reports_index + 1 < len(parts):
+            potential_team = parts[reports_index + 1]
+
+            # Check if there's another level (jira/github subdirectory)
+            if reports_index + 2 < len(parts):
+                next_part = parts[reports_index + 2]
+                # If next part is jira/github, extract team name (normal reports)
+                if next_part in ["jira", "github"]:
+                    team_name = potential_team
+                # If it's a file starting with "aggregated_", extract team name (aggregated reports)
+                elif next_part.startswith("aggregated_"):
+                    team_name = potential_team
+            # Single level under reports/ with aggregated file (also aggregated reports)
+            elif reports_index + 1 == len(parts) - 1:
+                # This is the file itself, check parent directory
+                if parts[-1].startswith("aggregated_"):
+                    team_name = potential_team
+
+    # Add project/repo name first (if available)
     if "jira" in args.sheet_name.lower():
         project_key = os.getenv("JIRA_PROJECT_KEY", "")
         if project_key:
@@ -183,6 +221,11 @@ Note:
         repo_name = os.getenv("GITHUB_REPO_NAME", "")
         if repo_name:
             args.sheet_name = f"{repo_name} {args.sheet_name}"
+
+    # Add team name prefix at the very beginning (if in multi-team setup)
+    # This ensures format: team-name repo-name Report-Type
+    if team_name:
+        args.sheet_name = f"{team_name} {args.sheet_name}"
 
     print("\n📊 Uploading report to Google Sheets...")
     print(f"Report: {args.report}")

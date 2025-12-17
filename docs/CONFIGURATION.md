@@ -661,3 +661,124 @@ docker-compose run impactlens ls -la /app/config/team-a/
 - Verify team_members section is not empty
 
 For more help, check the [main README](../README.md) or open an issue on GitHub.
+
+---
+
+## Report Aggregation
+
+### Overview
+
+Combine multiple report directories into unified reports for team-wide analysis.
+
+**Terminology:**
+- **Report directory**: Directory under `reports/` (e.g., `backend`, `frontend`)
+- **Jira project**: Jira project like KONFLUX, RHTAP
+- **GitHub repository**: Repo like konflux-ui, konflux-api
+- **Team**: Your entire team across all Jira projects and repos
+
+**Use Cases:**
+- Team maintains multiple GitHub repositories (frontend + backend + mobile)
+- Team works across multiple Jira projects
+- Executive reporting with aggregated team metrics
+
+**How it works:**
+- Reads existing combined reports from multiple report directories
+- Merges data with OVERALL + per-source + per-member columns
+- No API calls (fast aggregation of existing reports)
+
+### Quick Start
+
+**1. Generate reports for each source:**
+
+```bash
+# Generate reports for backend (could be Jira project + GitHub repo)
+impactlens jira full --config config/backend/jira_report_config.yaml
+impactlens pr full --config config/backend/pr_report_config.yaml
+
+# Generate reports for frontend
+impactlens pr full --config config/frontend/pr_report_config.yaml
+```
+
+This creates:
+```
+reports/
+├── backend/
+│   ├── jira/combined_jira_report_*.tsv
+│   └── github/combined_pr_report_*.tsv
+└── frontend/
+    └── github/combined_pr_report_*.tsv
+```
+
+**2. Create aggregation config:**
+
+```bash
+cp config/aggregation_config.yaml.example config/my_team_agg.yaml
+```
+
+Edit config to list report directories:
+```yaml
+aggregation:
+  name: "Platform Team"
+  projects:
+    - "backend"      # Aggregates reports from reports/backend/
+    - "frontend"     # Aggregates reports from reports/frontend/
+```
+
+**3. Run aggregation:**
+
+```bash
+impactlens aggregate --config config/my_team_agg.yaml
+
+# Options:
+#   --jira-only    Only aggregate Jira reports
+#   --pr-only      Only aggregate GitHub PR reports
+```
+
+### Configuration
+
+See `config/aggregation_config.yaml.example` for full configuration reference.
+
+**Key settings:**
+
+- `projects`: List of **report directory names** to aggregate
+  - Example: `["backend", "frontend"]` → aggregates `reports/backend/` and `reports/frontend/`
+
+- `exclude`: Exclude specific combinations
+  - Format: `"{report-dir}/{report-type}"`
+  - Example: `"docs/jira"` → exclude Jira reports from `reports/docs/`
+
+- `manual_reports`: Manually specify exact file paths (advanced)
+
+### Output Format
+
+Aggregated reports include:
+
+- **OVERALL column**: Team-wide metrics across all report sources
+- **Source columns**: One column per report directory (e.g., `backend`, `frontend`)
+- **Member columns**: Individual developers (aggregated if they appear in multiple sources)
+
+**Aggregation logic:**
+- **Sum metrics** (Total PRs, Total Issues): Values are summed
+- **Average metrics** (Avg Time to Merge, AI Adoption Rate): Values are averaged
+
+### Best Practices
+
+- **Consistent emails**: Use same `email` field across all configs for proper member aggregation
+- **Consistent phases**: Use same phase definitions for meaningful comparisons
+- **Clear naming**: Use descriptive report directory names (e.g., `ui-frontend`, `api-backend`, `team-a`, `team-b`)
+  - Directory names are used as prefixes in Google Sheets tab names to avoid conflicts
+  - Multiple teams can analyze the same repository with unique directory names
+- **Re-run after updates**: Run aggregation again when individual reports are regenerated
+
+### Troubleshooting
+
+**No reports found:**
+- Check that report directory names in config match actual directories under `reports/`
+- Example: If config has `"backend"`, verify `reports/backend/jira/` or `reports/backend/github/` exists
+
+**Inconsistent phases:**
+- All individual report configs must use same phase definitions
+
+**Developer appears in multiple sources:**
+- This is expected behavior
+- Values are automatically aggregated (sum for totals, average for averages)

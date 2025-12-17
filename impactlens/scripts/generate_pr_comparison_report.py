@@ -14,7 +14,11 @@ from datetime import datetime
 from pathlib import Path
 
 from impactlens.core.pr_report_generator import PRReportGenerator
-from impactlens.utils.report_utils import generate_comparison_report, get_identifier_for_file
+from impactlens.utils.report_utils import (
+    generate_comparison_report,
+    get_identifier_for_file,
+    build_pr_project_prefix,
+)
 from impactlens.utils.workflow_utils import (
     load_config_file,
     get_project_root,
@@ -129,11 +133,12 @@ def main():
     custom_config_file = Path(args.config) if args.config else None
 
     try:
-        phases, _, _, _ = load_config_file(default_config_file, custom_config_file)
+        phases, _, _, project_settings = load_config_file(default_config_file, custom_config_file)
         phase_names = [phase[0] for phase in phases]  # Extract phase names
     except Exception as e:
         print(f"Warning: Could not load phase names from config: {e}")
         phase_names = []
+        project_settings = {}
 
     # For anonymization consistency: use email if available, otherwise use author
     # This ensures the same person gets the same hash in both Jira and PR reports
@@ -212,6 +217,9 @@ def main():
         else None
     )
 
+    # Build project_prefix from repo owner and name
+    project_prefix = build_pr_project_prefix(project_settings)
+
     generate_comparison_report(
         report_files=report_files,
         report_generator=report_gen,
@@ -220,6 +228,7 @@ def main():
         output_dir=args.reports_dir,
         output_file=args.output,
         report_type="pr",
+        project_prefix=project_prefix,
         hide_individual_names=args.hide_individual_names,
     )
 

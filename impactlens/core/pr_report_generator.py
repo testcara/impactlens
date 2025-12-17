@@ -349,7 +349,9 @@ class PRReportGenerator:
             "has_human_metrics": has_human_metrics,
         }
 
-    def generate_comparison_tsv(self, reports, phase_names, author=None):
+    def generate_comparison_tsv(
+        self, reports, phase_names, author=None, repo_owner=None, repo_name=None
+    ):
         """
         Generate TSV comparison report from multiple phase reports.
 
@@ -357,6 +359,8 @@ class PRReportGenerator:
             reports: List of parsed report dictionaries
             phase_names: List of phase names
             author: Optional author
+            repo_owner: Optional repository owner
+            repo_name: Optional repository name
 
         Returns:
             TSV format string
@@ -369,7 +373,10 @@ class PRReportGenerator:
         else:
             lines.append("PR AI Impact Analysis Report - Team Overall")
         lines.append(f"Report Generated: {datetime.now().strftime('%B %d, %Y')}")
-        lines.append("Repository: konflux-ci/konflux-ui")
+        if repo_owner and repo_name:
+            lines.append(f"Repository: {repo_owner}/{repo_name}")
+        elif repo_name:
+            lines.append(f"Repository: {repo_name}")
         lines.append("")
 
         # Add description for multi-phase analysis

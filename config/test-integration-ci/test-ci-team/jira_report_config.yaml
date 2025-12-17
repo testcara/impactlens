@@ -2,8 +2,8 @@
 # This config uses a small date range and minimal team members for fast testing
 
 project:
-  github_repo_owner: "konflux-ci"
-  github_repo_name: "konflux-ui"
+  jira_url: "https://issues.redhat.com"
+  jira_project_key: "Konflux UI"
 
 phases:
   - name: "Test Period 1"
@@ -13,16 +13,20 @@ phases:
     start: "2025-11-01"
     end: "2025-11-30"
 
-default_author: "" # "" represent team
+default_assignee: "" # "" represent team
 
 team_members:
-  - name: testcara
+  - member: wlin
     email: wlin@redhat.com
-  - name: sahil143
+    leave_days: 0
+    capacity: 1.0
+  - member: sbudhwar
     email: sbudhwar@redhat.com
+    leave_days: 0
+    capacity: 1.0
 
 # Use test output directory to avoid polluting main reports
-output_dir: "reports/test/github"
+output_dir: "reports/test-ci-team1/jira"
 
 # Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
 log_level: "WARNING"

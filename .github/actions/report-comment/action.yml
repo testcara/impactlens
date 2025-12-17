@@ -27,6 +27,9 @@ outputs:
   combined_count:
     description: 'Number of combined reports'
     value: ${{ steps.stats.outputs.combined_count }}
+  aggregated_count:
+    description: 'Number of aggregated reports'
+    value: ${{ steps.stats.outputs.aggregated_count }}
   total_tsv:
     description: 'Total TSV files'
     value: ${{ steps.stats.outputs.total_tsv }}
@@ -49,6 +52,21 @@ runs:
       run: |
         REPORTS_DIR="${{ inputs.reports_dir }}"
 
+        # Check if reports directory exists
+        if [ ! -d "$REPORTS_DIR" ]; then
+          echo "⚠️  Reports directory not found: $REPORTS_DIR"
+          echo "json_count=0" >> $GITHUB_OUTPUT
+          echo "team_comparison_count=0" >> $GITHUB_OUTPUT
+          echo "member_comparison_count=0" >> $GITHUB_OUTPUT
+          echo "combined_count=0" >> $GITHUB_OUTPUT
+          echo "aggregated_count=0" >> $GITHUB_OUTPUT
+          echo "total_tsv=0" >> $GITHUB_OUTPUT
+          echo "prompt_count=0" >> $GITHUB_OUTPUT
+          echo "phase_report_count=0" >> $GITHUB_OUTPUT
+          echo "total_txt=0" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
         # Count different types of files with detailed breakdown
 
         # JSON files (raw metrics data)
@@ -60,8 +78,11 @@ runs:
         # TSV Reports - Individual member reports (exclude general and combined)
         MEMBER_COMPARISON_COUNT=$(find "$REPORTS_DIR" -name "*comparison_*.tsv" -type f 2>/dev/null | grep -v "general" | wc -l)
 
-        # Combined reports
-        COMBINED_COUNT=$(find "$REPORTS_DIR" -name "*combined*report*.tsv" -type f 2>/dev/null | wc -l)
+        # Combined reports (exclude aggregated)
+        COMBINED_COUNT=$(find "$REPORTS_DIR" -name "*combined*report*.tsv" -type f 2>/dev/null | grep -v "aggregated" | wc -l)
+
+        # Aggregated reports (multi-team aggregation)
+        AGGREGATED_COUNT=$(find "$REPORTS_DIR" -name "aggregated_*_report_*.tsv" -type f 2>/dev/null | wc -l)
 
         # Total TSV files
         TOTAL_TSV=$(find "$REPORTS_DIR" -name "*.tsv" -type f 2>/dev/null | wc -l)
@@ -80,6 +101,7 @@ runs:
         echo "team_comparison_count=$TEAM_COMPARISON_COUNT" >> $GITHUB_OUTPUT
         echo "member_comparison_count=$MEMBER_COMPARISON_COUNT" >> $GITHUB_OUTPUT
         echo "combined_count=$COMBINED_COUNT" >> $GITHUB_OUTPUT
+        echo "aggregated_count=$AGGREGATED_COUNT" >> $GITHUB_OUTPUT
         echo "total_tsv=$TOTAL_TSV" >> $GITHUB_OUTPUT
         echo "prompt_count=$PROMPT_COUNT" >> $GITHUB_OUTPUT
         echo "phase_report_count=$PHASE_REPORT_COUNT" >> $GITHUB_OUTPUT
@@ -90,6 +112,7 @@ runs:
         echo "  Team comparison reports: $TEAM_COMPARISON_COUNT"
         echo "  Member comparison reports: $MEMBER_COMPARISON_COUNT"
         echo "  Combined reports: $COMBINED_COUNT"
+        echo "  Aggregated reports: $AGGREGATED_COUNT"
         echo "  Total TSV files: $TOTAL_TSV"
         echo "  Detailed phase reports: $PHASE_REPORT_COUNT"
         echo "  Analysis prompts: $PROMPT_COUNT"
@@ -110,6 +133,7 @@ runs:
           const teamCount = '${{ steps.stats.outputs.team_comparison_count }}' || '0';
           const memberCount = '${{ steps.stats.outputs.member_comparison_count }}' || '0';
           const combinedCount = '${{ steps.stats.outputs.combined_count }}' || '0';
+          const aggregatedCount = '${{ steps.stats.outputs.aggregated_count }}' || '0';
           const totalTsv = '${{ steps.stats.outputs.total_tsv }}' || '0';
           const promptCount = '${{ steps.stats.outputs.prompt_count }}' || '0';
           const phaseReportCount = '${{ steps.stats.outputs.phase_report_count }}' || '0';
@@ -120,6 +144,25 @@ runs:
 
           // Calculate total reports and breakdown
           const totalReports = parseInt(totalTsv) + parseInt(totalTxt);
+
+          // Check if no reports were generated (skipped execution)
+          if (totalReports === 0) {
+            const body = '## ℹ️ Report Generation Skipped\n\n' +
+              '**Reason**: Only test configs or CI workflow files were modified.\n\n' +
+              '---\n\n' +
+              '💡 **Note**: Report generation only runs when production config files are changed:\n' +
+              '- Production configs: `config/<team>/jira_report_config.yaml` or `config/<team>/pr_report_config.yaml`\n' +
+              '- Test configs (skipped): `config/test-*/...`\n\n' +
+              '✅ This PR can be merged if all tests pass.';
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+            return;
+          }
 
           // Calculate individual members count (total - team reports - combined reports)
           const individualMembersCount = parseInt(memberCount) / 2; // Divide by 2 (Jira + PR)
@@ -132,6 +175,9 @@ runs:
           body += `  - Team comparison: ${teamCount} TSV (Jira team + PR team)\n`;
           body += `  - Individual comparison: ${memberCount} TSV (${individualMembersCount} Jira members + ${individualMembersCount} PR members)\n`;
           body += `  - Combined views: ${combinedCount} TSV (Jira combined + PR combined)\n`;
+          if (parseInt(aggregatedCount) > 0) {
+            body += `  - **Aggregated views** 🔗: ${aggregatedCount} TSV (Multi-team aggregation)\n`;
+          }
           if (parseInt(phaseReportCount) > 0) {
             body += `  - Detailed phase reports: ${phaseReportCount} TXT (per-phase breakdowns for all members)\n`;
           }
@@ -149,6 +195,12 @@ runs:
             body += `[View in Google Sheets](${sheetsUrl}) | `;
           }
           body += `[Download All Files](${artifactsUrl})\n\n`;
+
+          // Aggregation info
+          if (parseInt(aggregatedCount) > 0) {
+            body += '> 🔗 **Multi-Team Aggregation**: This workflow aggregated reports from multiple sub-teams into unified views. ';
+            body += 'Aggregated reports combine metrics across all configured teams for organization-level insights.\n\n';
+          }
 
           // AI Analysis tip
           if (parseInt(promptCount) > 0) {

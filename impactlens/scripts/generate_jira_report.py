@@ -30,7 +30,9 @@ from impactlens.utils.report_utils import (
     normalize_username,
     combine_comparison_reports,
     get_identifier_for_display,
+    build_jira_project_prefix,
 )
+from impactlens.core.report_aggregator import ReportAggregator
 
 
 def print_header(title: str, subtitle: Optional[str] = None) -> None:
@@ -286,10 +288,14 @@ Examples:
         print()
 
         try:
+            # Get project key for display in combined report
+            project_key = build_jira_project_prefix(project_settings)
+
             output_file = combine_comparison_reports(
                 reports_dir=str(reports_dir),
                 report_type="jira",
                 title="Jira AI Impact Analysis - Combined Report (Grouped by Metric)",
+                project_prefix=project_key,
                 hide_individual_names=args.hide_individual_names,
             )
             print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
@@ -297,8 +303,37 @@ Examples:
             upload_to_google_sheets(output_file, skip_upload=args.no_upload)
         except Exception as e:
             print(f"{Colors.RED}Error combining reports: {e}{Colors.NC}")
-            traceback.logger.debug_exc()
+            traceback.print_exc()
             return 1
+
+        # Check if aggregation config exists and run aggregation
+        # Look for aggregation_config.yaml in two places:
+        # 1. Same directory as the config file (for single team)
+        # 2. Parent directory (for multi-team with aggregation at parent level)
+        config_dir = config_file.parent
+        aggregation_config = config_dir / "aggregation_config.yaml"
+        if not aggregation_config.exists():
+            aggregation_config = config_dir.parent / "aggregation_config.yaml"
+
+        if aggregation_config.exists():
+            print()
+            print(f"{Colors.BLUE}{'=' * 40}{Colors.NC}")
+            print(f"{Colors.BLUE}Found aggregation config, running aggregation...{Colors.NC}")
+            print(f"{Colors.BLUE}{'=' * 40}{Colors.NC}")
+            print()
+            try:
+                aggregator = ReportAggregator(str(aggregation_config))
+                jira_output = aggregator.aggregate_jira_reports()
+                if jira_output:
+                    print(
+                        f"{Colors.GREEN}✓ Jira aggregation completed: {jira_output.name}{Colors.NC}"
+                    )
+                else:
+                    print(f"{Colors.YELLOW}⚠ No Jira reports found for aggregation{Colors.NC}")
+            except Exception as e:
+                print(f"{Colors.RED}Error during aggregation: {e}{Colors.NC}")
+                # Don't fail the whole script if aggregation fails
+                traceback.print_exc()
 
         return 0
 

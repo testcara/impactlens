@@ -15,6 +15,59 @@ from typing import List, Optional, Any, Tuple, Dict
 from impactlens.utils.anonymization import anonymize_name
 
 
+def build_jira_project_prefix(project_settings: Optional[Dict]) -> Optional[str]:
+    """
+    Build project prefix for Jira reports from project settings.
+
+    Args:
+        project_settings: Dictionary containing project configuration
+
+    Returns:
+        Project key (e.g., "KONFLUX") or None if not available
+
+    Examples:
+        >>> build_jira_project_prefix({"jira_project_key": "KONFLUX"})
+        'KONFLUX'
+        >>> build_jira_project_prefix({})
+        None
+    """
+    if not project_settings:
+        return None
+    return project_settings.get("jira_project_key")
+
+
+def build_pr_project_prefix(project_settings: Optional[Dict]) -> Optional[str]:
+    """
+    Build project prefix for PR reports from project settings.
+
+    Args:
+        project_settings: Dictionary containing project configuration
+
+    Returns:
+        Project prefix in "owner/repo" format, or just "repo" if owner not available,
+        or None if neither is available
+
+    Examples:
+        >>> build_pr_project_prefix({"github_repo_owner": "konflux-ci", "github_repo_name": "konflux-ui"})
+        'konflux-ci/konflux-ui'
+        >>> build_pr_project_prefix({"github_repo_name": "konflux-ui"})
+        'konflux-ui'
+        >>> build_pr_project_prefix({})
+        None
+    """
+    if not project_settings:
+        return None
+
+    repo_owner = project_settings.get("github_repo_owner")
+    repo_name = project_settings.get("github_repo_name")
+
+    if repo_owner and repo_name:
+        return f"{repo_owner}/{repo_name}"
+    elif repo_name:
+        return repo_name
+    return None
+
+
 def get_identifier_for_display(name_or_email: str, hide_individual_names: bool = False) -> str:
     """
     Get display identifier for a user (for terminal output, headers, etc.).
@@ -284,8 +337,21 @@ def generate_comparison_report(
     # Add identifier (different parameter names for different report types)
     if report_type == "jira":
         tsv_kwargs["assignee"] = identifier
+        # Add project_key if available
+        if project_prefix:
+            tsv_kwargs["project_key"] = project_prefix
     else:  # pr
         tsv_kwargs["author"] = identifier
+        # For PR reports, project_prefix should be in "owner/repo" format
+        # Parse it to get repo_owner and repo_name
+        if project_prefix:
+            if "/" in project_prefix:
+                parts = project_prefix.split("/", 1)
+                tsv_kwargs["repo_owner"] = parts[0]
+                tsv_kwargs["repo_name"] = parts[1]
+            else:
+                # If no "/" separator, assume it's just the repo name
+                tsv_kwargs["repo_name"] = project_prefix
 
     # Add phase_configs if available (for displaying phase dates)
     if phase_configs:
@@ -315,17 +381,11 @@ def generate_comparison_report(
         else:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # Build filename with optional project prefix
+        # Build filename (without project prefix to keep filenames simple)
         if identifier:
-            base_filename = f"{report_type}_comparison_{identifier}_{timestamp}.tsv"
+            filename = f"{report_type}_comparison_{identifier}_{timestamp}.tsv"
         else:
-            base_filename = f"{report_type}_comparison_general_{timestamp}.tsv"
-
-        # Add project prefix if provided
-        if project_prefix:
-            filename = f"{project_prefix}_{base_filename}"
-        else:
-            filename = base_filename
+            filename = f"{report_type}_comparison_general_{timestamp}.tsv"
 
         output_path = os.path.join(output_dir, filename)
 
@@ -475,7 +535,8 @@ def combine_comparison_reports(
         )
 
     lines.append(f"Generated: {datetime.now().strftime('%B %d, %Y')}")
-    lines.append("Project: Konflux UI")
+    if project_prefix:
+        lines.append(f"Project: {project_prefix}")
     lines.append("")
     lines.append(
         f"This report compares {report_type.upper()} metrics across different time periods"
@@ -524,17 +585,9 @@ def combine_comparison_reports(
 
         lines.append("")  # Empty line between sections
 
-    # Determine output filename with optional project prefix
+    # Determine output filename (without project prefix to keep filenames simple)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    base_filename = f"combined_{report_type}_report_{timestamp}.tsv"
-
-    # Add project prefix if provided
-    if project_prefix:
-        # Normalize project prefix for filename (replace spaces and special chars with underscores)
-        normalized_prefix = project_prefix.replace(" ", "_").replace("-", "_")
-        filename = f"{normalized_prefix}_{base_filename}"
-    else:
-        filename = base_filename
+    filename = f"combined_{report_type}_report_{timestamp}.tsv"
 
     output_file = reports_dir / filename
 
