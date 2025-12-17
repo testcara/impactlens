@@ -12,6 +12,7 @@ This script orchestrates the complete GitHub PR report generation workflow:
 import sys
 import argparse
 import subprocess
+import traceback
 from pathlib import Path
 from typing import List, Optional
 
@@ -29,7 +30,9 @@ from impactlens.utils.report_utils import (
     normalize_username,
     combine_comparison_reports,
     get_identifier_for_display,
+    build_pr_project_prefix,
 )
+from impactlens.core.report_aggregator import ReportAggregator
 
 
 def print_header(title: str, subtitle: Optional[str] = None) -> None:
@@ -297,10 +300,14 @@ Examples:
         print()
 
         try:
+            # Build project_prefix from repo owner and name
+            project_prefix = build_pr_project_prefix(project_settings)
+
             output_file = combine_comparison_reports(
                 reports_dir=str(reports_dir),
                 report_type="pr",
                 title="GitHub PR AI Impact Analysis - Combined Report (Grouped by Metric)",
+                project_prefix=project_prefix,
                 hide_individual_names=args.hide_individual_names,
             )
             print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
@@ -313,11 +320,39 @@ Examples:
             print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
             print(f"{Colors.GREEN}✓ Combined report completed successfully!{Colors.NC}")
             print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
-            return 0
 
         except Exception as e:
             print(f"{Colors.RED}Error combining reports: {e}{Colors.NC}")
             return 1
+
+        # Check if aggregation config exists and run aggregation
+        # Look for aggregation_config.yaml in two places:
+        # 1. Same directory as the config file (for single team)
+        # 2. Parent directory (for multi-team with aggregation at parent level)
+        config_dir = config_file.parent
+        aggregation_config = config_dir / "aggregation_config.yaml"
+        if not aggregation_config.exists():
+            aggregation_config = config_dir.parent / "aggregation_config.yaml"
+
+        if aggregation_config.exists():
+            print()
+            print(f"{Colors.BLUE}{'=' * 40}{Colors.NC}")
+            print(f"{Colors.BLUE}Found aggregation config, running aggregation...{Colors.NC}")
+            print(f"{Colors.BLUE}{'=' * 40}{Colors.NC}")
+            print()
+            try:
+                aggregator = ReportAggregator(str(aggregation_config))
+                pr_output = aggregator.aggregate_pr_reports()
+                if pr_output:
+                    print(f"{Colors.GREEN}✓ PR aggregation completed: {pr_output.name}{Colors.NC}")
+                else:
+                    print(f"{Colors.YELLOW}⚠ No PR reports found for aggregation{Colors.NC}")
+            except Exception as e:
+                print(f"{Colors.RED}Error during aggregation: {e}{Colors.NC}")
+                # Don't fail the whole script if aggregation fails
+                traceback.print_exc()
+
+        return 0
 
     # Handle --all-members flag
     if args.all_members:

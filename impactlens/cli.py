@@ -17,6 +17,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from impactlens.utils.logger import set_log_level
+from impactlens.core.report_aggregator import ReportAggregator
+from impactlens.utils.workflow_utils import upload_to_google_sheets
 
 # Main app
 app = typer.Typer(
@@ -819,6 +821,59 @@ def full_workflow(
     if run_script("impactlens.scripts.generate_pr_report", pr_combine_args, "PR combine") != 0:
         failed_workflows.append("PR combine")
 
+    # Check if aggregation config exists and run aggregation
+    # Look for aggregation_config.yaml in two places:
+    # 1. Same directory as the config files (for single team)
+    # 2. Parent directory (for multi-team with aggregation at parent level)
+    config_dir = None
+    if jira_config_path:
+        config_dir = jira_config_path.parent
+    elif pr_config_path:
+        config_dir = pr_config_path.parent
+
+    aggregation_config = None
+    if config_dir:
+        # Try current directory first
+        aggregation_config = config_dir / "aggregation_config.yaml"
+        if not aggregation_config.exists():
+            # Try parent directory
+            aggregation_config = config_dir.parent / "aggregation_config.yaml"
+
+        if aggregation_config.exists():
+            console.print("\n" + "=" * 60)
+            console.print("[bold cyan]AGGREGATION[/bold cyan]")
+            console.print("=" * 60)
+            console.print(f"[dim]Found aggregation config: {aggregation_config}[/dim]\n")
+
+            try:
+                aggregator = ReportAggregator(str(aggregation_config))
+
+                # Aggregate Jira reports
+                console.print("[cyan]Aggregating Jira reports...[/cyan]")
+                jira_output = aggregator.aggregate_jira_reports()
+                if jira_output:
+                    console.print(
+                        f"[green]✓ Jira aggregation completed: {jira_output.name}[/green]"
+                    )
+                    # Upload aggregated Jira report
+                    upload_to_google_sheets(jira_output, skip_upload=no_upload)
+                else:
+                    console.print("[yellow]⚠ No Jira reports found for aggregation[/yellow]")
+
+                # Aggregate PR reports
+                console.print("[cyan]Aggregating PR reports...[/cyan]")
+                pr_output = aggregator.aggregate_pr_reports()
+                if pr_output:
+                    console.print(f"[green]✓ PR aggregation completed: {pr_output.name}[/green]")
+                    # Upload aggregated PR report
+                    upload_to_google_sheets(pr_output, skip_upload=no_upload)
+                else:
+                    console.print("[yellow]⚠ No PR reports found for aggregation[/yellow]")
+
+            except Exception as e:
+                console.print(f"[red]Error during aggregation: {e}[/red]")
+                failed_workflows.append("Aggregation")
+
     # PR: Claude insights (opt-in)
     if with_claude_insights:
         pr_reports = list(Path("reports/github").glob("combined_pr_report_*.tsv"))
@@ -859,6 +914,35 @@ def full_workflow(
         console.print("[bold green]✓ Complete workflow finished successfully![/bold green]")
         console.print("\n[dim]All reports generated in reports/ directory[/dim]")
         sys.exit(0)
+
+
+@app.command()
+def aggregate(
+    config: str = typer.Option(..., "--config", help="Path to aggregation config file"),
+    jira_only: bool = typer.Option(False, "--jira-only", help="Aggregate only Jira reports"),
+    pr_only: bool = typer.Option(False, "--pr-only", help="Aggregate only PR reports"),
+):
+    """Aggregate multiple project reports into unified reports."""
+    console.print(
+        Panel.fit(
+            "[bold green]Report Aggregation[/bold green]\n"
+            "[dim]Merging multiple project reports into unified reports[/dim]",
+            border_style="green",
+        )
+    )
+
+    args = ["--config", config]
+    if jira_only:
+        args.append("--jira-only")
+    if pr_only:
+        args.append("--pr-only")
+
+    return_code = run_script("impactlens.scripts.aggregate_reports", args, "Aggregating reports")
+    sys.exit(return_code)
+
+
+# Add alias 'agg' for aggregate
+app.command(name="agg")(aggregate)
 
 
 @app.command()
@@ -914,6 +998,7 @@ def main(ctx: typer.Context):
         table.add_row("jira", "Jira issue analysis (team, member, members, all, combine, full)")
         table.add_row("pr", "GitHub PR analysis (team, member, members, all, combine, full)")
         table.add_row("full", "Complete workflow: Jira + PR")
+        table.add_row("aggregate (agg)", "Aggregate multiple project reports into unified reports")
         table.add_row("verify", "Verify setup and configuration")
         table.add_row("version", "Show version information")
 

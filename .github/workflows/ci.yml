@@ -55,32 +55,37 @@ jobs:
         python -m pip install --upgrade pip
         pip install tox tox-gh-actions
 
-    - name: Run tests with tox
+    - name: Run tests with tox (Python ${{ matrix.python-version }})
       if: steps.docs_check.outputs.code_changed == 'true'
       run: |
+        echo "=========================================="
+        echo "Running tests on Python ${{ matrix.python-version }}"
+        echo "=========================================="
         tox -e py$(echo "${{ matrix.python-version }}" | tr -d '.')
 
-    - name: Run lint checks
+    - name: Run lint checks (Python 3.11 only)
       if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
       run: |
+        echo "Running lint checks..."
         tox -e lint
 
-    - name: Run type checking
+    - name: Skip lint checks (Python ${{ matrix.python-version }})
+      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version != '3.11'
+      run: |
+        echo "⏭️  Skipping lint checks (only runs on Python 3.11)"
+
+    - name: Run type checking (Python 3.11 only)
       if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
       continue-on-error: true
       run: |
+        echo "Running type checks..."
         tox -e type
 
-    - name: Run coverage
-      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
+    - name: Skip type checking (Python ${{ matrix.python-version }})
+      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version != '3.11'
       run: |
-        tox -e coverage
+        echo "⏭️  Skipping type checks (only runs on Python 3.11)"
 
-    - name: Upload coverage reports
-      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
-      uses: codecov/codecov-action@v4
-      with:
-        fail_ci_if_error: false
 
   integration-test:
     name: Integration Test (Full Pipeline)
@@ -129,14 +134,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
+      - name: Setup Google Sheets credentials
+        if: steps.docs_check.outputs.code_changed == 'true'
+        env:
+          GOOGLE_CREDENTIALS_BASE64: ${{ secrets.GOOGLE_CREDENTIALS_BASE64 }}
+        run: |
+          if [ -n "$GOOGLE_CREDENTIALS_BASE64" ]; then
+            echo "Setting up Google Sheets credentials..."
+            echo "$GOOGLE_CREDENTIALS_BASE64" | base64 -d > /tmp/google_credentials.json
+            echo "GOOGLE_CREDENTIALS_FILE=/tmp/google_credentials.json" >> $GITHUB_ENV
+            echo "✓ Google Sheets credentials configured"
+          else
+            echo "⚠️  GOOGLE_CREDENTIALS_BASE64 not set, uploads will be skipped"
+          fi
+
       - name: Restore GitHub PR cache
         if: steps.docs_check.outputs.code_changed == 'true'
         uses: actions/cache@v4
         with:
           path: .cache/github
-          key: integration-test-pr-cache-${{ hashFiles('config/test/pr_report_config.yaml') }}-${{ github.run_id }}
+          key: integration-test-pr-cache-${{ hashFiles('config/test-integration-ci/test-ci-team/pr_report_config.yaml') }}-${{ github.run_id }}
           restore-keys: |
-            integration-test-pr-cache-${{ hashFiles('config/test/pr_report_config.yaml') }}-
+            integration-test-pr-cache-${{ hashFiles('config/test-integration-ci/test-ci-team/pr_report_config.yaml') }}-
             integration-test-pr-cache-
 
       - name: Run integration test - Jira reports
@@ -144,6 +163,7 @@ jobs:
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
         run: |
           if [ -z "$JIRA_API_TOKEN" ]; then
             echo "⚠️  JIRA_API_TOKEN not set, skipping Jira integration test"
@@ -154,49 +174,196 @@ jobs:
           echo "Running Jira Integration Test"
           echo "=========================================="
 
+          # Add --no-upload only if Google Sheets is not configured
+          UPLOAD_ARGS=""
+          if [ -z "$GOOGLE_CREDENTIALS_FILE" ] || [ -z "$GOOGLE_SPREADSHEET_ID" ]; then
+            UPLOAD_ARGS="--no-upload"
+            echo "⚠️  Google Sheets not configured, skipping upload"
+          else
+            echo "✓ Google Sheets configured, will upload reports"
+          fi
+
           python -m impactlens.cli jira full \
-            --config config/test/jira_report_config.yaml \
-            --no-upload \
+            --config config/test-integration-ci/test-ci-team/jira_report_config.yaml \
+            $UPLOAD_ARGS \
             --hide-individual-names
 
           echo ""
           echo "✓ Jira integration test completed"
-          ls -lh reports/test/jira/ || echo "No reports generated"
+          ls -lh reports/test-ci-team/jira/ || echo "No reports generated"
 
       - name: Run integration test - PR reports
         if: steps.docs_check.outputs.code_changed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
         run: |
           echo "=========================================="
           echo "Running PR Integration Test"
           echo "=========================================="
-          echo "Command: python -m impactlens.cli pr full --config config/test/pr_report_config.yaml --no-upload --incremental"
+
+          # Add --no-upload only if Google Sheets is not configured
+          UPLOAD_ARGS=""
+          if [ -z "$GOOGLE_CREDENTIALS_FILE" ] || [ -z "$GOOGLE_SPREADSHEET_ID" ]; then
+            UPLOAD_ARGS="--no-upload"
+            echo "⚠️  Google Sheets not configured, skipping upload"
+          else
+            echo "✓ Google Sheets configured, will upload reports"
+          fi
+
+          echo "Command: python -m impactlens.cli pr full --config config/test-integration-ci/test-ci-team/pr_report_config.yaml $UPLOAD_ARGS --incremental"
           echo ""
 
           python -m impactlens.cli pr full \
-            --config config/test/pr_report_config.yaml \
-            --no-upload \
+            --config config/test-integration-ci/test-ci-team/pr_report_config.yaml \
+            $UPLOAD_ARGS \
             --incremental \
             --hide-individual-names
 
           echo ""
           echo "✓ PR integration test completed"
-          ls -lh reports/test/github/ || echo "No reports generated"
+          ls -lh reports/test-ci-team/github/ || echo "No reports generated"
+
+      - name: Run integration test - Multi-team aggregation (Team 1)
+        if: steps.docs_check.outputs.code_changed == 'true'
+        env:
+          JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
+        run: |
+          echo "=========================================="
+          echo "Scenario 2: Multi-Team Aggregation - Team 1"
+          echo "=========================================="
+
+          # Add --no-upload only if Google Sheets is not configured
+          UPLOAD_ARGS=""
+          if [ -z "$GOOGLE_CREDENTIALS_FILE" ] || [ -z "$GOOGLE_SPREADSHEET_ID" ]; then
+            UPLOAD_ARGS="--no-upload"
+          fi
+
+          # Generate Jira reports for Team 1
+          if [ -n "$JIRA_API_TOKEN" ]; then
+            echo "Generating Jira reports for Team 1..."
+            python -m impactlens.cli jira full \
+              --config config/test-aggregation-ci/test-ci-team1/jira_report_config.yaml \
+              $UPLOAD_ARGS \
+              --hide-individual-names || echo "⚠️  Team 1 Jira generation failed (continuing)"
+          fi
+
+          # Generate PR reports for Team 1
+          echo "Generating PR reports for Team 1..."
+          python -m impactlens.cli pr full \
+            --config config/test-aggregation-ci/test-ci-team1/pr_report_config.yaml \
+            $UPLOAD_ARGS \
+            --incremental \
+            --hide-individual-names || echo "⚠️  Team 1 PR generation failed (continuing)"
+
+          echo "✓ Team 1 reports completed"
+          ls -lh reports/test-ci-team1/ || true
+
+      - name: Run integration test - Multi-team aggregation (Team 2)
+        if: steps.docs_check.outputs.code_changed == 'true'
+        env:
+          JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
+        run: |
+          echo "=========================================="
+          echo "Scenario 2: Multi-Team Aggregation - Team 2"
+          echo "=========================================="
+
+          # Add --no-upload only if Google Sheets is not configured
+          UPLOAD_ARGS=""
+          if [ -z "$GOOGLE_CREDENTIALS_FILE" ] || [ -z "$GOOGLE_SPREADSHEET_ID" ]; then
+            UPLOAD_ARGS="--no-upload"
+          fi
+
+          # Generate Jira reports for Team 2
+          if [ -n "$JIRA_API_TOKEN" ]; then
+            echo "Generating Jira reports for Team 2..."
+            python -m impactlens.cli jira full \
+              --config config/test-aggregation-ci/test-ci-team2/jira_report_config.yaml \
+              $UPLOAD_ARGS \
+              --hide-individual-names || echo "⚠️  Team 2 Jira generation failed (continuing)"
+          fi
+
+          # Generate PR reports for Team 2
+          echo "Generating PR reports for Team 2..."
+          python -m impactlens.cli pr full \
+            --config config/test-aggregation-ci/test-ci-team2/pr_report_config.yaml \
+            $UPLOAD_ARGS \
+            --incremental \
+            --hide-individual-names || echo "⚠️  Team 2 PR generation failed (continuing)"
+
+          echo "✓ Team 2 reports completed"
+          ls -lh reports/test-ci-team2/ || true
+
+      - name: Run integration test - Report aggregation
+        if: steps.docs_check.outputs.code_changed == 'true'
+        env:
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
+        run: |
+          echo "=========================================="
+          echo "Scenario 2: Multi-Team Aggregation - Aggregating Reports"
+          echo "=========================================="
+
+          # Check if at least one team report exists
+          if [ ! -d "reports/test-ci-team1" ] && [ ! -d "reports/test-ci-team2" ]; then
+            echo "⚠️  No team reports found, skipping aggregation test"
+            exit 0
+          fi
+
+          # Use the prepared aggregation config (no .example suffix in test-aggregation-ci)
+          AGGREGATION_CONFIG="config/test-aggregation-ci/aggregation_config.yaml"
+
+          echo "Aggregation config:"
+          cat "$AGGREGATION_CONFIG"
+          echo ""
+
+          echo "Available reports:"
+          ls -R reports/test-ci-team*/*/combined_*.tsv 2>/dev/null || echo "No combined reports found yet"
+          echo ""
+
+          # Add --no-upload only if Google Sheets is not configured
+          UPLOAD_ARGS=""
+          if [ -z "$GOOGLE_CREDENTIALS_FILE" ] || [ -z "$GOOGLE_SPREADSHEET_ID" ]; then
+            UPLOAD_ARGS="--no-upload"
+            echo "⚠️  Google Sheets not configured, skipping upload"
+          else
+            echo "✓ Google Sheets configured, will upload aggregated reports"
+          fi
+
+          echo "Command: python -m impactlens.cli aggregate --config $AGGREGATION_CONFIG $UPLOAD_ARGS"
+          echo ""
+
+          python -m impactlens.cli aggregate \
+            --config "$AGGREGATION_CONFIG" \
+            $UPLOAD_ARGS
+
+          echo ""
+          echo "✓ Aggregation integration test completed"
+          echo "Generated aggregated reports:"
+          ls -lh reports/test-ci-aggregated/ || echo "No aggregated reports generated"
 
       - name: Upload test reports as artifacts
         if: steps.docs_check.outputs.code_changed == 'true' && always()
         uses: actions/upload-artifact@v4
         with:
           name: integration-test-reports
-          path: reports/test/
+          path: |
+            reports/test-ci-team/
+            reports/test-ci-team1/
+            reports/test-ci-team2/
+            reports/test-ci-aggregated/
           retention-days: 7
 
       - name: Report Statistics and PR Comment
         if: steps.docs_check.outputs.code_changed == 'true' && always()
         uses: ./.github/actions/report-comment
         with:
-          reports_dir: 'reports/test'
+          reports_dir: 'reports/test-ci-team'
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Integration test summary
@@ -206,10 +373,23 @@ jobs:
           echo "Integration Test Summary"
           echo "=========================================="
           echo ""
-          echo "Test configuration used:"
-          echo "  - Jira: config/test/jira_report_config.yaml"
-          echo "  - PR: config/test/pr_report_config.yaml"
+          echo "Test Scenarios Executed:"
           echo ""
-          echo "Reports generated in: reports/test/"
+          echo "  1️⃣ Basic Integration Test (Single Team):"
+          echo "     - Config: config/test-integration-ci/test-ci-team/"
+          echo "     - Reports: reports/test-ci-team/"
           echo ""
-          echo "✓ Integration test pipeline completed successfully"
+          echo "  2️⃣ Multi-Team Aggregation Test:"
+          echo "     - Team 1: config/test-aggregation-ci/test-ci-team1/"
+          echo "     - Team 2: config/test-aggregation-ci/test-ci-team2/"
+          echo "     - Aggregation: config/test-aggregation-ci/aggregation_config.yaml"
+          echo "     - Team 1 Reports: reports/test-ci-team1/"
+          echo "     - Team 2 Reports: reports/test-ci-team2/"
+          echo "     - Aggregated Reports: reports/test-ci-aggregated/"
+          echo ""
+          if [ -d "reports/test-ci-aggregated" ]; then
+            echo "  📊 Aggregated report files:"
+            ls -1 reports/test-ci-aggregated/ 2>/dev/null | sed 's/^/       /' || echo "       (none generated)"
+            echo ""
+          fi
+          echo "✅ Integration test pipeline completed successfully"

@@ -24,9 +24,13 @@ team_members:
     email: sbudhwar@redhat.com
     leave_days: 0
     capacity: 1.0
+  - member: kkanova
+    email: kkanova@redhat.com
+    leave_days: 0
+    capacity: 0.5
 
 # Use test output directory to avoid polluting main reports
-output_dir: "reports/test/jira"
+output_dir: "reports/test-ci-team1/jira"
 
 # Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
 log_level: "WARNING"

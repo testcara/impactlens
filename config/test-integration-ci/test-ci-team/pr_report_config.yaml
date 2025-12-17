@@ -1,0 +1,28 @@
+# Test configuration for CI integration testing
+# This config uses a small date range and minimal team members for fast testing
+
+project:
+  github_repo_owner: "konflux-ci"
+  github_repo_name: "konflux-ui"
+
+phases:
+  - name: "Test Period 1"
+    start: "2025-10-01"
+    end: "2025-10-31"
+  - name: "Test Period 2"
+    start: "2025-11-01"
+    end: "2025-11-30"
+
+default_author: "" # "" represent team
+
+team_members:
+  - name: testcara
+    email: wlin@redhat.com
+  - name: sahil143
+    email: sbudhwar@redhat.com
+
+# Use test output directory to avoid polluting main reports
+output_dir: "reports/test-ci-team1/github"
+
+# Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
+log_level: "WARNING"

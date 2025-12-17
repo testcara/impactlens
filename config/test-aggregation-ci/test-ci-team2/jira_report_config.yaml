@@ -1,0 +1,29 @@
+# Test configuration for CI integration testing
+# This config uses a small date range and minimal team members for fast testing
+
+project:
+  jira_url: "https://issues.redhat.com"
+  jira_project_key: "RHTAP UI"
+
+phases:
+  - name: "Test Period 1"
+    start: "2025-10-01"
+    end: "2025-10-31"
+  - name: "Test Period 2"
+    start: "2025-11-01"
+    end: "2025-11-30"
+
+
+default_assignee: "" # "" represent team
+
+team_members:
+  - member: kkanova
+    email: kkanova@redhat.com
+    leave_days: 0
+    capacity: 0.5
+
+# Use test output directory to avoid polluting main reports
+output_dir: "reports/test-ci-team2/jira"
+
+# Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
+log_level: "WARNING"

@@ -26,6 +26,7 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 - **Data-Driven Insights**: Track closure time, merge time, throughput, and more to help making informed decisions
 - **Privacy Protection**: Optional anonymization for sharing reports while protecting individual privacy
 - **Multi-Team Support**: Isolated configs and reports for multiple teams
+- **Multi-Repo Aggregation**: Combine reports from multiple repositories/projects into unified team-wide views
 - **Automated Reporting**: Generate comprehensive reports with one command
 - **Easy Sharing**: Auto-upload to Google Sheets for stakeholder visibility
 
@@ -98,6 +99,7 @@ impactlens/
 │   │   ├── pr_metrics_calculator.py
 │   │   ├── jira_report_generator.py
 │   │   ├── pr_report_generator.py
+│   │   ├── report_aggregator.py  # Multi-team aggregation
 │   │   └── report_orchestrator.py
 │   ├── models/                   # Data models & config
 │   ├── scripts/                  # Script modules
@@ -118,16 +120,20 @@ impactlens/
 ├── config/                       # Configuration files
 │   ├── jira_report_config.yaml.example  # Jira config template
 │   ├── pr_report_config.yaml.example    # PR config template
+│   ├── aggregation_config.yaml.example  # Multi-repo aggregation config
 │   ├── analysis_prompt_template.yaml    # AI analysis prompts
-│   ├── test/                     # CI integration test configs
-│   │   ├── jira_report_config.yaml
-│   │   └── pr_report_config.yaml
-│   ├── team-a/                   # Team-specific configs (multi-team)
-│   │   ├── jira_report_config.yaml
-│   │   └── pr_report_config.yaml
-│   └── team-b/                   # Another team (example)
-│       ├── jira_report_config.yaml
-│       └── pr_report_config.yaml
+│   ├── test-integration-ci/      # CI integration test configs
+│   │   └── test-ci-team1/
+│   │       ├── jira_report_config.yaml
+│   │       └── pr_report_config.yaml
+│   └── test-aggregation-ci/      # CI aggregation test configs
+│       ├── aggregation_config.yaml
+│       ├── test-ci-team1/
+│       │   ├── jira_report_config.yaml
+│       │   └── pr_report_config.yaml
+│       └── test-ci-team2/
+│           ├── jira_report_config.yaml
+│           └── pr_report_config.yaml
 ├── docs/                         # Documentation
 │   ├── CONFIGURATION.md          # Detailed configuration guide
 │   ├── METRICS_GUIDE.md          # Metrics explanations & formulas
@@ -259,6 +265,7 @@ impactlens full
 ➡️ **For complete configuration reference including:**
 
 - Multi-team setup & isolation
+- Multi-repo aggregation (for teams with multiple repositories/projects)
 - Google Sheets integration
 - Custom config paths
 - Environment variables reference
@@ -281,13 +288,22 @@ impactlens verify
 **Generate reports:**
 
 ```bash
-impactlens full                              # ALL reports (Jira + PR)
+# Complete workflows
+impactlens full                              # ALL reports (Jira + PR + Auto-aggregate if config exists)
 impactlens jira full                         # Jira: Team + Members + Combined
 impactlens pr full                           # PR: Team + Members + Combined
+
+# Individual reports
 impactlens jira team                         # Jira team report only
 impactlens pr team                           # PR team report only
 impactlens jira member alice@company.com     # Jira for one member
 impactlens pr member alice-github            # PR for one member (GitHub username)
+
+# Multi-repo aggregation (combine reports from multiple repositories/projects)
+impactlens aggregate --config config/aggregation_config.yaml      # Aggregate both Jira and PR
+impactlens agg --config config/aggregation_config.yaml            # Short alias
+impactlens aggregate --config config/aggregation_config.yaml --jira-only   # Jira only
+impactlens aggregate --config config/aggregation_config.yaml --pr-only     # PR only
 ```
 
 **Advanced usage with options:**
@@ -357,9 +373,15 @@ The `full` command workflow: Get metrics → Generate reports → Upload reports
 - `pr_comparison_general_*.tsv` - Comparison table (phases side-by-side)
 - `{project}_combined_pr_report_*.tsv` - Combined view (all members grouped by metric)
 
+**Aggregated Reports** (in custom `output_dir` from aggregation config, for multi-repo teams):
+
+- `aggregated_jira_report_*.tsv` - Unified Jira metrics across all repositories
+- `aggregated_pr_report_*.tsv` - Unified PR metrics across all repositories
+
 **Note:**
 
 - `{project}` prefix is added when `jira_project_key` or `github_repo_name` is configured
+- Aggregated reports are generated only when `aggregation_config.yaml` is present
 - AI-powered analysis reports are listed separately in the [AI-Powered Analysis](#ai-powered-analysis-experimental) section
 
 ## AI-Powered Analysis (Experimental)

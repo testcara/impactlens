@@ -496,7 +496,9 @@ class JiraReportGenerator:
 
         return data
 
-    def generate_comparison_tsv(self, reports, phase_names, assignee=None, phase_configs=None):
+    def generate_comparison_tsv(
+        self, reports, phase_names, assignee=None, phase_configs=None, project_key=None
+    ):
         """
         Generate TSV comparison report from multiple phase reports.
 
@@ -517,7 +519,8 @@ class JiraReportGenerator:
         else:
             lines.append("AI Impact Analysis Report - Team Overall")
         lines.append(f"Report Generated: {datetime.now().strftime('%B %d, %Y')}")
-        lines.append("Project: Konflux UI")
+        if project_key:
+            lines.append(f"Project: {project_key}")
         lines.append("")
 
         # Add description for multi-phase analysis
