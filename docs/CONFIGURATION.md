@@ -161,11 +161,30 @@ git push origin report/platform-team
 1. **Team Report** - Team metrics for frontend, backend, mobile (isolated)
 2. **Combined Report** - Team + members for each sub-project (detailed)
 
-**Aggregated:** 3. **Aggregated Report** - Unified team-wide metrics
+**Aggregated:**
 
-- **OVERALL column**: Total team performance across all projects
-- **Per-source columns**: frontend, backend, mobile
-- **Per-member columns**: alice, bob, charlie (auto-merged via email)
+3. **Aggregated Report** - Unified team-wide metrics
+   - **OVERALL column**: Total team performance across all projects
+   - **Per-source columns**: frontend, backend, mobile
+   - **Per-member columns**: alice, bob, charlie (auto-merged via email)
+
+**Why All Three Report Types Are Necessary:**
+
+Different sub-projects/repos often have **completely different characteristics**:
+
+- **Frontend** may have shorter PRs, faster review cycles, higher AI adoption
+- **Backend** may have complex PRs, longer testing cycles, lower AI adoption
+- **Mobile** may have platform-specific workflows, different metrics patterns
+
+**If you only see aggregated reports**, you would:
+- ❌ **Miss critical sub-project insights** - Backend bottlenecks hidden by frontend speed
+- ❌ **Get misleading averages** - High AI adoption in frontend masks low adoption in backend
+- ❌ **Lose actionable context** - Can't identify which team/project needs improvement
+
+**Each report type serves a purpose:**
+- **Per Sub-Project Reports** → Identify specific bottlenecks and patterns in each project/repo
+- **Aggregated Report** → Overall team performance and cross-project member contributions
+- **Combined View** → Both perspectives needed for accurate analysis and decision-making
 
 **Aggregation Logic:**
 
@@ -279,6 +298,8 @@ output_dir: "reports/platform-team-aggregated"
 ---
 
 ## Understanding Report Types
+
+> **💡 Why multiple report types?** Each provides a necessary perspective - see [Why All Three Are Necessary](#why-all-three-report-types-are-necessary) above.
 
 ### 1. TEAM Report (`*_report_general_*.txt`)
 
