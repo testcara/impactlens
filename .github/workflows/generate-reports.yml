@@ -189,7 +189,7 @@ jobs:
           echo "Google Sheets ID: $([ -n "$GOOGLE_SPREADSHEET_ID" ] && echo '✓ Set' || echo '✗ Not set')"
           echo "=========================================="
 
-      - name: Generate Aggregated Reports
+      - name: Generate Individual Team Reports (for Aggregation)
         if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && steps.config.outputs.is_aggregation == 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
@@ -198,36 +198,129 @@ jobs:
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
         run: |
           AGGREGATION_CONFIG="${{ steps.config.outputs.config_dir }}/aggregation_config.yaml"
-          if [ -f "$AGGREGATION_CONFIG" ]; then
-            echo "=========================================="
-            echo "Generating aggregated reports"
-            echo "=========================================="
-            echo "Config: $AGGREGATION_CONFIG"
 
-            # Determine report type based on input or default to both
-            REPORT_TYPE="${{ github.event.inputs.report_type }}"
-            if [ -z "$REPORT_TYPE" ] || [ "$REPORT_TYPE" = "both" ]; then
-              echo "Running command: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\" --hide-individual-names"
-              python -m impactlens.cli aggregate \
-                --config "$AGGREGATION_CONFIG" \
-                --hide-individual-names
-            elif [ "$REPORT_TYPE" = "jira" ]; then
-              echo "Running command: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\" --jira-only --hide-individual-names"
-              python -m impactlens.cli aggregate \
-                --config "$AGGREGATION_CONFIG" \
-                --jira-only \
-                --hide-individual-names
-            elif [ "$REPORT_TYPE" = "pr" ]; then
-              echo "Running command: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\" --pr-only --hide-individual-names"
-              python -m impactlens.cli aggregate \
-                --config "$AGGREGATION_CONFIG" \
-                --pr-only \
-                --hide-individual-names
-            fi
-          else
+          if [ ! -f "$AGGREGATION_CONFIG" ]; then
             echo "⚠️  Aggregation config not found at $AGGREGATION_CONFIG"
             exit 1
           fi
+
+          echo "=========================================="
+          echo "Step 1: Generate Individual Team Reports"
+          echo "=========================================="
+          echo "Aggregation config: $AGGREGATION_CONFIG"
+          echo ""
+
+          # Parse YAML to get subdirectories from projects list
+          # The aggregation config uses 'projects' which are subdirectory names
+          # We need to find the config files in those subdirectories
+          PROJECTS=$(python3 << 'PYTHON_SCRIPT'
+          import yaml
+          import sys
+          try:
+              with open('${{ steps.config.outputs.config_dir }}/aggregation_config.yaml', 'r') as f:
+                  config = yaml.safe_load(f)
+                  projects = config.get('aggregation', {}).get('projects', [])
+                  for proj in projects:
+                      print(proj)
+          except Exception as e:
+              sys.stderr.write(f"Error: {e}\n")
+          PYTHON_SCRIPT
+          )
+
+          if [ -z "$PROJECTS" ]; then
+            echo "⚠️  No projects found in aggregation config"
+            exit 1
+          fi
+
+          echo "Found projects:"
+          echo "$PROJECTS"
+          echo ""
+
+          REPORT_TYPE="${{ github.event.inputs.report_type }}"
+          CONFIG_BASE_DIR="${{ steps.config.outputs.config_dir }}"
+
+          # Generate reports for each project
+          while IFS= read -r project; do
+            if [ -z "$project" ]; then
+              continue
+            fi
+
+            echo "=========================================="
+            echo "Processing project: $project"
+            echo "=========================================="
+
+            # Generate Jira reports
+            if [ "$REPORT_TYPE" = "jira" ] || [ "$REPORT_TYPE" = "both" ] || [ -z "$REPORT_TYPE" ]; then
+              JIRA_CONFIG="$CONFIG_BASE_DIR/$project/jira_report_config.yaml"
+              if [ -f "$JIRA_CONFIG" ]; then
+                echo "Generating Jira report: $JIRA_CONFIG"
+                python -m impactlens.cli jira full \
+                  --config "$JIRA_CONFIG" \
+                  --hide-individual-names || echo "⚠️  Failed to generate Jira report (continuing)"
+              else
+                echo "⚠️  Jira config not found: $JIRA_CONFIG"
+              fi
+            fi
+
+            # Generate PR reports
+            if [ "$REPORT_TYPE" = "pr" ] || [ "$REPORT_TYPE" = "both" ] || [ -z "$REPORT_TYPE" ]; then
+              PR_CONFIG="$CONFIG_BASE_DIR/$project/pr_report_config.yaml"
+              if [ -f "$PR_CONFIG" ]; then
+                echo "Generating PR report: $PR_CONFIG"
+                python -m impactlens.cli pr full \
+                  --config "$PR_CONFIG" \
+                  --incremental \
+                  --hide-individual-names || echo "⚠️  Failed to generate PR report (continuing)"
+              else
+                echo "⚠️  PR config not found: $PR_CONFIG"
+              fi
+            fi
+
+            echo ""
+          done <<< "$PROJECTS"
+
+          echo "✓ Individual team reports generation completed"
+
+      - name: Generate Aggregated Reports
+        if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && steps.config.outputs.is_aggregation == 'true'
+        env:
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+        run: |
+          AGGREGATION_CONFIG="${{ steps.config.outputs.config_dir }}/aggregation_config.yaml"
+
+          echo "=========================================="
+          echo "Step 2: Aggregate Team Reports"
+          echo "=========================================="
+          echo "Config: $AGGREGATION_CONFIG"
+          echo ""
+
+          # Check if at least one combined report exists
+          echo "Available combined reports:"
+          ls -R reports/**/combined_*.tsv 2>/dev/null || echo "⚠️  No combined reports found yet"
+          echo ""
+
+          # Determine report type based on input or default to both
+          REPORT_TYPE="${{ github.event.inputs.report_type }}"
+          if [ -z "$REPORT_TYPE" ] || [ "$REPORT_TYPE" = "both" ]; then
+            echo "Running: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\""
+            python -m impactlens.cli aggregate \
+              --config "$AGGREGATION_CONFIG"
+          elif [ "$REPORT_TYPE" = "jira" ]; then
+            echo "Running: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\" --jira-only"
+            python -m impactlens.cli aggregate \
+              --config "$AGGREGATION_CONFIG" \
+              --jira-only
+          elif [ "$REPORT_TYPE" = "pr" ]; then
+            echo "Running: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\" --pr-only"
+            python -m impactlens.cli aggregate \
+              --config "$AGGREGATION_CONFIG" \
+              --pr-only
+          fi
+
+          echo ""
+          echo "✓ Aggregation completed"
+          echo "Generated aggregated reports:"
+          ls -lh reports/**/aggregated_*.tsv 2>/dev/null || echo "No aggregated reports found"
 
       - name: Generate Jira Report
         if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && steps.config.outputs.is_aggregation != 'true' && (github.event.inputs.report_type == 'jira' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
