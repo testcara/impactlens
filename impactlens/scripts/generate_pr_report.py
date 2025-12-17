@@ -314,7 +314,9 @@ Examples:
             print()
 
             # Upload to Google Sheets if not disabled
-            upload_to_google_sheets(output_file, skip_upload=args.no_upload)
+            upload_to_google_sheets(
+                output_file, skip_upload=args.no_upload, config_path=custom_config_file
+            )
 
             print()
             print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
@@ -446,7 +448,9 @@ Examples:
     if comparison_file:
         print(f"{Colors.GREEN}✓ Report generated: {comparison_file.name}{Colors.NC}")
         print()
-        upload_to_google_sheets(comparison_file, skip_upload=args.no_upload)
+        upload_to_google_sheets(
+            comparison_file, skip_upload=args.no_upload, config_path=custom_config_file
+        )
 
     print(f"{Colors.GREEN}Done!{Colors.NC}")
     return 0

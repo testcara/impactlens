@@ -24,11 +24,11 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 - **Track AI Productivity Impact**: Compare development efficiency before and after AI tool adoption
 - **Performance Reviews**: Objective metrics for evaluating team and individual performance
 - **Data-Driven Insights**: Track closure time, merge time, throughput, and more to help making informed decisions
-- **Privacy Protection**: Optional anonymization for sharing reports while protecting individual privacy
-- **Multi-Team Support**: Isolated configs and reports for multiple teams
+- **Privacy Protection**: Automatic anonymization in CI for sharing reports while protecting individual privacy
+- **CI-Driven Automation**: Submit config via PR → Reports auto-generated and posted as PR comments
 - **Multi-Repo Aggregation**: Combine reports from multiple repositories/projects into unified team-wide views
-- **Automated Reporting**: Generate comprehensive reports with one command
 - **Easy Sharing**: Auto-upload to Google Sheets for stakeholder visibility
+- **Flexible Deployment**: GitHub Actions CI (zero config) or local CLI for full data access
 
 **Use Cases:**
 
@@ -203,75 +203,30 @@ impactlens full
 
 ## Configuration
 
-### Quick Configuration Guide
+ImpactLens supports two configuration scenarios:
 
-**Configuration priority**: YAML Config (non-sensitive) → Environment Variables (credentials) → CI Defaults
+| Scenario | Team Structure | Reports Generated |
+|----------|---------------|-------------------|
+| **Simple** | Single project/repo | TEAM + COMBINED |
+| **Complex** | Multiple projects/repos | TEAM + COMBINED + AGGREGATED |
 
-**Essential setup**:
+**Quick Setup (Simple Scenario):**
 
-1. **Project Settings** (YAML) - Define project/repo to analyze:
+1. Create config directory: `mkdir -p config/my-team`
+2. Copy templates and edit with your team settings:
+   - `project`: Jira project key or GitHub repo owner/name
+   - `phases`: Analysis periods (e.g., before/after AI adoption)
+   - `team_members`: Team scope with optional leave_days and capacity
+3. Submit via PR → CI auto-generates reports
 
-   ```yaml
-   # Jira config (config/jira_report_config.yaml)
-   project:
-     jira_url: "https://issues.redhat.com"
-     jira_project_key: "KONFLUX"
-
-   # PR config (config/pr_report_config.yaml)
-   project:
-     github_repo_owner: "konflux-ci"
-     github_repo_name: "konflux-ui"
-   ```
-
-2. **Phases** (YAML) - Define before/after AI periods:
-
-   ```yaml
-   phases:
-     - name: "Before AI"
-       start: "2024-01-01"
-       end: "2024-06-30"
-     - name: "With AI"
-       start: "2024-07-01"
-       end: "2024-12-31"
-   ```
-
-3. **Team Members** (YAML) - Define team scope for filtering:
-
-   ```yaml
-   # Jira: Only issues assigned to these members
-   team_members:
-     - member: alice
-       email: alice@company.com
-
-   # PR: Only PRs authored by these members
-   # Add 'email' field to match Jira for consistent anonymization
-   team_members:
-     - name: alice-github
-       email: alice@company.com  # Same email as Jira for consistent hashing
-     - name: bob-github
-       email: bob@company.com
-   ```
-
-   Team reports aggregate only these members' data. Individual reports also generated.
-
-   **💡 Privacy Tip**: Add `email` to PR config using the same email as Jira config. This ensures the same person gets the same anonymous hash (`Developer-XXXX`) in both Jira and PR reports when using `--hide-individual-names`.
-
-4. **Credentials** (.env) - API tokens and passwords:
-   ```bash
-   cp .env.example .env
-   # Add: JIRA_API_TOKEN, GITHUB_TOKEN, etc.
-   ```
-
-➡️ **For complete configuration reference including:**
-
-- Multi-team setup & isolation
-- Multi-repo aggregation (for teams with multiple repositories/projects)
-- Google Sheets integration
-- Custom config paths
-- Environment variables reference
+**For complete configuration guide including:**
+- Detailed configuration examples for both scenarios
+- Multi-repo aggregation setup
+- Privacy & anonymization
+- Environment variables
 - Best practices & troubleshooting
 
-**See [Configuration Guide](docs/CONFIGURATION.md)**
+**➡️ See [Configuration Guide](docs/CONFIGURATION.md)**
 
 ## Usage Examples
 

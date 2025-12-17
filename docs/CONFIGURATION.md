@@ -1,784 +1,477 @@
 # Configuration Guide
 
-This guide explains how to configure AI Impact Analysis for your team(s) and customize report generation.
+This guide explains how to configure ImpactLens for GitHub Actions CI-driven report generation.
 
 ## Table of Contents
 
-- [Quick Start (Single Team)](#quick-start-single-team)
-- [Configuration Options](#configuration-options)
-- [Advanced Configuration](#advanced-configuration)
-  - [Custom Config Files](#custom-config-files)
-  - [Multi-Team Setup (Enterprise)](#multi-team-setup-enterprise)
-  - [Google Sheets Integration](#google-sheets-integration)
-- [Environment Variables](#environment-variables)
-- [Best Practices & Security](#best-practices--security)
+- [Overview](#overview)
+- [Two Configuration Scenarios](#two-configuration-scenarios)
+  - [Scenario 1: Simple Team](#scenario-1-simple-team-single-projectrepo)
+  - [Scenario 2: Complex Team](#scenario-2-complex-team-multi-projectrepo)
+- [Configuration Reference](#configuration-reference)
+- [Understanding Report Types](#understanding-report-types)
+- [Privacy & Anonymization](#privacy--anonymization)
+- [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
 
-## Quick Start (Single Team)
+## Overview
 
-**Default Setup:**
+**Primary Usage Model:** Submit config via PR → CI auto-generates reports → View in PR comments or download artifacts
 
-By default, the tool uses:
-- Config files: `config/jira_report_config.yaml`, `config/pr_report_config.yaml`
-- Output directories: `reports/jira/`, `reports/github/`
-- Environment: `.env` file
+ImpactLens supports two configuration scenarios based on your team's complexity:
 
-**Steps:**
+| Scenario    | Team Structure          | Configuration                                    | Reports Generated            |
+| ----------- | ----------------------- | ------------------------------------------------ | ---------------------------- |
+| **Simple**  | Single project/repo     | One config directory                             | TEAM + COMBINED              |
+| **Complex** | Multiple projects/repos | Multiple config directories + aggregation config | TEAM + COMBINED + AGGREGATED |
 
-1. Copy config templates:
-   ```bash
-   cp config/jira_report_config.yaml.example config/jira_report_config.yaml
-   cp config/pr_report_config.yaml.example config/pr_report_config.yaml
-   ```
+---
 
-2. Edit config files with your team's information (phases, team members)
+## Two Configuration Scenarios
 
-3. Set environment variables (see [Environment Variables](#environment-variables))
+### Scenario 1: Simple Team (Single Project/Repo)
 
-4. Run analysis:
-   ```bash
-   impactlens full
-   ```
+**Use when:** Your team works on a single Jira project and/or single GitHub repository.
 
-That's it! Reports will be generated in `reports/jira/` and `reports/github/`.
+**Directory Structure:**
 
-## Configuration Options
+```
+config/my-team/
+├── jira_report_config.yaml
+└── pr_report_config.yaml
+```
 
-Both `config/jira_report_config.yaml` and `config/pr_report_config.yaml` support these options:
+**Configuration Example:**
 
-### 1. Phases (Required)
+See [Configuration Reference](#configuration-reference) for all available options. Key settings:
 
-Define analysis periods for comparison (e.g., before/after AI adoption):
+- **project**: Jira project key or GitHub repo owner/name
+- **phases**: Analysis periods (e.g., before/after AI adoption)
+- **team_members**: Team scope with optional leave_days and capacity
+- **output_dir**: Where to save reports (e.g., `reports/my-team/jira`)
+
+**Submit via PR:**
+
+```bash
+git clone https://github.com/testcara/impactlens.git
+cd impactlens
+mkdir -p config/my-team
+# Copy and edit config files
+git checkout -b my-team
+git add -f config/my-team/
+git commit -m "chore: generate AI impact report for my-team"
+git push origin my-team
+# Create PR → CI auto-generates reports
+```
+
+**Reports Generated:**
+
+1. **Team Report** - Aggregated team metrics
+2. **Combined Report** - Team + individual member breakdown (anonymized in CI)
+
+Reports are posted as PR comments, uploaded to Google Sheets (anonymized), and available as workflow artifacts.
+
+---
+
+### Scenario 2: Complex Team (Multi-Project/Repo)
+
+**Use when:**
+
+- Team members work across multiple Jira projects (e.g., "KONFLUX" + "RHTAP")
+- Team maintains multiple GitHub repos (e.g., frontend + backend)
+- You need unified team-wide metrics across all projects/repos
+
+**Why 3 report types:**
+
+- **TEAM reports** - Per-project/repo team performance (isolated view)
+- **COMBINED reports** - Per-project/repo with member breakdown (detailed view)
+- **AGGREGATED reports** - Unified cross-project/repo metrics (executive view)
+
+**Directory Structure:**
+
+```
+config/platform-team/
+├── aggregation_config.yaml       # Defines how to aggregate
+├── frontend/                     # Sub-project 1
+│   ├── jira_report_config.yaml
+│   └── pr_report_config.yaml
+├── backend/                      # Sub-project 2
+│   ├── jira_report_config.yaml
+│   └── pr_report_config.yaml
+└── mobile/                       # Sub-project 3
+    └── pr_report_config.yaml
+```
+
+**Sub-Project Configs:**
+
+Each sub-project uses standard config (same as Scenario 1). Key requirement: **Use same email across projects for proper member aggregation**.
+
+Example:
+
+```yaml
+# frontend/jira_report_config.yaml
+team_members:
+  - member: charlie
+    email: charlie@company.com
+    capacity: 0.5  # Part-time on frontend
+
+# backend/jira_report_config.yaml
+team_members:
+  - member: charlie
+    email: charlie@company.com  # Same email → will be aggregated
+    capacity: 0.5  # Part-time on backend
+```
+
+**Aggregation Config:**
+
+`config/platform-team/aggregation_config.yaml`:
+
+```yaml
+aggregation:
+  name: "Platform Team"
+  output_dir: "reports/platform-team-aggregated"
+
+  # Sub-project directories to aggregate (must match directory names)
+  projects:
+    - "frontend"
+    - "backend"
+    - "mobile"
+
+  # Optional: exclude specific combinations
+  exclude:
+    # - "mobile/jira"  # Skip if mobile has no Jira reports
+```
+
+**Submit via PR:**
+
+```bash
+mkdir -p config/platform-team/{frontend,backend,mobile}
+# Edit config files for each sub-project and aggregation_config.yaml
+git checkout -b report/platform-team
+git add -f config/platform-team/
+git commit -m "chore: generate AI impact report for platform-team"
+git push origin report/platform-team
+# Create PR → CI detects aggregation mode → auto-generates all reports
+```
+
+**Reports Generated:**
+
+**Per Sub-Project:**
+
+1. **Team Report** - Team metrics for frontend, backend, mobile (isolated)
+2. **Combined Report** - Team + members for each sub-project (detailed)
+
+**Aggregated:** 3. **Aggregated Report** - Unified team-wide metrics
+
+- **OVERALL column**: Total team performance across all projects
+- **Per-source columns**: frontend, backend, mobile
+- **Per-member columns**: alice, bob, charlie (auto-merged via email)
+
+**Aggregation Logic:**
+
+- **Sum metrics** (Total PRs, Total Issues): Values summed across projects
+- **Average metrics** (Avg Time to Merge, AI Adoption Rate): Weighted average
+- **Member deduplication**: Same `email` in multiple projects → single aggregated column
+
+---
+
+## Configuration Reference
+
+### Project Settings
+
+**Jira:**
+
+```yaml
+project:
+  jira_url: "https://issues.redhat.com"
+  jira_project_key: "Your Project Name"
+```
+
+**PR:**
+
+```yaml
+project:
+  github_repo_owner: "your-org"
+  github_repo_name: "your-repo"
+```
+
+### Phases
+
+Define analysis periods for comparison:
 
 ```yaml
 phases:
   - name: "Before AI"
     start: "2024-01-01"
     end: "2024-06-30"
-  - name: "With AI Tools"
+  - name: "With AI"
     start: "2024-07-01"
     end: "2024-12-31"
 ```
 
 **Notes:**
+
 - Add as many phases as needed
-- Use descriptive names (e.g., "No AI Period", "Cursor Only", "Claude + Cursor")
-- Dates must be in YYYY-MM-DD format
+- Use descriptive names (e.g., "No AI", "Cursor Only", "Claude + Cursor")
+- Dates must be in `YYYY-MM-DD` format
+- **All sub-projects must use identical phase definitions** for aggregation
 
-### 2. Team Members (Optional)
+### Team Members
 
-For individual reports when using `--all-members` mode:
+**Jira:**
 
-**Jira config:**
 ```yaml
 team_members:
-  - member: alice
+  - member: alice # Jira username or display name
     email: alice@company.com
-    leave_days: 10      # or [10, 5] per phase
-    capacity: 1.0       # 1.0 = full time, or [1.0, 0.5] per phase
+    leave_days: 10 # Optional: days on leave
+    capacity: 1.0 # Optional: 1.0 = full time
   - member: bob
     email: bob@company.com
-    leave_days: [5, 8]  # Different per phase
-    capacity: [1.0, 0.0] # Left team in phase 2
+    leave_days: [5, 8] # Optional: per-phase values
+    capacity: [1.0, 0.5] # Optional: left team in phase 2
 ```
 
-**PR config:**
+**PR:**
+
 ```yaml
 team_members:
-  - name: alice-github
-    email: alice@company.com  # Optional: use same email as Jira for consistent anonymization
+  - name: alice-github # GitHub username
+    email: alice@company.com # Recommended: same email as Jira for consistent anonymization
   - name: bob-github
-    email: bob@company.com    # Optional: ensures same hash in both Jira and PR reports
+    email: bob@company.com
 ```
 
-**🔒 Privacy & Anonymization:**
+**Leave Days & Capacity:**
 
-When using `--hide-individual-names`, adding the `email` field to PR config ensures consistent anonymous identifiers across both Jira and PR reports:
+- **Leave Days**: Days on leave during the phase
 
-- **Without email mapping**: Same person gets different hashes
-  - Jira (`alice@company.com`) → `Developer-1AC5`
-  - PR (`alice-github`) → `Developer-3FB7`
+  - Single value: `leave_days: 10` (applies to all phases)
+  - Per-phase: `leave_days: [26, 20, 11.5]`
 
-- **With email mapping**: Same person gets the same hash
-  - Jira (`alice@company.com`) → `Developer-1AC5`
-  - PR with `email: alice@company.com` → `Developer-1AC5` ✅
-
-This is optional but recommended for cross-system analysis.
-
-**Leave Days & Capacity Metrics:**
-
-- **Leave Days**: Days the member was on leave during the phase
-  - Can be single number (applies to all phases): `leave_days: 0`
-  - Or list (one per phase): `leave_days: [26, 20, 11.5]`
-
-- **Capacity**: Work capacity (0.0 to 1.0, where 1.0 = full time)
+- **Capacity**: Work capacity (0.0 to 1.0)
   - `1.0` = Full time (100%)
   - `0.8` = 80% time (e.g., 4 days/week)
   - `0.5` = Half time
   - `0.0` = Not on team (member left)
-  - Can be single number or list per phase
 
-Reports include **four Daily Throughput metrics** for comprehensive analysis:
-1. Daily Throughput (skip leave days) = Total Issues / (Period - Leave Days)
-2. Daily Throughput (based on capacity) = Total Issues / (Period × Capacity)
-3. Daily Throughput (leave days + capacity) = Total Issues / ((Period - Leave Days) × Capacity)
-4. Daily Throughput = Total Issues / Period (baseline)
+Reports include **4 Daily Throughput metrics** for comprehensive analysis:
 
-### 3. Default Assignee/Author (Optional)
+1. Skip leave days: `Total Issues / (Period - Leave Days)`
+2. Based on capacity: `Total Issues / (Period × Capacity)`
+3. Leave + capacity: `Total Issues / ((Period - Leave Days) × Capacity)`
+4. Baseline: `Total Issues / Period`
 
-Control default report scope:
-
-**Jira config:**
-```yaml
-default_assignee: ""  # "" = team reports (default)
-                     # "email@company.com" = individual reports
-```
-
-**PR config:**
-```yaml
-default_author: ""    # "" = team reports (default)
-                     # "username" = individual reports
-```
-
-Command line arguments override this setting.
-
-### 4. Output Directory (Optional, for multi-team)
-
-Customize where reports are saved:
+### Output Directory
 
 ```yaml
-# Jira config
-output_dir: "reports/jira"              # Default
-output_dir: "reports/team-a/jira"       # Team-specific
+# Simple scenario
+output_dir: "reports/my-team/jira"
 
-# PR config
-output_dir: "reports/github"            # Default
-output_dir: "reports/team-a/github"     # Team-specific
+# Complex scenario - per sub-project
+output_dir: "reports/frontend/jira"
+output_dir: "reports/backend/jira"
+
+# Aggregated - in aggregation_config.yaml
+output_dir: "reports/platform-team-aggregated"
 ```
-
-If not specified, uses default directories.
-
-### 5. AI Detection in Commits (PR reports)
-
-The tool detects AI assistance from Git commit trailers:
-
-```bash
-# Claude assistance
-git commit -m "Fix authentication bug
-
-Assisted-by: Claude <noreply@anthropic.com>"
-
-# Cursor assistance
-git commit -m "Implement new feature
-
-Assisted-by: Cursor"
-```
-
-Configure authorized emails in `AI_authorized_emails.txt` for AI analysis features.
-
-## Advanced Configuration
-
-### Custom Config Files
-
-Create custom YAML files to override default settings. Only include values you want to change:
-
-**Example: my-config.yaml**
-```yaml
-# Override only phases (keep default team members)
-phases:
-  - name: "Q1 2024"
-    start: "2024-01-01"
-    end: "2024-03-31"
-  - name: "Q2 2024"
-    start: "2024-04-01"
-    end: "2024-06-30"
-```
-
-**Usage:**
-
-All commands support `--config` parameter:
-
-```bash
-# Full workflow
-impactlens jira full --config my-config.yaml
-impactlens pr full --config my-config.yaml
-
-# Individual commands
-impactlens jira team --config my-config.yaml
-impactlens jira member alice@company.com --config my-config.yaml
-impactlens jira members --config my-config.yaml
-impactlens jira all --config my-config.yaml
-impactlens jira combine --config my-config.yaml
-
-impactlens pr team --config my-config.yaml
-impactlens pr member alice --config my-config.yaml
-impactlens pr members --config my-config.yaml
-impactlens pr all --config my-config.yaml
-impactlens pr combine --config my-config.yaml
-```
-
-**How merging works:**
-- Values in custom config override defaults from `config/jira_report_config.yaml` or `config/pr_report_config.yaml`
-- Missing values in custom config are taken from default config
-
-### Multi-Team Setup (Enterprise)
-
-For organizations managing multiple teams, isolate configs and reports using separate directories.
-
-**Naming Flexibility:**
-
-Throughout this guide we use `team-a`, `team-b` as examples. You can use **any naming scheme**:
-- By team: `frontend`, `backend`, `mobile`, `platform`
-- By product: `product-x`, `product-y`
-- By location: `us-team`, `eu-team`
-- By individual: `alice`, `bob`
-
-The tool is **completely flexible** - the examples use `team-a` for clarity.
-
-#### Directory Structure
-
-```
-ai-analysis/
-├── config/
-│   ├── test/                     # CI integration test configs (internal use)
-│   │   ├── jira_report_config.yaml
-│   │   └── pr_report_config.yaml
-│   ├── team-a/
-│   │   ├── jira_report_config.yaml
-│   │   └── pr_report_config.yaml
-│   ├── team-b/
-│   │   ├── jira_report_config.yaml
-│   │   └── pr_report_config.yaml
-│   └── team-c/
-│       ├── jira_report_config.yaml
-│       └── pr_report_config.yaml
-├── reports/
-│   ├── test/                     # CI test reports (auto-generated)
-│   │   ├── jira/
-│   │   └── github/
-│   ├── team-a/
-│   │   ├── jira/
-│   │   └── github/
-│   ├── team-b/
-│   │   ├── jira/
-│   │   └── github/
-│   └── team-c/
-│       ├── jira/
-│       └── github/
-├── .env.team-a
-├── .env.team-b
-├── .env.team-c
-└── docker-compose.yml
-```
-
-#### Environment Files
-
-Create separate environment files for each team:
-
-**.env.team-a:**
-```bash
-# Jira configuration
-JIRA_URL=https://issues.redhat.com
-JIRA_API_TOKEN=team_a_token_here
-JIRA_PROJECT_KEY=TEAM_A_PROJECT
-
-# GitHub configuration
-GITHUB_TOKEN=ghp_team_a_token
-GITHUB_REPO_OWNER=org-name
-GITHUB_REPO_NAME=team-a-repo
-
-# Google Sheets (optional)
-GOOGLE_CREDENTIALS_FILE=/path/to/team-a-credentials.json
-GOOGLE_SPREADSHEET_ID=team_a_sheet_id
-
-# AI Analysis (optional)
-ANTHROPIC_API_KEY=sk-ant-team-a-key
-```
-
-**.env.team-b:**
-```bash
-# Similar structure with Team B specific values
-JIRA_URL=https://issues.redhat.com
-JIRA_API_TOKEN=team_b_token_here
-JIRA_PROJECT_KEY=TEAM_B_PROJECT
-# ... etc
-```
-
-#### Configuration Files
-
-**config/team-a/jira_report_config.yaml:**
-```yaml
-# Custom output directory for team isolation
-output_dir: "reports/team-a/jira"
-
-phases:
-  - name: "Before AI"
-    start: "2024-01-01"
-    end: "2024-06-30"
-  - name: "With AI Tools"
-    start: "2024-07-01"
-    end: "2024-12-31"
-
-default_assignee: ""
-
-team_members:
-  - member: alice
-    email: alice@company.com
-    leave_days: 10
-    capacity: 1.0
-  - member: bob
-    email: bob@company.com
-    leave_days: 5
-    capacity: 0.8
-```
-
-**config/team-a/pr_report_config.yaml:**
-```yaml
-# Custom output directory for team isolation
-output_dir: "reports/team-a/github"
-
-phases:
-  - name: "Before AI"
-    start: "2024-01-01"
-    end: "2024-06-30"
-  - name: "With AI Tools"
-    start: "2024-07-01"
-    end: "2024-12-31"
-
-default_author: ""
-
-team_members:
-  - name: alice-github
-  - name: bob-github
-```
-
-#### Usage
-
-**CLI Usage:**
-
-```bash
-# Recommended: Directory config (auto-finds both jira & pr configs)
-source .env.team-a
-impactlens full --config config/team-a
-
-# Alternative: Specific files
-source .env.team-a
-impactlens jira full --config config/team-a/jira_report_config.yaml
-impactlens pr full --config config/team-a/pr_report_config.yaml
-
-# All other commands also support --config (see "Custom Config Files" section for full list)
-```
-
-**Docker Usage:**
-
-**Important:** The `--env-file` flag must be placed **before** `run`.
-
-```bash
-# Recommended: Directory config
-docker-compose --env-file .env.team-a run impactlens \
-  full --config /app/config/team-a
-
-# Alternative: Specific files
-docker-compose --env-file .env.team-a run impactlens \
-  jira full --config /app/config/team-a/jira_report_config.yaml
-
-docker-compose --env-file .env.team-a run impactlens \
-  pr full --config /app/config/team-a/pr_report_config.yaml
-
-# All other commands also support --config (see "Custom Config Files" section for full list)
-```
-
-**Config Parameter Behavior:**
-- **Directory** (e.g., `config/team-a`): Auto-finds `jira_report_config.yaml` and `pr_report_config.yaml`
-- **Specific file** (e.g., `config/team-a/jira_report_config.yaml`): Uses that specific file
-
-#### Output Structure
-
-Each team's reports are isolated:
-
-```
-reports/
-├── team-a/
-│   ├── jira/
-│   │   ├── jira_report_general_*.txt
-│   │   ├── comparison_report_general_*.tsv
-│   │   └── combined_jira_report_*.tsv
-│   └── github/
-│       ├── pr_report_general_*.txt
-│       ├── pr_comparison_general_*.tsv
-│       └── combined_pr_report_*.tsv
-└── team-b/
-    ├── jira/
-    └── github/
-```
-
-#### Automation Scripts
-
-Create wrapper scripts for convenience:
-
-**scripts/run-team-analysis.sh:**
-```bash
-#!/bin/bash
-# Usage: ./scripts/run-team-analysis.sh team-a full
-
-TEAM=$1
-MODE=$2  # full, jira, or pr
-
-if [ -z "$TEAM" ] || [ -z "$MODE" ]; then
-    echo "Usage: $0 <team-name> <full|jira|pr>"
-    exit 1
-fi
-
-ENV_FILE=".env.$TEAM"
-CONFIG_DIR="config/$TEAM"
-
-if [ ! -f "$ENV_FILE" ]; then
-    echo "Error: Environment file $ENV_FILE not found"
-    exit 1
-fi
-
-if [ ! -d "$CONFIG_DIR" ]; then
-    echo "Error: Config directory $CONFIG_DIR not found"
-    exit 1
-fi
-
-echo "Running $MODE analysis for $TEAM..."
-docker-compose --env-file "$ENV_FILE" run impactlens \
-  $MODE --config "/app/$CONFIG_DIR"
-```
-
-**Usage:**
-```bash
-chmod +x scripts/run-team-analysis.sh
-
-# Run full workflow for Team A
-./scripts/run-team-analysis.sh team-a full
-
-# Run only Jira analysis for Team B
-./scripts/run-team-analysis.sh team-b jira
-```
-
-#### Migration from Single Team
-
-If migrating from single-team setup:
-
-1. **Backup existing reports:**
-   ```bash
-   cp -r reports reports.backup
-   ```
-
-2. **Create team-specific structure:**
-   ```bash
-   mkdir -p config/team-default
-   cp config/*.yaml config/team-default/
-   ```
-
-3. **Update config with output_dir:**
-   ```yaml
-   output_dir: "reports/team-default/jira"
-   ```
-
-4. **Test new structure:**
-   ```bash
-   docker-compose run impactlens verify
-   ```
-
-### Google Sheets Integration
-
-Reports can be **automatically uploaded** to Google Sheets if configured.
-
-#### Setup (one-time)
-
-```bash
-# 1. Install Google Sheets dependencies
-pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
-
-# 2. Create Service Account at https://console.cloud.google.com
-#    - Create project and enable Google Sheets API
-#    - Create Service Account credentials
-#    - Download JSON key file
-#    - Note the Service Account email (client_email in JSON)
-
-# 3. Create Google Spreadsheet
-#    - Go to https://sheets.google.com and create new spreadsheet
-#    - Name it like: "AI Analysis - Team A"
-#    - Click "Share" and add Service Account email with Editor permission
-#    - Copy Spreadsheet ID from URL: https://docs.google.com/spreadsheets/d/[SPREADSHEET_ID]/edit
-
-# 4. Configure environment variables
-export GOOGLE_CREDENTIALS_FILE="/path/to/service-account-key.json"
-export GOOGLE_SPREADSHEET_ID="1ABCdefGHI..."
-```
-
-#### Usage
-
-```bash
-# Automatic upload (if environment variables configured)
-impactlens jira full    # Generates & auto-uploads Jira reports
-impactlens pr full      # Generates & auto-uploads PR reports
-
-# Skip upload with --no-upload flag
-impactlens jira full --no-upload
-impactlens pr full --no-upload
-```
-
-#### Features
-
-- Each upload creates a new tab with timestamp (e.g., "Team A Report - 2024-12-01 14:30")
-- All previous tabs are preserved for historical tracking
-- You can use the same spreadsheet for both Jira and GitHub reports (different tabs)
-- If auto-upload not configured, scripts show manual upload instructions
-
-## Environment Variables
-
-### Required for Jira Analysis
-
-```bash
-export JIRA_URL="https://issues.redhat.com"
-export JIRA_API_TOKEN="your_api_token_here"
-export JIRA_PROJECT_KEY="Your Project Name"
-```
-
-### Required for GitHub PR Analysis
-
-```bash
-export GITHUB_TOKEN="your_github_token"
-export GITHUB_REPO_OWNER="your-org-or-username"
-export GITHUB_REPO_NAME="your-repo-name"
-```
-
-### Optional - Google Sheets Integration
-
-```bash
-export GOOGLE_CREDENTIALS_FILE="/path/to/service-account-key.json"
-export GOOGLE_SPREADSHEET_ID="1ABCdefGHI..."
-```
-
-### Optional - AI Analysis (Experimental)
-
-```bash
-# If using Anthropic API instead of Claude Code CLI
-export ANTHROPIC_API_KEY="sk-ant-..."
-```
-
-### Making Environment Variables Persistent
-
-**For CLI (single team):**
-
-Add to `~/.bashrc` or `~/.zshrc`:
-
-```bash
-# Jira
-export JIRA_URL="https://issues.redhat.com"
-export JIRA_API_TOKEN="your_token"
-export JIRA_PROJECT_KEY="Your Project"
-
-# GitHub
-export GITHUB_TOKEN="your_token"
-export GITHUB_REPO_OWNER="your-org"
-export GITHUB_REPO_NAME="your-repo"
-
-# Google Sheets (optional)
-export GOOGLE_CREDENTIALS_FILE="/path/to/credentials.json"
-export GOOGLE_SPREADSHEET_ID="your_sheet_id"
-```
-
-Then reload: `source ~/.bashrc`
-
-**For multi-team:**
-
-Use separate `.env.team-name` files and load with:
-- **CLI**: `source .env.team-a` before running commands
-- **Docker**: `docker-compose --env-file .env.team-a run ...`
-
-## Best Practices & Security
-
-### Security
-
-- ✅ **Keep `.env*` files in `.gitignore`** - Never commit credentials
-- ✅ **Use separate service accounts per team** - Better access control
-- ✅ **Rotate tokens regularly** - Minimize security risks
-- ✅ **Use minimal permissions** - Read-only access where possible
-
-### Organization
-
-- ✅ **Use consistent naming** - `.env.team-name`, `config/team-name/`
-- ✅ **Document team configurations** - Maintain a team registry
-- ✅ **Create template configs** - Easier to onboard new teams
-- ✅ **Centralize common phase definitions** - If teams share analysis periods
-
-### Maintenance
-
-- ✅ **Regular backups of reports** - Preserve historical data
-- ✅ **Version control for configs** - Track configuration changes (exclude `.env` files)
-- ✅ **Test new configurations** - Use `verify` command before full runs
-
-## Troubleshooting
-
-### Common Issues
-
-**1. No config files found:**
-```bash
-# Check if templates exist
-ls -la config/*.example
-
-# Copy templates
-cp config/jira_report_config.yaml.example config/jira_report_config.yaml
-cp config/pr_report_config.yaml.example config/pr_report_config.yaml
-```
-
-**2. Environment variables not loaded (Docker):**
-```bash
-# Verify which env is loaded
-docker-compose --env-file .env.team-a config | grep JIRA_PROJECT_KEY
-
-# Make sure --env-file is BEFORE run
-docker-compose --env-file .env.team-a run impactlens verify
-```
-
-**3. Reports in wrong directory:**
-- Check `output_dir` in config file
-- Ensure path uses forward slashes (`reports/team-a/jira` not `reports\team-a\jira`)
-- Verify directory is writable
-
-**4. Config not found (multi-team):**
-```bash
-# CLI - Check if config exists
-ls -la config/team-a/
-
-# Docker - Check inside container
-docker-compose run impactlens ls -la /app/config/team-a/
-```
-
-**5. Google Sheets upload fails:**
-- Verify service account email has Editor permission on spreadsheet
-- Check credentials file path is correct
-- Ensure Google Sheets API is enabled in Cloud Console
-
-**6. No team members found:**
-- Ensure config file exists (not just `.example` template)
-- Check YAML syntax is correct (proper indentation)
-- Verify team_members section is not empty
-
-For more help, check the [main README](../README.md) or open an issue on GitHub.
 
 ---
 
-## Report Aggregation
+## Understanding Report Types
 
-### Overview
+### 1. TEAM Report (`*_report_general_*.txt`)
 
-Combine multiple report directories into unified reports for team-wide analysis.
+**Purpose:** High-level team performance per phase
 
-**Terminology:**
-- **Report directory**: Directory under `reports/` (e.g., `backend`, `frontend`)
-- **Jira project**: Jira project like KONFLUX, RHTAP
-- **GitHub repository**: Repo like konflux-ui, konflux-api
-- **Team**: Your entire team across all Jira projects and repos
+**Contains:** Total PRs/Issues, average time to merge/close, AI adoption rate, state distribution, team throughput
 
-**Use Cases:**
-- Team maintains multiple GitHub repositories (frontend + backend + mobile)
-- Team works across multiple Jira projects
-- Executive reporting with aggregated team metrics
+**Use for:** Quick team health check, phase-over-phase comparison
 
-**How it works:**
-- Reads existing combined reports from multiple report directories
-- Merges data with OVERALL + per-source + per-member columns
-- No API calls (fast aggregation of existing reports)
+### 2. COMBINED Report (`combined_*_report_*.tsv`)
 
-### Quick Start
+**Purpose:** Detailed breakdown with individual member columns
 
-**1. Generate reports for each source:**
+**Contains:**
 
-```bash
-# Generate reports for backend (could be Jira project + GitHub repo)
-impactlens jira full --config config/backend/jira_report_config.yaml
-impactlens pr full --config config/backend/pr_report_config.yaml
+- TEAM column (aggregated team metrics)
+- Individual member columns (alice, bob, charlie, etc.)
+- All metrics for each member
+- Phase-over-phase comparison
 
-# Generate reports for frontend
-impactlens pr full --config config/frontend/pr_report_config.yaml
+**Use for:** Individual performance analysis, capacity planning, detailed reviews
+
+**CI behavior:** Individual names automatically anonymized (`Developer-A3F2`, etc.)
+
+### 3. AGGREGATED Report (`aggregated_*_report_*.tsv`)
+
+**Only in Complex Scenario**
+
+**Purpose:** Unified view across multiple projects/repos
+
+**Contains:**
+
+- OVERALL column (total team across all projects)
+- Per-source columns (frontend, backend, mobile)
+- Per-member columns (auto-merged across projects)
+
+**Use for:** Executive reporting, team-wide AI impact, cross-project insights
+
+**Example:**
+
+```
+Metric               | OVERALL | frontend | backend | alice  | bob    | charlie
+---------------------|---------|----------|---------|--------|--------|--------
+Total PRs            | 150     | 80       | 70      | 90     | 40     | 20
+AI Adoption Rate (%) | 65%     | 70%      | 60%     | 80%    | 50%    | 60%
+Avg Time to Merge    | 2.5d    | 2.3d     | 2.7d    | 2.1d   | 3.0d   | 2.5d
 ```
 
-This creates:
-```
-reports/
-├── backend/
-│   ├── jira/combined_jira_report_*.tsv
-│   └── github/combined_pr_report_*.tsv
-└── frontend/
-    └── github/combined_pr_report_*.tsv
-```
+---
 
-**2. Create aggregation config:**
+## Privacy & Anonymization
 
-```bash
-cp config/aggregation_config.yaml.example config/my_team_agg.yaml
-```
+### CI Auto-Anonymization
 
-Edit config to list report directories:
+**What's anonymized:**
+
+- Individual names → `Developer-A3F2`, `Developer-B7E1`, etc.
+- Email addresses, leave days, capacity → Hidden
+
+**What's NOT anonymized:**
+
+- Team aggregated metrics
+- Phase names, project/repo names
+
+**Consistent hashing across Jira and PR:**
+
+Add `email` field to PR config using the **same email** as Jira:
+
 ```yaml
-aggregation:
-  name: "Platform Team"
-  projects:
-    - "backend"      # Aggregates reports from reports/backend/
-    - "frontend"     # Aggregates reports from reports/frontend/
+# Jira config
+team_members:
+  - member: alice
+    email: alice@company.com
+
+# PR config
+team_members:
+  - name: alice-github
+    email: alice@company.com  # Same email → same hash ✅
 ```
 
-**3. Run aggregation:**
+**Result:**
+
+- Without email: Different hashes in Jira vs PR
+- With email: Same hash in both (`Developer-1AC5`) ✅
+
+### Local Full Data Access
+
+To see non-anonymized data, run locally:
 
 ```bash
-impactlens aggregate --config config/my_team_agg.yaml
+# Docker
+cp .env.example .env && vim .env
+docker-compose run impactlens full
 
-# Options:
-#   --jira-only    Only aggregate Jira reports
-#   --pr-only      Only aggregate GitHub PR reports
+# CLI
+python3 -m venv venv && source venv/bin/activate
+pip install -e . && source .env
+impactlens full
 ```
 
-### Configuration
+---
 
-See `config/aggregation_config.yaml.example` for full configuration reference.
+## Best Practices
 
-**Key settings:**
+### ✅ Configuration
 
-- `projects`: List of **report directory names** to aggregate
-  - Example: `["backend", "frontend"]` → aggregates `reports/backend/` and `reports/frontend/`
+1. **Use consistent phases** across all sub-projects
+2. **Add email field** to PR configs for consistent anonymization
+3. **Match directory names** between `aggregation_config.yaml` and actual `config/` structure
+4. **Use descriptive names** for sub-projects (e.g., `ui-frontend`, `api-backend`)
 
-- `exclude`: Exclude specific combinations
-  - Format: `"{report-dir}/{report-type}"`
-  - Example: `"docs/jira"` → exclude Jira reports from `reports/docs/`
+### ✅ Team Members
 
-- `manual_reports`: Manually specify exact file paths (advanced)
+1. **Same email across projects** for proper aggregation
+2. **Set realistic capacity** for part-time contributors
+3. **Track leave days** for accurate throughput metrics
+4. **Keep team lists updated** when members join/leave
 
-### Output Format
+### ✅ Git Workflow
 
-Aggregated reports include:
+1. **One PR per reporting period** (e.g., `report/team-2024-12`)
+2. **Use `git add -f config/`** since config/ might be in `.gitignore`
+3. **Wait for CI completion** before merging (reports in comments)
+4. **Archive old report branches** after reviewing
 
-- **OVERALL column**: Team-wide metrics across all report sources
-- **Source columns**: One column per report directory (e.g., `backend`, `frontend`)
-- **Member columns**: Individual developers (aggregated if they appear in multiple sources)
+### ✅ Multi-Project Teams
 
-**Aggregation logic:**
-- **Sum metrics** (Total PRs, Total Issues): Values are summed
-- **Average metrics** (Avg Time to Merge, AI Adoption Rate): Values are averaged
+1. **Test individual configs first** before aggregation
+2. **Use same phase definitions** across all sub-projects
+3. **Verify output_dir** matches aggregation expectations
+4. **Check member email consistency** across projects
 
-### Best Practices
+---
 
-- **Consistent emails**: Use same `email` field across all configs for proper member aggregation
-- **Consistent phases**: Use same phase definitions for meaningful comparisons
-- **Clear naming**: Use descriptive report directory names (e.g., `ui-frontend`, `api-backend`, `team-a`, `team-b`)
-  - Directory names are used as prefixes in Google Sheets tab names to avoid conflicts
-  - Multiple teams can analyze the same repository with unique directory names
-- **Re-run after updates**: Run aggregation again when individual reports are regenerated
+## Troubleshooting
 
-### Troubleshooting
+### CI not generating reports
 
-**No reports found:**
-- Check that report directory names in config match actual directories under `reports/`
-- Example: If config has `"backend"`, verify `reports/backend/jira/` or `reports/backend/github/` exists
+**Check:**
 
-**Inconsistent phases:**
-- All individual report configs must use same phase definitions
+1. Config files exist at correct paths (`config/{team}/`)
+2. YAML syntax is valid (use YAML linter)
+3. GitHub Actions workflow ran successfully
+4. Repository secrets are configured
 
-**Developer appears in multiple sources:**
-- This is expected behavior
-- Values are automatically aggregated (sum for totals, average for averages)
+### Aggregation not working
+
+**Common issues:**
+
+- `projects` list doesn't match actual directory names
+- Sub-project `output_dir` doesn't follow pattern `reports/{project}/jira`
+- Phase definitions differ across sub-projects
+- Combined reports don't exist yet (run individual reports first)
+
+**Fix:**
+
+```bash
+# Verify directory structure
+ls -la config/platform-team/
+ls -la reports/frontend/jira/
+
+# Check aggregation config matches directories
+cat config/platform-team/aggregation_config.yaml
+```
+
+### Reports in wrong directory
+
+**Check:**
+
+- `output_dir` in config file
+- Path uses forward slashes (`reports/team/jira` not `reports\team\jira`)
+- Directory is writable
+
+### Member appears multiple times in aggregated report
+
+**This is expected** if they work on multiple projects. Verify:
+
+- Same `email` used across all project configs → Merged correctly ✅
+- Different `email` or missing → Treated as separate people ❌
+
+### No team members found
+
+**Check:**
+
+- Config file exists (not just `.example` template)
+- YAML syntax is correct (proper indentation)
+- `team_members` section is not empty
+- Member names match Jira/GitHub usernames
+
+---
+
+## Next Steps
+
+- **[METRICS_GUIDE.md](METRICS_GUIDE.md)** - Metric explanations and formulas
+- **[README.md](../README.md)** - Quick Start and Usage Examples
+- **Report issues:** https://github.com/testcara/impactlens/issues
