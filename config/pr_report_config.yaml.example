@@ -6,7 +6,7 @@ project:
   github_repo_name: "konflux-ui"  # GitHub repository name
 
   # Google Sheets settings (optional)
-  google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
+  # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
   # If you do not set, would upload to the default google-sheet.
   # IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com
 

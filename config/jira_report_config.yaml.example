@@ -3,7 +3,7 @@
 project:
   # Jira project settings
   jira_url: "https://issues.redhat.com"  # Jira instance URL
-  jira_project_key: "Konflux UI"  # Jira project key or name
+  jira_project_key: "Konflux UI"  # Use Jira project NAME (not the project key). E.g., use "Konflux UI" instead of "KFLUXUI"
 
   # Google Sheets settings (optional)
   # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
