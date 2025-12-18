@@ -119,7 +119,7 @@ runs:
         echo "  Total TXT files: $TOTAL_TXT"
 
     - name: Comment on PR - Success
-      if: github.event_name == 'pull_request' && success()
+      if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && success()
       continue-on-error: true
       uses: actions/github-script@v7
       with:

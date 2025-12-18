@@ -125,7 +125,7 @@ jobs:
           EXIT_CODE=0
           while IFS= read -r config_file; do
             if [ -f "$config_file" ]; then
-              python scripts/validate_config.py "$config_file" || EXIT_CODE=1
+              python .github/scripts/validate_config.py "$config_file" || EXIT_CODE=1
             fi
           done <<< "$CHANGED_CONFIGS"
 
@@ -161,24 +161,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## ✅ Config-Only PR Validated
-
-This PR contains only configuration files and has passed security validation.
-
-**Next Steps:**
-1. A maintainer will review your configuration
-2. Once approved, the report generation workflow will run
-3. Reports will be posted as PR comments and uploaded to Google Sheets
-
-**What gets validated:**
-- ✅ No command injection patterns
-- ✅ No environment variable expansion
-- ✅ No path traversal attempts
-- ✅ No hardcoded secrets
-- ✅ Valid YAML structure
-- ✅ Required fields present
-
-Thank you for your contribution! 🎉`
+              body: '## ✅ Config-Only PR Validated\n\nThis PR contains only configuration files and has passed security validation.\n\n**Next Steps:**\n1. A maintainer will review your configuration\n2. Once approved, the report generation workflow will run\n3. Reports will be posted as PR comments and uploaded to Google Sheets\n\n**What gets validated:**\n- No command injection patterns\n- No environment variable expansion\n- No path traversal attempts\n- No hardcoded secrets\n- Valid YAML structure\n- Required fields present\n\nThank you for your contribution!'
             });
 
       - name: Comment on PR - Mixed files blocked
@@ -190,25 +173,6 @@ Thank you for your contribution! 🎉`
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## ❌ Mixed PR Not Allowed
-
-This PR contains **both configuration files and code changes**, which is not permitted.
-
-**Please split into two separate PRs:**
-
-### 1️⃣ Config-Only PR
-- Include only: \`config/**/*.yaml\` files
-- Will trigger: Report generation
-- Requires: Config validation to pass
-
-### 2️⃣ Code-Only PR
-- Include: Python code, workflows, docs, etc.
-- Will trigger: CI tests
-- Requires: Code review and tests to pass
-
-**Why this restriction?**
-
-Config-only PRs can access repository secrets to generate reports. Mixing code changes would allow malicious code execution with secret access, creating a security vulnerability.
-
-For questions, see our [Security Guide](docs/SECURITY.md) (TODO).`
+              body: '## ❌ Mixed PR Not Allowed\n\nThis PR contains **both configuration files and code changes**, which is not permitted.\n\n**Please split into two separate PRs:**\n\n### Config-Only PR\n- Include only: config/**/*.yaml files\n- Will trigger: Report generation\n- Requires: Config validation to pass\n\n### Code-Only PR\n- Include: Python code, workflows, docs, etc.\n- Will trigger: CI tests\n- Requires: Code review and tests to pass\n\n**Why this restriction?**\n\nConfig-only PRs can access repository secrets to generate reports. Mixing code changes would allow malicious code execution with secret access, creating a security vulnerability.\n\nFor questions, see our [Security Guide](docs/SECURITY.md) (TODO).'
             });
+
