@@ -254,22 +254,23 @@ The tool calculates four throughput metrics to provide comprehensive productivit
 1. **Daily Throughput (skip leave days)**
    - **Formula**: `Total Issues / (Analysis Period - Leave Days)`
    - **Example**: 28 issues / (220 - 26) days = 0.14/d
-   - **Use case**: Accounts for vacation time
+   - **Use case**: Team throughput accounting for vacation time
 
-2. **Daily Throughput (based on capacity)**
-   - **Formula**: `Total Issues / (Analysis Period × Capacity)`
-   - **Example**: 28 issues / (220 × 0.8) = 0.16/d
-   - **Use case**: Accounts for part-time work
+2. **Daily Throughput (average per capacity)**
+   - **Formula**: `Total Issues / (Analysis Period × Total Capacity)`
+   - **Example**: 28 issues / (220 × 0.8) = 0.16 issues/capacity/day
+   - **Use case**: Average productivity per capacity unit, comparable across different team sizes
+   - **Note**: For teams, Total Capacity = sum of all members' capacity (e.g., 6-person team at full time = 6.0, or 5.5 if some members are part-time)
 
-3. **Daily Throughput (considering leave days + capacity)**
-   - **Formula**: `Total Issues / ((Analysis Period - Leave Days) × Capacity)`
-   - **Example**: 28 issues / ((220 - 26) × 0.8) = 0.18/d
-   - **Use case**: Most accurate - accounts for both vacation and capacity
+3. **Daily Throughput (average per capacity, excl. leave)**
+   - **Formula**: `Total Issues / ((Analysis Period - Leave Days) × Total Capacity)`
+   - **Example**: 28 issues / ((220 - 26) × 0.8) = 0.18 issues/capacity/day
+   - **Use case**: Most accurate per-capacity metric - accounts for both vacation and capacity
 
 4. **Daily Throughput**
    - **Formula**: `Total Issues / Analysis Period`
    - **Example**: 28 issues / 220 days = 0.13/d
-   - **Use case**: Baseline metric for simple comparison
+   - **Use case**: Team baseline throughput for simple period-to-period comparison
 
 ### State Time Metrics
 
@@ -398,10 +399,10 @@ Re-entry rates measure workflow instability and rework.
 
 **Comparing Daily Throughput Metrics:**
 
-- **Baseline comparison**: Use "Daily Throughput" for simple period-to-period comparison
+- **Team baseline**: Use "Daily Throughput" for simple team-level period-to-period comparison
 - **Accounting for vacation**: Use "Daily Throughput (skip leave days)" when leave varies significantly
-- **Accounting for team changes**: Use "Daily Throughput (based on capacity)" when members join/leave
-- **Most accurate**: Use "Daily Throughput (considering leave days + capacity)" for comprehensive analysis
+- **Cross-team comparison**: Use "Daily Throughput (average per capacity)" to compare teams of different sizes
+- **Most accurate productivity**: Use "Daily Throughput (average per capacity, excl. leave)" for the most accurate per-capacity productivity measurement
 
 **Things to Watch:**
 

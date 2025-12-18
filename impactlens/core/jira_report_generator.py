@@ -618,9 +618,9 @@ class JiraReportGenerator:
                 throughputs_both.append("N/A")
 
         lines.append("Daily Throughput (skip leave days)\t" + "\t".join(throughputs_skip_leave))
-        lines.append("Daily Throughput (based on capacity)\t" + "\t".join(throughputs_capacity))
+        lines.append("Daily Throughput (average per capacity)\t" + "\t".join(throughputs_capacity))
         lines.append(
-            "Daily Throughput (considering leave days + capacity)\t" + "\t".join(throughputs_both)
+            "Daily Throughput (average per capacity, excl. leave)\t" + "\t".join(throughputs_both)
         )
 
         # Daily throughput = Total Issues / Analysis Period

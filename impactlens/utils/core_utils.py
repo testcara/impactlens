@@ -56,10 +56,10 @@ def calculate_throughput_variants(item_count, analysis_days, leave_days=0, capac
     This function provides 4 different throughput calculations to account for
     team size (capacity) and availability (leave days):
 
-    1. Baseline: Simple throughput without adjustments
-    2. Skip leave: Adjusts for days on leave
-    3. Capacity: Adjusts for team size/capacity
-    4. Both: Adjusts for both leave days and capacity
+    1. Baseline: Team throughput without adjustments
+    2. Skip leave: Team throughput accounting for vacation
+    3. Capacity: Average per-capacity throughput (comparable across team sizes)
+    4. Both: Average per-capacity throughput excluding leave days
 
     Args:
         item_count: Number of items (PRs, issues, etc.)
@@ -73,10 +73,10 @@ def calculate_throughput_variants(item_count, analysis_days, leave_days=0, capac
     Returns:
         Dictionary with 4 throughput variants:
         {
-            'baseline': float or None,
-            'skip_leave': float or None,
-            'capacity': float or None,
-            'both': float or None
+            'baseline': float or None,           # Team throughput
+            'skip_leave': float or None,         # Team throughput (excl. leave)
+            'capacity': float or None,           # Per-capacity throughput
+            'both': float or None                # Per-capacity throughput (excl. leave)
         }
 
     Examples:
@@ -88,13 +88,19 @@ def calculate_throughput_variants(item_count, analysis_days, leave_days=0, capac
         >>> calculate_throughput_variants(10, 30, 5, 1.0)
         {'baseline': 0.333, 'skip_leave': 0.4, 'capacity': 0.333, 'both': 0.4}
 
-        >>> # Team of 6, no leave
+        >>> # Team of 6, no leave - 60 items total
         >>> calculate_throughput_variants(60, 30, 0, 6.0)
-        {'baseline': 2.0, 'skip_leave': 2.0, 'capacity': 0.333, 'both': 0.333}
+        {'baseline': 2.0,      # 60 / 30 = 2.0 items/day (team)
+         'skip_leave': 2.0,    # same as baseline (no leave)
+         'capacity': 0.333,    # 60 / (30 * 6) = 0.333 items/capacity/day
+         'both': 0.333}        # same as capacity (no leave)
 
-        >>> # Team of 6, 5 days total leave
-        >>> calculate_throughput_variants(60, 30, 5, 6.0)
-        {'baseline': 2.0, 'skip_leave': 2.4, 'capacity': 0.333, 'both': 0.4}
+        >>> # Team of 6, 10 days total leave - 60 items
+        >>> calculate_throughput_variants(60, 30, 10, 6.0)
+        {'baseline': 2.0,      # 60 / 30 = 2.0 items/day (team)
+         'skip_leave': 3.0,    # 60 / (30-10) = 3.0 items/day (team, excl. leave)
+         'capacity': 0.333,    # 60 / (30 * 6) = 0.333 items/capacity/day
+         'both': 0.5}          # 60 / ((30-10) * 6) = 0.5 items/capacity/day (excl. leave)
     """
     if not analysis_days or analysis_days <= 0:
         return {"baseline": None, "skip_leave": None, "capacity": None, "both": None}
