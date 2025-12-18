@@ -92,6 +92,7 @@ class ConfigValidator:
         'google_spreadsheet_id',
         'spreadsheet_id',
         'jira_url',
+        'github_url',
         'github_repo_owner',
         'github_repo_name',
         'jira_project_key',

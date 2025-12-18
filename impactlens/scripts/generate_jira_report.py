@@ -25,6 +25,7 @@ from impactlens.utils.workflow_utils import (
     load_team_members,
     load_and_resolve_config,
     load_team_members_from_yaml,
+    aggregate_member_values_for_phases,
 )
 from impactlens.utils.report_utils import (
     normalize_username,
@@ -373,59 +374,10 @@ Examples:
     # Use config file for team members filtering (only when not filtering by assignee)
     team_config_file = config_file if not assignee else None
 
-    # Load leave_days and capacity
-    leave_days_list = None
-    capacity_list = None
-    team_members_details = load_team_members_from_yaml(config_file, detailed=True)
-
-    if assignee:
-        # Individual report: get specific member's values
-        for member_id, details in team_members_details.items():
-            if member_id == assignee or details.get("member") == assignee:
-                # Process leave_days
-                leave_days_config = details.get("leave_days", 0)
-                if isinstance(leave_days_config, list):
-                    leave_days_list = leave_days_config
-                else:
-                    # Single value, use for all phases
-                    leave_days_list = [leave_days_config] * len(phases)
-
-                # Process capacity
-                capacity_config = details.get("capacity", 1.0)
-                if isinstance(capacity_config, list):
-                    capacity_list = capacity_config
-                else:
-                    # Single value, use for all phases
-                    capacity_list = [capacity_config] * len(phases)
-                break
-    else:
-        # Team report: aggregate all members' values
-        # Initialize lists for each phase
-        leave_days_list = [0.0] * len(phases)
-        capacity_list = [0.0] * len(phases)
-
-        for member_id, details in team_members_details.items():
-            # Process leave_days
-            leave_days_config = details.get("leave_days", 0)
-            if isinstance(leave_days_config, list):
-                for i, ld in enumerate(leave_days_config):
-                    if i < len(leave_days_list):
-                        leave_days_list[i] += ld
-            else:
-                # Single value, add to all phases
-                for i in range(len(phases)):
-                    leave_days_list[i] += leave_days_config
-
-            # Process capacity
-            capacity_config = details.get("capacity", 1.0)
-            if isinstance(capacity_config, list):
-                for i, cap in enumerate(capacity_config):
-                    if i < len(capacity_list):
-                        capacity_list[i] += cap
-            else:
-                # Single value, add to all phases
-                for i in range(len(phases)):
-                    capacity_list[i] += capacity_config
+    # Load leave_days and capacity from team members (using shared utility)
+    leave_days_list, capacity_list = aggregate_member_values_for_phases(
+        config_file, phases, author=assignee
+    )
 
     for phase_index, (phase_name, start_date, end_date) in enumerate(phases):
         print(

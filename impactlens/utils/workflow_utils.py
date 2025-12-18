@@ -272,6 +272,7 @@ def load_config_file(
     env_mappings = {
         "jira_url": "JIRA_URL",
         "jira_project_key": "JIRA_PROJECT_KEY",
+        "github_url": "GITHUB_URL",
         "github_repo_owner": "GITHUB_REPO_OWNER",
         "github_repo_name": "GITHUB_REPO_NAME",
         "google_spreadsheet_id": "GOOGLE_SPREADSHEET_ID",
@@ -289,6 +290,92 @@ def load_config_file(
         print(f"[INFO] Log level set to: {log_level}")
 
     return phases, default_assignee, output_dir, project_settings
+
+
+def aggregate_member_values_for_phases(
+    config_file: Path, phases: list, author: Optional[str] = None
+) -> tuple:
+    """
+    Aggregate leave_days and capacity values for all phases.
+
+    This function handles both individual and team reports:
+    - For individual reports: extracts values for the specific member
+    - For team reports: aggregates values across all team members
+
+    Supports both single values (applied to all phases) and per-phase lists.
+
+    Args:
+        config_file: Path to config YAML file
+        phases: List of (phase_name, start_date, end_date) tuples
+        author: Optional author/assignee for individual reports (None for team)
+
+    Returns:
+        Tuple of (leave_days_list, capacity_list) where each is a list of values per phase
+
+    Examples:
+        >>> # Team report with 2 members
+        >>> aggregate_member_values_for_phases(config_file, phases, author=None)
+        ([10, 15, 5], [2.0, 1.5, 2.0])  # Aggregated across team
+
+        >>> # Individual report
+        >>> aggregate_member_values_for_phases(config_file, phases, author="wlin")
+        ([5, 10, 0], [1.0, 0.5, 1.0])  # Single member's values
+    """
+    team_members_details = load_team_members_from_yaml(config_file, detailed=True)
+
+    leave_days_list = None
+    capacity_list = None
+
+    if author:
+        # Individual report: get specific member's values
+        for member_id, details in team_members_details.items():
+            if member_id == author or details.get("name") == author:
+                # Process leave_days
+                leave_days_config = details.get("leave_days", 0)
+                if isinstance(leave_days_config, list):
+                    leave_days_list = leave_days_config
+                else:
+                    # Single value, use for all phases
+                    leave_days_list = [leave_days_config] * len(phases)
+
+                # Process capacity
+                capacity_config = details.get("capacity", 1.0)
+                if isinstance(capacity_config, list):
+                    capacity_list = capacity_config
+                else:
+                    # Single value, use for all phases
+                    capacity_list = [capacity_config] * len(phases)
+                break
+    else:
+        # Team report: aggregate all members' values
+        # Initialize lists for each phase
+        leave_days_list = [0.0] * len(phases)
+        capacity_list = [0.0] * len(phases)
+
+        for member_id, details in team_members_details.items():
+            # Process leave_days
+            leave_days_config = details.get("leave_days", 0)
+            if isinstance(leave_days_config, list):
+                for i, ld in enumerate(leave_days_config):
+                    if i < len(leave_days_list):
+                        leave_days_list[i] += ld
+            else:
+                # Single value, add to all phases
+                for i in range(len(phases)):
+                    leave_days_list[i] += leave_days_config
+
+            # Process capacity
+            capacity_config = details.get("capacity", 1.0)
+            if isinstance(capacity_config, list):
+                for i, cap in enumerate(capacity_config):
+                    if i < len(capacity_list):
+                        capacity_list[i] += cap
+            else:
+                # Single value, add to all phases
+                for i in range(len(phases)):
+                    capacity_list[i] += capacity_config
+
+    return leave_days_list, capacity_list
 
 
 def load_team_members_from_yaml(config_path: Path, detailed: bool = False):

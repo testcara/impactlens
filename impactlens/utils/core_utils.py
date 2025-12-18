@@ -49,6 +49,79 @@ def calculate_daily_throughput(start_date, end_date, item_count):
     return None
 
 
+def calculate_throughput_variants(item_count, analysis_days, leave_days=0, capacity=1.0):
+    """
+    Calculate 4 throughput variants considering leave days and capacity.
+
+    This function provides 4 different throughput calculations to account for
+    team size (capacity) and availability (leave days):
+
+    1. Baseline: Simple throughput without adjustments
+    2. Skip leave: Adjusts for days on leave
+    3. Capacity: Adjusts for team size/capacity
+    4. Both: Adjusts for both leave days and capacity
+
+    Args:
+        item_count: Number of items (PRs, issues, etc.)
+        analysis_days: Number of days in the analysis period
+        leave_days: Number of leave days during the period (default: 0)
+        capacity: Team capacity as FTE (Full-Time Equivalent)
+                 For individuals: 0.0-1.0 (1.0 = full time, 0.5 = half time)
+                 For teams: sum of all members' capacity (e.g., 6.0 for 6-person team)
+                 (default: 1.0)
+
+    Returns:
+        Dictionary with 4 throughput variants:
+        {
+            'baseline': float or None,
+            'skip_leave': float or None,
+            'capacity': float or None,
+            'both': float or None
+        }
+
+    Examples:
+        >>> # Single developer, no leave
+        >>> calculate_throughput_variants(10, 30, 0, 1.0)
+        {'baseline': 0.333, 'skip_leave': 0.333, 'capacity': 0.333, 'both': 0.333}
+
+        >>> # Single developer, 5 days leave
+        >>> calculate_throughput_variants(10, 30, 5, 1.0)
+        {'baseline': 0.333, 'skip_leave': 0.4, 'capacity': 0.333, 'both': 0.4}
+
+        >>> # Team of 6, no leave
+        >>> calculate_throughput_variants(60, 30, 0, 6.0)
+        {'baseline': 2.0, 'skip_leave': 2.0, 'capacity': 0.333, 'both': 0.333}
+
+        >>> # Team of 6, 5 days total leave
+        >>> calculate_throughput_variants(60, 30, 5, 6.0)
+        {'baseline': 2.0, 'skip_leave': 2.4, 'capacity': 0.333, 'both': 0.4}
+    """
+    if not analysis_days or analysis_days <= 0:
+        return {"baseline": None, "skip_leave": None, "capacity": None, "both": None}
+
+    # Variant 1: Baseline (no adjustments)
+    baseline = item_count / analysis_days
+
+    # Variant 2: Skip leave days
+    effective_days_leave = analysis_days - leave_days
+    skip_leave = item_count / effective_days_leave if effective_days_leave > 0 else None
+
+    # Variant 3: Based on capacity
+    effective_days_capacity = analysis_days * capacity
+    capacity_based = item_count / effective_days_capacity if effective_days_capacity > 0 else None
+
+    # Variant 4: Both leave days and capacity
+    effective_days_both = (analysis_days - leave_days) * capacity
+    both = item_count / effective_days_both if effective_days_both > 0 else None
+
+    return {
+        "baseline": baseline,
+        "skip_leave": skip_leave,
+        "capacity": capacity_based,
+        "both": both,
+    }
+
+
 def convert_date_to_jql(date_str):
     """
     Convert YYYY-MM-DD format date to Jira JQL relative time expression.

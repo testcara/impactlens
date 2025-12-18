@@ -323,6 +323,11 @@ class PRReportGenerator:
             "period": period,
             "total_prs": stats.get("total_prs", 0),
             "daily_throughput": stats.get("daily_throughput", 0),
+            "daily_throughput_skip_leave": stats.get("daily_throughput_skip_leave"),
+            "daily_throughput_capacity": stats.get("daily_throughput_capacity"),
+            "daily_throughput_both": stats.get("daily_throughput_both"),
+            "leave_days": stats.get("leave_days", 0),
+            "capacity": stats.get("capacity", 1.0),
             "ai_adoption_rate": stats.get("ai_adoption_rate", 0),
             "ai_assisted_prs": stats.get("ai_assisted_prs", 0),
             "non_ai_prs": stats.get("non_ai_prs", 0),
@@ -407,11 +412,60 @@ class PRReportGenerator:
                 periods.append("N/A")
         lines.append("Analysis Period\t" + "\t".join(periods))
 
+        # Leave days
+        leave_days_list = []
+        for r in reports:
+            leave_days = r.get("leave_days", 0)
+            # Format as int if it's a whole number, otherwise as float
+            if isinstance(leave_days, float) and leave_days == int(leave_days):
+                leave_days_list.append(str(int(leave_days)))
+            else:
+                leave_days_list.append(str(leave_days))
+        lines.append("Leave Days\t" + "\t".join(leave_days_list))
+
+        # Capacity
+        capacity_list = []
+        for r in reports:
+            capacity = r.get("capacity", 1.0)
+            capacity_list.append(str(capacity))
+        lines.append("Capacity\t" + "\t".join(capacity_list))
+
         # Total PRs
         total_prs = [str(r["total_prs"]) for r in reports]
         lines.append("Total PRs Merged (excl. bot-authored)\t" + "\t".join(total_prs))
 
-        # Daily Throughput - read from parsed reports
+        # Daily Throughput - 4 variants (same order as Jira metrics)
+        # Variant 1: Skip leave days
+        throughputs_skip_leave = []
+        for r in reports:
+            throughput = r.get("daily_throughput_skip_leave")
+            if throughput is not None and throughput > 0:
+                throughputs_skip_leave.append(f"{throughput:.2f}/d")
+            else:
+                throughputs_skip_leave.append("N/A")
+        lines.append("Daily Throughput (skip leave days)\t" + "\t".join(throughputs_skip_leave))
+
+        # Variant 2: Based on capacity
+        throughputs_capacity = []
+        for r in reports:
+            throughput = r.get("daily_throughput_capacity")
+            if throughput is not None and throughput > 0:
+                throughputs_capacity.append(f"{throughput:.2f}/d")
+            else:
+                throughputs_capacity.append("N/A")
+        lines.append("Daily Throughput (based on capacity)\t" + "\t".join(throughputs_capacity))
+
+        # Variant 3: Both leave days + capacity
+        throughputs_both = []
+        for r in reports:
+            throughput = r.get("daily_throughput_both")
+            if throughput is not None and throughput > 0:
+                throughputs_both.append(f"{throughput:.2f}/d")
+            else:
+                throughputs_both.append("N/A")
+        lines.append("Daily Throughput (leave + capacity)\t" + "\t".join(throughputs_both))
+
+        # Variant 4: Baseline (no adjustments) - placed last like Jira
         daily_throughputs = []
         for r in reports:
             throughput = r.get("daily_throughput")
@@ -419,7 +473,7 @@ class PRReportGenerator:
                 daily_throughputs.append(f"{throughput:.2f}/d")
             else:
                 daily_throughputs.append("N/A")
-        lines.append("Daily Throughput (PRs/day)\t" + "\t".join(daily_throughputs))
+        lines.append("Daily Throughput\t" + "\t".join(daily_throughputs))
 
         # AI Adoption Rate
         ai_rates = [f"{r['ai_adoption_rate']:.1f}%" for r in reports]
