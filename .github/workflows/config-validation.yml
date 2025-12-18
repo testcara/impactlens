@@ -176,3 +176,27 @@ jobs:
               body: '## ❌ Mixed PR Not Allowed\n\nThis PR contains **both configuration files and code changes**, which is not permitted.\n\n**Please split into two separate PRs:**\n\n### Config-Only PR\n- Include only: config/**/*.yaml files\n- Will trigger: Report generation\n- Requires: Config validation to pass\n\n### Code-Only PR\n- Include: Python code, workflows, docs, etc.\n- Will trigger: CI tests\n- Requires: Code review and tests to pass\n\n**Why this restriction?**\n\nConfig-only PRs can access repository secrets to generate reports. Mixing code changes would allow malicious code execution with secret access, creating a security vulnerability.\n\nFor questions, see our [Security Guide](docs/SECURITY.md) (TODO).'
             });
 
+      - name: Block config-only PRs from merging
+        if: steps.check_config_only.outputs.is_config_only == 'true'
+        run: |
+          echo "=========================================="
+          echo "❌ CONFIG-ONLY PR - MERGE BLOCKED"
+          echo "=========================================="
+          echo ""
+          echo "This PR contains only configuration files."
+          echo "Config-only PRs are used to trigger report generation."
+          echo ""
+          echo "✅ Security validation passed"
+          echo "✅ Reports will be generated automatically"
+          echo ""
+          echo "⚠️  DO NOT MERGE this PR!"
+          echo ""
+          echo "Next steps:"
+          echo "1. Review the generated reports in PR comments"
+          echo "2. Download reports from workflow artifacts or Google Sheets"
+          echo "3. Manually close this PR after reviewing"
+          echo ""
+          echo "This check intentionally fails to prevent accidental merging."
+          echo "=========================================="
+          exit 1
+
