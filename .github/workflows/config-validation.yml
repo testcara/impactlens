@@ -1,0 +1,214 @@
+name: Config-Only PR Enforcement
+
+on:
+  pull_request_target:
+    branches: [ master ]
+    # Trigger on any file change to check if PR mixes code and config
+    paths:
+      - '**'
+
+jobs:
+  validate-config-only:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Check if PR is config-only
+        id: check_config_only
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          echo ""
+
+          # Categorize changed files
+          CONFIG_FILES=$(echo "$CHANGED_FILES" | grep -E '^config/.*\.(yaml|yml)$' | grep -v -E '^config/test-' || true)
+          NON_CONFIG_FILES=$(echo "$CHANGED_FILES" | grep -v -E '^config/.*\.(yaml|yml)$' || true)
+
+          echo "Config files changed:"
+          echo "${CONFIG_FILES:-<none>}"
+          echo ""
+          echo "Non-config files changed:"
+          echo "${NON_CONFIG_FILES:-<none>}"
+          echo ""
+
+          # Check if this is a config-only PR
+          if [ -n "$CONFIG_FILES" ] && [ -z "$NON_CONFIG_FILES" ]; then
+            echo "✅ This is a config-only PR"
+            echo "is_config_only=true" >> $GITHUB_OUTPUT
+            echo "has_config=true" >> $GITHUB_OUTPUT
+          elif [ -n "$CONFIG_FILES" ] && [ -n "$NON_CONFIG_FILES" ]; then
+            echo "❌ This PR mixes config files and code changes"
+            echo "is_config_only=false" >> $GITHUB_OUTPUT
+            echo "has_config=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ This is a code-only PR (no config files)"
+            echo "is_config_only=false" >> $GITHUB_OUTPUT
+            echo "has_config=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Block mixed PRs
+        if: steps.check_config_only.outputs.has_config == 'true' && steps.check_config_only.outputs.is_config_only == 'false'
+        run: |
+          echo "=========================================="
+          echo "❌ PR VALIDATION FAILED"
+          echo "=========================================="
+          echo ""
+          echo "This PR contains BOTH configuration files AND code changes."
+          echo "This is not allowed for security reasons."
+          echo ""
+          echo "Please split this PR into two separate PRs:"
+          echo ""
+          echo "1️⃣  Config-only PR:"
+          echo "   - Only files in config/**/*.yaml"
+          echo "   - Will trigger automated report generation"
+          echo "   - Requires config validation to pass"
+          echo ""
+          echo "2️⃣  Code-only PR:"
+          echo "   - All other files (Python code, workflows, docs, etc.)"
+          echo "   - Will trigger CI tests"
+          echo "   - Requires code review"
+          echo ""
+          echo "=========================================="
+          echo "Why this restriction exists:"
+          echo "=========================================="
+          echo ""
+          echo "Config-only PRs can access secrets to generate reports."
+          echo "Mixing code changes would allow malicious code to steal secrets."
+          echo "Keeping them separate maintains security boundaries."
+          echo ""
+          exit 1
+
+      - name: Set up Python
+        if: steps.check_config_only.outputs.is_config_only == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate config files (security)
+        if: steps.check_config_only.outputs.is_config_only == 'true'
+        run: |
+          echo "=========================================="
+          echo "Security: Validating Config Files"
+          echo "=========================================="
+          echo ""
+
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED_CONFIGS=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep -E '^config/.*\.(yaml|yml)$' | grep -v -E '^config/test-' || true)
+
+          if [ -z "$CHANGED_CONFIGS" ]; then
+            echo "No config files to validate"
+            exit 0
+          fi
+
+          echo "Validating config files:"
+          echo "$CHANGED_CONFIGS"
+          echo ""
+
+          # Install dependencies
+          pip install -q PyYAML
+
+          # Validate each changed config file
+          EXIT_CODE=0
+          while IFS= read -r config_file; do
+            if [ -f "$config_file" ]; then
+              python scripts/validate_config.py "$config_file" || EXIT_CODE=1
+            fi
+          done <<< "$CHANGED_CONFIGS"
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "❌ Config validation failed!"
+            echo "=========================================="
+            echo ""
+            echo "Security issues detected in configuration files."
+            echo "Please review the errors above and fix them."
+            echo ""
+            echo "Common issues:"
+            echo "  - Command injection patterns (\$(command), \`command\`, etc.)"
+            echo "  - Environment variable expansion (\${VAR}, \$VAR)"
+            echo "  - Path traversal (../, /etc/passwd, etc.)"
+            echo "  - Hardcoded secrets"
+            echo ""
+            exit 1
+          fi
+
+          echo ""
+          echo "=========================================="
+          echo "✅ All config files passed security validation"
+          echo "=========================================="
+
+      - name: Comment on PR - Success
+        if: steps.check_config_only.outputs.is_config_only == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## ✅ Config-Only PR Validated
+
+This PR contains only configuration files and has passed security validation.
+
+**Next Steps:**
+1. A maintainer will review your configuration
+2. Once approved, the report generation workflow will run
+3. Reports will be posted as PR comments and uploaded to Google Sheets
+
+**What gets validated:**
+- ✅ No command injection patterns
+- ✅ No environment variable expansion
+- ✅ No path traversal attempts
+- ✅ No hardcoded secrets
+- ✅ Valid YAML structure
+- ✅ Required fields present
+
+Thank you for your contribution! 🎉`
+            });
+
+      - name: Comment on PR - Mixed files blocked
+        if: failure() && steps.check_config_only.outputs.has_config == 'true' && steps.check_config_only.outputs.is_config_only == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## ❌ Mixed PR Not Allowed
+
+This PR contains **both configuration files and code changes**, which is not permitted.
+
+**Please split into two separate PRs:**
+
+### 1️⃣ Config-Only PR
+- Include only: \`config/**/*.yaml\` files
+- Will trigger: Report generation
+- Requires: Config validation to pass
+
+### 2️⃣ Code-Only PR
+- Include: Python code, workflows, docs, etc.
+- Will trigger: CI tests
+- Requires: Code review and tests to pass
+
+**Why this restriction?**
+
+Config-only PRs can access repository secrets to generate reports. Mixing code changes would allow malicious code execution with secret access, creating a security vulnerability.
+
+For questions, see our [Security Guide](docs/SECURITY.md) (TODO).`
+            });
