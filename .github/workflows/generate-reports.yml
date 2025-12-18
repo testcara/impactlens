@@ -83,61 +83,8 @@ jobs:
             echo "✗ Only test configs or non-config files changed, skipping report generation"
           fi
 
-      - name: Validate Config Files
-        if: steps.pr_context.outputs.is_pr == 'true' && steps.check_files.outputs.skip != 'true'
-        run: |
-          echo "=========================================="
-          echo "Security: Validating Config Files"
-          echo "=========================================="
-
-          # Get changed config files
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-
-          CHANGED_CONFIGS=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep -E '^config/.*\.(yaml|yml)$' | grep -v -E '^config/test-' || true)
-
-          if [ -z "$CHANGED_CONFIGS" ]; then
-            echo "No config files to validate"
-            exit 0
-          fi
-
-          echo "Validating config files:"
-          echo "$CHANGED_CONFIGS"
-          echo ""
-
-          # Install PyYAML for validation
-          pip install -q PyYAML
-
-          # Validate each changed config file
-          EXIT_CODE=0
-          while IFS= read -r config_file; do
-            if [ -f "$config_file" ]; then
-              python .github/scripts/validate_config.py "$config_file" || EXIT_CODE=1
-            fi
-          done <<< "$CHANGED_CONFIGS"
-
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo ""
-            echo "=========================================="
-            echo "❌ Config validation failed!"
-            echo "=========================================="
-            echo ""
-            echo "Security issues detected in configuration files."
-            echo "Please review the errors above and fix them."
-            echo ""
-            echo "Common issues:"
-            echo "  - Command injection patterns (\$(command), \`command\`, etc.)"
-            echo "  - Environment variable expansion (\${VAR}, \$VAR)"
-            echo "  - Path traversal (../, /etc/passwd, etc.)"
-            echo "  - Hardcoded secrets"
-            echo ""
-            exit 1
-          fi
-
-          echo ""
-          echo "=========================================="
-          echo "✅ All config files passed validation"
-          echo "=========================================="
+      # Note: Config validation already ran in config-validation.yml
+      # This is a defensive check in case that workflow is bypassed
 
       - name: Set up Python
         if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'

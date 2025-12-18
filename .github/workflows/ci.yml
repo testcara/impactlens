@@ -18,7 +18,7 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Check if only docs changed
+    - name: Check if only docs/config changed
       id: docs_check
       run: |
         if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -26,21 +26,38 @@ jobs:
           echo "Changed files:"
           echo "$FILES"
 
-          # Check if only docs/config files changed
-          if echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore)$'; then
+          # Categorize changed files
+          TEST_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/test-(integration|aggregation)-ci/.*\.(yaml|yml)$' || true)
+          USER_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/.*\.(yaml|yml)$' | grep -v -E '^config/test-' | grep -v -E '\.example$' || true)
+          NON_CONFIG_NON_DOC_FILES=$(echo "$FILES" | grep -vE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore|config/.*\.(yaml|yml)$)' || true)
+
+          # Skip tests if:
+          # 1. Only docs/examples changed
+          # 2. Only USER config files changed (not test configs)
+          if [ -n "$TEST_CONFIG_FILES" ]; then
+            # Test configs changed - must run integration tests
             echo "code_changed=true" >> $GITHUB_OUTPUT
-          else
+            echo "✅ Test config files changed - running integration tests"
+          elif [ -z "$NON_CONFIG_NON_DOC_FILES" ]; then
             echo "code_changed=false" >> $GITHUB_OUTPUT
-            echo "Only documentation/config files changed, skipping tests"
+            if [ -n "$USER_CONFIG_FILES" ]; then
+              echo "✅ User config-only PR - skipping CI tests"
+              echo "   (Config validation runs in separate workflow)"
+            else
+              echo "✅ Documentation-only PR - skipping tests"
+            fi
+          else
+            echo "code_changed=true" >> $GITHUB_OUTPUT
           fi
         else
           echo "code_changed=true" >> $GITHUB_OUTPUT
         fi
 
-    - name: Skip tests (docs only)
+    - name: Skip tests (docs/config only)
       if: steps.docs_check.outputs.code_changed == 'false'
       run: |
-        echo "✓ Skipping tests - only documentation files changed"
+        echo "✓ Skipping tests - only documentation or config files changed"
+        echo "  Config-only PRs are validated in the 'Config-Only PR Enforcement' workflow"
         exit 0
 
     - name: Set up Python ${{ matrix.python-version }}
@@ -101,16 +118,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if only docs changed
+      - name: Check if code or test configs changed
         id: docs_check
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
-            if echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore)$'; then
+
+            # Check for test config changes
+            TEST_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/test-(integration|aggregation)-ci/.*\.(yaml|yml)$' || true)
+
+            # Check for code/non-doc changes
+            CODE_CHANGED=$(echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore|config/[^/]+/.*\.(yaml|yml)$)' && echo "true" || echo "false")
+
+            if [ -n "$TEST_CONFIG_FILES" ] || [ "$CODE_CHANGED" = "true" ]; then
               echo "code_changed=true" >> $GITHUB_OUTPUT
+              if [ -n "$TEST_CONFIG_FILES" ]; then
+                echo "✅ Test config files changed - running integration tests"
+              fi
             else
               echo "code_changed=false" >> $GITHUB_OUTPUT
-              echo "Only documentation/config files changed, skipping integration tests"
+              echo "⏭️ Only docs/user configs changed - skipping integration tests"
             fi
           else
             echo "code_changed=true" >> $GITHUB_OUTPUT
