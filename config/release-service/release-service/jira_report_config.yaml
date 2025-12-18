@@ -2,8 +2,8 @@
 # These settings can be safely version-controlled
 project:
   # Jira project settings
-  jira_url: "https://issues.redhat.com"  # Jira instance URL
-  jira_project_key: "RELEASE"  # Jira project key or name
+  jira_url: "https://issues.redhat.com" # Jira instance URL
+  jira_project_key: "Konflux Release" # Jira project name, Jira key reports 400 error
 
   # Google Sheets settings (optional)
   # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
@@ -84,3 +84,5 @@ team_members:
     email: sconroy@redhat.com
     leave_days: 0
     capacity: 1
+
+output_dir: "reports/release-service/jira"
