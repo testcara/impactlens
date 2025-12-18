@@ -3,7 +3,7 @@
 project:
   # Jira project settings
   jira_url: "https://issues.redhat.com"  # Jira instance URL
-  jira_project_key: "Konflux UI"  # Jira project key or name
+  jira_project_key: "Konflux UI"  # Jira project name
 
   # Google Sheets settings (optional)
   # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
@@ -32,7 +32,8 @@ team_members:
   - member: sbudhwar
     leave_days:
     email: sbudhwar@redhat.com
-    capacity: 1
+    leave_days: 0 # Optional when it is 0
+    capacity: 1 # Optional when it is 1
   - member: wlin
     email: wlin@redhat.com
     leave_days:

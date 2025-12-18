@@ -6,13 +6,19 @@ Extracted from cli/get_pr_metrics.py
 """
 
 from datetime import datetime
-from impactlens.utils.core_utils import calculate_daily_throughput
+from impactlens.utils.core_utils import (
+    calculate_daily_throughput,
+    calculate_throughput_variants,
+    calculate_days_between,
+)
 
 
 class PRMetricsCalculator:
     """Calculator for GitHub PR metrics and statistics."""
 
-    def calculate_statistics(self, prs_with_metrics, start_date=None, end_date=None):
+    def calculate_statistics(
+        self, prs_with_metrics, start_date=None, end_date=None, leave_days=0, capacity=1.0
+    ):
         """
         Calculate aggregated statistics from PR metrics.
 
@@ -20,6 +26,8 @@ class PRMetricsCalculator:
             prs_with_metrics: List of PR dictionaries with metrics
             start_date: Start date (YYYY-MM-DD) for period
             end_date: End date (YYYY-MM-DD) for period
+            leave_days: Days on leave during period (default: 0)
+            capacity: Team capacity 0.0-1.0 (default: 1.0 = full time)
 
         Returns:
             Dictionary with aggregated statistics
@@ -33,6 +41,11 @@ class PRMetricsCalculator:
                 "non_ai_prs": 0,
                 "ai_adoption_rate": 0,
                 "daily_throughput": daily_throughput,
+                "daily_throughput_skip_leave": None,
+                "daily_throughput_capacity": None,
+                "daily_throughput_both": None,
+                "leave_days": leave_days,
+                "capacity": capacity,
                 "claude_prs": 0,
                 "cursor_prs": 0,
                 "both_tools_prs": 0,
@@ -101,8 +114,23 @@ class PRMetricsCalculator:
                 "avg_files_changed": avg([pr["changed_files"] for pr in non_ai_prs]),
             }
 
-        # Calculate daily throughput if dates provided
-        daily_throughput = calculate_daily_throughput(start_date, end_date, len(prs_with_metrics))
+        # Calculate all 4 throughput variants using shared utility function
+        analysis_days = (
+            calculate_days_between(start_date, end_date, inclusive=True)
+            if start_date and end_date
+            else None
+        )
+        total_prs = len(prs_with_metrics)
+
+        throughput_variants = calculate_throughput_variants(
+            total_prs,
+            analysis_days if analysis_days else 0,
+            leave_days=leave_days,
+            capacity=capacity,
+        )
+
+        # For backwards compatibility, also calculate baseline using old function
+        daily_throughput = calculate_daily_throughput(start_date, end_date, total_prs)
 
         return {
             "total_prs": len(prs_with_metrics),
@@ -111,7 +139,12 @@ class PRMetricsCalculator:
             "ai_adoption_rate": (
                 (len(ai_prs) / len(prs_with_metrics) * 100) if prs_with_metrics else 0
             ),
-            "daily_throughput": daily_throughput,
+            "daily_throughput": daily_throughput,  # Variant 1: Baseline
+            "daily_throughput_skip_leave": throughput_variants["skip_leave"],  # Variant 2
+            "daily_throughput_capacity": throughput_variants["capacity"],  # Variant 3
+            "daily_throughput_both": throughput_variants["both"],  # Variant 4
+            "leave_days": leave_days,
+            "capacity": capacity,
             # By tool
             "claude_prs": len(claude_prs),
             "cursor_prs": len(cursor_prs),

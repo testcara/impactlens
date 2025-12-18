@@ -42,6 +42,7 @@ class GitHubGraphQLClient:
         repo_owner: Optional[str] = None,
         repo_name: Optional[str] = None,
         cache_dir: Optional[str] = None,
+        github_url: Optional[str] = None,
     ):
         """
         Initialize GitHub GraphQL API client.
@@ -51,10 +52,31 @@ class GitHubGraphQLClient:
             repo_owner: Repository owner/organization
             repo_name: Repository name
             cache_dir: Directory for caching PR data (default: .cache/github)
+            github_url: GitHub/GitLab base URL (or use GITHUB_URL env var, default: https://github.com)
         """
         self.token = token or os.getenv("GITHUB_TOKEN")
         self.repo_owner = repo_owner or os.getenv("GITHUB_REPO_OWNER")
         self.repo_name = repo_name or os.getenv("GITHUB_REPO_NAME")
+
+        # Support both GitHub and GitLab (and self-hosted instances)
+        base_git_url = github_url or os.getenv("GITHUB_URL", "https://github.com")
+
+        # Convert base URL to GraphQL endpoint
+        # GitHub: https://github.com -> https://api.github.com/graphql
+        # GitLab: https://gitlab.com -> https://gitlab.com/api/graphql
+        # GitHub Enterprise: https://git.example.com -> https://git.example.com/api/graphql
+        if "gitlab" in base_git_url.lower():
+            # GitLab or self-hosted GitLab
+            self.graphql_url = f"{base_git_url.rstrip('/')}/api/graphql"
+            self.is_gitlab = True
+        elif base_git_url == "https://github.com":
+            # Public GitHub
+            self.graphql_url = "https://api.github.com/graphql"
+            self.is_gitlab = False
+        else:
+            # GitHub Enterprise
+            self.graphql_url = f"{base_git_url.rstrip('/')}/api/graphql"
+            self.is_gitlab = False
 
         if not self.token:
             raise ValueError("GitHub token is required. Set GITHUB_TOKEN environment variable.")
@@ -64,11 +86,14 @@ class GitHubGraphQLClient:
                 "Repository owner and name are required. Set GITHUB_REPO_OWNER and GITHUB_REPO_NAME."
             )
 
-        self.graphql_url = "https://api.github.com/graphql"
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         }
+
+        logger.info(
+            f"Git GraphQL client initialized for {self.repo_owner}/{self.repo_name} (URL: {self.graphql_url})"
+        )
 
         # Setup caching
         self.cache_dir = Path(cache_dir or ".cache/github")

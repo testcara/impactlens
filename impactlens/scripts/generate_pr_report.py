@@ -25,6 +25,7 @@ from impactlens.utils.workflow_utils import (
     load_team_members,
     load_team_members_from_yaml,
     load_and_resolve_config,
+    aggregate_member_values_for_phases,
 )
 from impactlens.utils.report_utils import (
     normalize_username,
@@ -54,6 +55,8 @@ def generate_phase_metrics(
     output_dir: Optional[str] = None,
     hide_individual_names: bool = False,
     config_file: Optional[Path] = None,
+    leave_days: float = 0,
+    capacity: float = 1.0,
 ) -> bool:
     """Generate PR metrics for a single phase."""
     args = [
@@ -80,6 +83,12 @@ def generate_phase_metrics(
 
     if config_file:
         args.extend(["--config", str(config_file)])
+
+    if leave_days > 0:
+        args.extend(["--leave-days", str(leave_days)])
+
+    if capacity != 1.0:
+        args.extend(["--capacity", str(capacity)])
 
     try:
         subprocess.run(args, check=True)
@@ -403,13 +412,28 @@ Examples:
     cleanup_old_reports(reports_dir, identifier, "pr")
     print()
 
+    # Load leave_days and capacity from team members (using shared utility)
+    leave_days_list, capacity_list = aggregate_member_values_for_phases(
+        config_file, phases, author=author
+    )
+
     # Step 2-N: Generate metrics for each phase
     step_num = 2
 
-    for phase_name, start_date, end_date in phases:
+    for phase_index, (phase_name, start_date, end_date) in enumerate(phases):
         print(
             f"{Colors.YELLOW}Step {step_num}: Collecting PR metrics for '{phase_name}' ({start_date} to {end_date})...{Colors.NC}"
         )
+
+        # Get leave_days for this phase
+        phase_leave_days = 0
+        if leave_days_list and phase_index < len(leave_days_list):
+            phase_leave_days = leave_days_list[phase_index]
+
+        # Get capacity for this phase
+        phase_capacity = 1.0
+        if capacity_list and phase_index < len(capacity_list):
+            phase_capacity = capacity_list[phase_index]
 
         success = generate_phase_metrics(
             phase_name,
@@ -420,6 +444,8 @@ Examples:
             output_dir=str(reports_dir),
             hide_individual_names=args.hide_individual_names,
             config_file=config_file,
+            leave_days=phase_leave_days,
+            capacity=phase_capacity,
         )
 
         if success:

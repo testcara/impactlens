@@ -95,6 +95,18 @@ Examples:
         type=str,
         help="Path to config file (for email lookup when anonymizing)",
     )
+    parser.add_argument(
+        "--leave-days",
+        type=str,
+        help="Days on leave during period (for accurate throughput)",
+        default=None,
+    )
+    parser.add_argument(
+        "--capacity",
+        type=str,
+        help="Work capacity 0.0-1.0 or team total FTE (e.g., '6.0' for 6-person team)",
+        default=None,
+    )
 
     args = parser.parse_args()
 
@@ -230,9 +242,29 @@ Examples:
         print("\n⚠ No merged PRs found for the specified period")
         print("📊 Generating report with empty metrics...")
 
+    # Get leave_days and capacity from command line arguments
+    # (Orchestration layer like generate_pr_report.py should aggregate these from config)
+    leave_days = 0
+    if args.leave_days is not None:
+        try:
+            leave_days = float(args.leave_days)
+        except ValueError:
+            print(f"Error: --leave-days must be a number, got '{args.leave_days}'")
+            return 1
+
+    capacity = 1.0
+    if args.capacity is not None:
+        try:
+            capacity = float(args.capacity)
+        except ValueError:
+            print(f"Error: --capacity must be a number, got '{args.capacity}'")
+            return 1
+
     print("\n📊 Calculating statistics...")
     calculator = PRMetricsCalculator()
-    stats = calculator.calculate_statistics(prs_with_metrics, args.start, args.end)
+    stats = calculator.calculate_statistics(
+        prs_with_metrics, args.start, args.end, leave_days=leave_days, capacity=capacity
+    )
 
     # Generate reports using core logic
     report_gen = PRReportGenerator()

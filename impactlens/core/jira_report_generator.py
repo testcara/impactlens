@@ -18,7 +18,7 @@ from impactlens.utils.report_utils import (
     get_identifier_for_file,
     get_identifier_for_display,
 )
-from impactlens.utils.core_utils import calculate_days_between
+from impactlens.utils.core_utils import calculate_days_between, calculate_throughput_variants
 
 
 class JiraReportGenerator:
@@ -582,47 +582,43 @@ class JiraReportGenerator:
         max_times = [r["closure_stats"].get("max_days", 0) for r in reports]
         lines.append("Longest Closure Time\t" + "\t".join(f"{t:.2f}d" for t in max_times))
 
-        # Daily throughput (skip leave days) = Total Issues / (Analysis Period - Leave Days)
+        # Daily throughput variants - using shared utility function
         throughputs_skip_leave = []
+        throughputs_capacity = []
+        throughputs_both = []
+
         for i, report in enumerate(reports):
             period = periods[i]
             if period != "N/A" and period.endswith("d"):
                 analysis_days = int(period.replace("d", ""))
                 leave_days = report["time_range"].get("leave_days", 0)
-                effective_days = analysis_days - leave_days
-                throughput = report["total_issues"] / effective_days if effective_days > 0 else 0
-                throughputs_skip_leave.append(f"{throughput:.2f}/d")
+                capacity = report["time_range"].get("capacity", 1.0)
+                total_issues = report["total_issues"]
+
+                # Calculate all variants using shared function
+                variants = calculate_throughput_variants(
+                    total_issues, analysis_days, leave_days=leave_days, capacity=capacity
+                )
+
+                # Format each variant
+                throughputs_skip_leave.append(
+                    f"{variants['skip_leave']:.2f}/d"
+                    if variants["skip_leave"] is not None
+                    else "N/A"
+                )
+                throughputs_capacity.append(
+                    f"{variants['capacity']:.2f}/d" if variants["capacity"] is not None else "N/A"
+                )
+                throughputs_both.append(
+                    f"{variants['both']:.2f}/d" if variants["both"] is not None else "N/A"
+                )
             else:
                 throughputs_skip_leave.append("N/A")
-        lines.append("Daily Throughput (skip leave days)\t" + "\t".join(throughputs_skip_leave))
-
-        # Daily throughput (based on capacity) = Total Issues / (Analysis Period × Capacity)
-        throughputs_capacity = []
-        for i, report in enumerate(reports):
-            period = periods[i]
-            if period != "N/A" and period.endswith("d"):
-                analysis_days = int(period.replace("d", ""))
-                capacity = report["time_range"].get("capacity", 1.0)
-                effective_days = analysis_days * capacity
-                throughput = report["total_issues"] / effective_days if effective_days > 0 else 0
-                throughputs_capacity.append(f"{throughput:.2f}/d")
-            else:
                 throughputs_capacity.append("N/A")
-        lines.append("Daily Throughput (based on capacity)\t" + "\t".join(throughputs_capacity))
-
-        # Daily throughput (considering leave days + capacity) = Total Issues / ((Analysis Period - Leave Days) × Capacity)
-        throughputs_both = []
-        for i, report in enumerate(reports):
-            period = periods[i]
-            if period != "N/A" and period.endswith("d"):
-                analysis_days = int(period.replace("d", ""))
-                leave_days = report["time_range"].get("leave_days", 0)
-                capacity = report["time_range"].get("capacity", 1.0)
-                effective_days = (analysis_days - leave_days) * capacity
-                throughput = report["total_issues"] / effective_days if effective_days > 0 else 0
-                throughputs_both.append(f"{throughput:.2f}/d")
-            else:
                 throughputs_both.append("N/A")
+
+        lines.append("Daily Throughput (skip leave days)\t" + "\t".join(throughputs_skip_leave))
+        lines.append("Daily Throughput (based on capacity)\t" + "\t".join(throughputs_capacity))
         lines.append(
             "Daily Throughput (considering leave days + capacity)\t" + "\t".join(throughputs_both)
         )

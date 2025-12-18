@@ -1,12 +1,13 @@
 # Project configuration (non-sensitive settings)
 # These settings can be safely version-controlled
 project:
-  # GitHub repository settings
+  # GitHub/Gitlab repository settings
+  github_url: "https://github.com"
   github_repo_owner: "konflux-ci"  # GitHub repository owner/organization
   github_repo_name: "konflux-ui"  # GitHub repository name
 
   # Google Sheets settings (optional)
-  google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
+  # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
   # If you do not set, would upload to the default google-sheet.
   # IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com
 
@@ -33,21 +34,32 @@ team_members:
   # - Add 'email' field with the same email used in Jira config
   # - This ensures the same person gets the same anonymous hash in both reports
   # - The 'name' field is the GitHub username
+  #
+  # Optional fields for accurate Daily Throughput calculations:
+  # - leave_days: Days on leave during the phase (single value or per-phase list)
+  # - capacity: Work capacity 0.0-1.0 (1.0=full time, 0.5=half time, single value or per-phase list)
 
   - name: sahil143
     email: sbudhwar@redhat.com  # Same email as in Jira config
+    leave_days: 0 # Optional when it is 0
+    capacity: 1 # Optional when it is 1
   - name: testcara
-    email: wlin@redhat.com  # Same email as in Jira config
+    email: wlin@redhat.com
+    leave_days:
+      - 26
+      - 20
+      - 11.5
+    capacity: 0.8
   - name: rrosatti
-    email: rgalvao@redhat.com  # Same email as in Jira config
+    email: rgalvao@redhat.com
   - name: marcin-michal
-    email: mmarcin@redhat.com  # Same email as in Jira config
+    email: mmarcin@redhat.com
   - name: StanislavJochman
-    email: sjochman@redhat.com  # Same email as in Jira config
+    email: sjochman@redhat.com
   - name: JoaoPedroPP
-    email: jpolonip@redhat.com  # Same email as in Jira config
+    email: jpolonip@redhat.com
   - name: janaki29
-    email: djanaki@redhat.com  # Same email as in Jira config
+    email: djanaki@redhat.com
   - name: rakshett
     email: rakshett@redhat.com  # Same email as in Jira config
   - name: milantaky

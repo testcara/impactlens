@@ -32,6 +32,7 @@ class GitHubClient:
         token: Optional[str] = None,
         repo_owner: Optional[str] = None,
         repo_name: Optional[str] = None,
+        github_url: Optional[str] = None,
     ):
         """
         Initialize GitHub API client.
@@ -40,10 +41,32 @@ class GitHubClient:
             token: GitHub personal access token (or use GITHUB_TOKEN env var)
             repo_owner: Repository owner/organization (or use GITHUB_REPO_OWNER env var)
             repo_name: Repository name (or use GITHUB_REPO_NAME env var)
+            github_url: GitHub/GitLab base URL (or use GITHUB_URL env var, default: https://github.com)
         """
         self.token = token or os.getenv("GITHUB_TOKEN")
         self.repo_owner = repo_owner or os.getenv("GITHUB_REPO_OWNER")
         self.repo_name = repo_name or os.getenv("GITHUB_REPO_NAME")
+
+        # Support both GitHub and GitLab (and self-hosted instances)
+        base_git_url = github_url or os.getenv("GITHUB_URL", "https://github.com")
+
+        # Convert base URL to API URL
+        # GitHub: https://github.com -> https://api.github.com
+        # GitLab: https://gitlab.com -> https://gitlab.com/api/v4
+        # Self-hosted: https://git.example.com -> https://git.example.com/api/v4 (GitLab) or https://api.git.example.com (GitHub Enterprise)
+        if "gitlab" in base_git_url.lower():
+            # GitLab or self-hosted GitLab
+            self.base_url = f"{base_git_url.rstrip('/')}/api/v4"
+            self.is_gitlab = True
+        elif base_git_url == "https://github.com":
+            # Public GitHub
+            self.base_url = "https://api.github.com"
+            self.is_gitlab = False
+        else:
+            # GitHub Enterprise or other
+            # GitHub Enterprise uses: https://hostname/api/v3
+            self.base_url = f"{base_git_url.rstrip('/')}/api/v3"
+            self.is_gitlab = False
 
         if not self.token:
             raise ValueError(
@@ -55,14 +78,18 @@ class GitHubClient:
                 "Repository owner and name are required. Set GITHUB_REPO_OWNER and GITHUB_REPO_NAME environment variables."
             )
 
-        self.base_url = "https://api.github.com"
         self.headers = {
-            "Accept": "application/vnd.github+json",
+            "Accept": "application/vnd.github+json" if not self.is_gitlab else "application/json",
             "Authorization": f"Bearer {self.token}",
-            "X-GitHub-Api-Version": "2022-11-28",
         }
 
-        logger.info(f"GitHub client initialized for {self.repo_owner}/{self.repo_name}")
+        # Add GitHub API version header only for GitHub (not GitLab)
+        if not self.is_gitlab:
+            self.headers["X-GitHub-Api-Version"] = "2022-11-28"
+
+        logger.info(
+            f"Git client initialized for {self.repo_owner}/{self.repo_name} (URL: {self.base_url})"
+        )
 
     @staticmethod
     def is_bot_user(username: str) -> bool:
