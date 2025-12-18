@@ -2,30 +2,32 @@ name: Generate AI Impact Reports
 
 on:
   # Trigger when config files or workflow itself are modified in PRs
-  pull_request:
-    branches: [ master ]
+  # Using pull_request_target to allow fork PRs to access secrets
+  # SECURITY: Workflow only reads config files and generates reports - no code execution from PR
+  pull_request_target:
+    branches: [master]
     paths:
-      - 'config/**/jira_report_config.yaml'
-      - 'config/**/pr_report_config.yaml'
-      - 'config/**/aggregation_config.yaml'
-      - '.github/workflows/generate-reports.yml'
+      - "config/**/jira_report_config.yaml"
+      - "config/**/pr_report_config.yaml"
+      - "config/**/aggregation_config.yaml"
+      - ".github/workflows/generate-reports.yml"
 
   # Allow manual trigger with team selection
   workflow_dispatch:
     inputs:
       team:
-        description: 'Team config directory (e.g., konfluxui)'
+        description: "Team config directory (e.g., konfluxui)"
         required: false
-        default: ''
+        default: ""
       report_type:
-        description: 'Report type to generate'
+        description: "Report type to generate"
         required: true
         type: choice
         options:
           - both
           - jira
           - pr
-        default: 'both'
+        default: "both"
 
 jobs:
   generate-reports:
@@ -39,10 +41,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history for git diff
+          # For pull_request_target, we need to explicitly checkout the PR's head
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0 # Fetch full history for git diff
+
+      - name: Set PR context flag
+        id: pr_context
+        run: |
+          # Set a flag to indicate if this is a PR event
+          if [ "${{ github.event_name }}" = "pull_request_target" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "is_pr=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_pr=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Check if only test configs changed
-        if: github.event_name == 'pull_request'
+        if: steps.pr_context.outputs.is_pr == 'true'
         id: check_files
         run: |
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
@@ -69,20 +83,76 @@ jobs:
             echo "✗ Only test configs or non-config files changed, skipping report generation"
           fi
 
+      - name: Validate Config Files
+        if: steps.pr_context.outputs.is_pr == 'true' && steps.check_files.outputs.skip != 'true'
+        run: |
+          echo "=========================================="
+          echo "Security: Validating Config Files"
+          echo "=========================================="
+
+          # Get changed config files
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED_CONFIGS=$(git diff --name-only $BASE_SHA $HEAD_SHA | grep -E '^config/.*\.(yaml|yml)$' | grep -v -E '^config/test-' || true)
+
+          if [ -z "$CHANGED_CONFIGS" ]; then
+            echo "No config files to validate"
+            exit 0
+          fi
+
+          echo "Validating config files:"
+          echo "$CHANGED_CONFIGS"
+          echo ""
+
+          # Install PyYAML for validation
+          pip install -q PyYAML
+
+          # Validate each changed config file
+          EXIT_CODE=0
+          while IFS= read -r config_file; do
+            if [ -f "$config_file" ]; then
+              python .github/scripts/validate_config.py "$config_file" || EXIT_CODE=1
+            fi
+          done <<< "$CHANGED_CONFIGS"
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "❌ Config validation failed!"
+            echo "=========================================="
+            echo ""
+            echo "Security issues detected in configuration files."
+            echo "Please review the errors above and fix them."
+            echo ""
+            echo "Common issues:"
+            echo "  - Command injection patterns (\$(command), \`command\`, etc.)"
+            echo "  - Environment variable expansion (\${VAR}, \$VAR)"
+            echo "  - Path traversal (../, /etc/passwd, etc.)"
+            echo "  - Hardcoded secrets"
+            echo ""
+            exit 1
+          fi
+
+          echo ""
+          echo "=========================================="
+          echo "✅ All config files passed validation"
+          echo "=========================================="
+
       - name: Set up Python
-        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
-        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         run: |
           python -m pip install --upgrade pip
           pip install -e .
 
       - name: Restore GitHub PR cache
-        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         uses: actions/cache@v4
         with:
           path: .cache/github
@@ -92,7 +162,7 @@ jobs:
             github-pr-cache-
 
       - name: Setup Google Credentials
-        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         run: |
           if [ -n "${{ secrets.GOOGLE_CREDENTIALS_BASE64 }}" ]; then
             echo "${{ secrets.GOOGLE_CREDENTIALS_BASE64 }}" | base64 -d > /tmp/google-credentials.json
@@ -109,14 +179,14 @@ jobs:
           fi
 
       - name: Determine config path
-        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         id: config
         run: |
           if [ -n "${{ github.event.inputs.team }}" ]; then
             # Manual trigger with team specified
             CONFIG_DIR="config/${{ github.event.inputs.team }}"
             echo "Using manually specified team: ${{ github.event.inputs.team }}"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+          elif [ "${{ steps.pr_context.outputs.is_pr }}" = "true" ]; then
             # PR trigger - detect which config changed
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
             HEAD_SHA="${{ github.event.pull_request.head.sha }}"
@@ -164,7 +234,7 @@ jobs:
           echo "Using config directory: $CONFIG_DIR"
 
       - name: Verify Setup
-        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
@@ -190,7 +260,7 @@ jobs:
           echo "=========================================="
 
       - name: Generate Individual Team Reports (for Aggregation)
-        if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && steps.config.outputs.is_aggregation == 'true'
+        if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation == 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
@@ -282,7 +352,7 @@ jobs:
           echo "✓ Individual team reports generation completed"
 
       - name: Generate Aggregated Reports
-        if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && steps.config.outputs.is_aggregation == 'true'
+        if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation == 'true'
         env:
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
         run: |
@@ -323,7 +393,7 @@ jobs:
           ls -lh reports/**/aggregated_*.tsv 2>/dev/null || echo "No aggregated reports found"
 
       - name: Generate Jira Report
-        if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && steps.config.outputs.is_aggregation != 'true' && (github.event.inputs.report_type == 'jira' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
+        if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation != 'true' && (github.event.inputs.report_type == 'jira' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
@@ -341,7 +411,7 @@ jobs:
           fi
 
       - name: Generate PR Report
-        if: (steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request') && steps.config.outputs.is_aggregation != 'true' && (github.event.inputs.report_type == 'pr' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
+        if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation != 'true' && (github.event.inputs.report_type == 'pr' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
@@ -359,7 +429,7 @@ jobs:
           fi
 
       - name: Generate Analysis Prompts
-        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         run: |
           echo "Generating AI analysis prompts for combined reports..."
 
@@ -394,7 +464,7 @@ jobs:
           fi
 
       - name: Upload Reports as Artifacts
-        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         uses: actions/upload-artifact@v4
         with:
           name: impactlens-reports
@@ -405,15 +475,15 @@ jobs:
           retention-days: 30
 
       - name: Report Statistics and PR Comment
-        if: steps.check_files.outputs.skip != 'true' || github.event_name != 'pull_request'
+        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         uses: ./.github/actions/report-comment
         with:
-          reports_dir: 'reports'
+          reports_dir: "reports"
           google_spreadsheet_id: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Comment on PR - Failure
-        if: github.event_name == 'pull_request' && failure() && steps.check_files.outputs.skip != 'true'
+        if: steps.pr_context.outputs.is_pr == 'true' && failure() && steps.check_files.outputs.skip != 'true'
         continue-on-error: true
         uses: actions/github-script@v7
         with:
