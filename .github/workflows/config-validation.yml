@@ -1,4 +1,4 @@
-name: Config-Only PR Enforcement
+name: Config-Only PR - Block Merge
 
 on:
   pull_request_target:
@@ -8,7 +8,7 @@ on:
       - '**'
 
 jobs:
-  validate-config-only:
+  block-config-only-merge:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -152,7 +152,7 @@ jobs:
           echo "✅ All config files passed security validation"
           echo "=========================================="
 
-      - name: Comment on PR - Success
+      - name: Comment on PR - Config-only validation passed
         if: steps.check_config_only.outputs.is_config_only == 'true'
         uses: actions/github-script@v7
         with:
@@ -161,7 +161,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: '## ✅ Config-Only PR Validated\n\nThis PR contains only configuration files and has passed security validation.\n\n**Next Steps:**\n1. A maintainer will review your configuration\n2. Once approved, the report generation workflow will run\n3. Reports will be posted as PR comments and uploaded to Google Sheets\n\n**What gets validated:**\n- No command injection patterns\n- No environment variable expansion\n- No path traversal attempts\n- No hardcoded secrets\n- Valid YAML structure\n- Required fields present\n\nThank you for your contribution!'
+              body: '## 🔒 Config-Only PR - Security Validation\n\n✅ **Security validation passed!** This PR contains only configuration files and has been validated for security issues.\n\n### ⚠️ Important: CI Check Will Fail\n\nThe CI check **"block-config-only-merge"** will show as ❌ **FAILED** - **this is intentional** to prevent accidental merging of config-only PRs.\n\n### What was validated:\n- ✅ No command injection patterns\n- ✅ No environment variable expansion  \n- ✅ No path traversal attempts\n- ✅ No hardcoded secrets\n- ✅ Valid YAML structure\n- ✅ Required fields present\n\n**Note**: Report generation workflow will run automatically. Check PR comments below for generated reports.'
             });
 
       - name: Comment on PR - Mixed files blocked
