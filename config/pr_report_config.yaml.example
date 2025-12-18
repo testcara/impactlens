@@ -1,20 +1,32 @@
 # Project configuration (non-sensitive settings)
 # These settings can be safely version-controlled
 project:
-  # GitHub/Gitlab repository settings
+  # GitHub/GitLab repository settings
+  # For GitHub (default):
   github_url: "https://github.com"
-  github_repo_owner: "konflux-ci"  # GitHub repository owner/organization
-  github_repo_name: "konflux-ui"  # GitHub repository name
+  github_repo_owner: "konflux-ci"  # Repository owner/organization
+  github_repo_name: "konflux-ui"   # Repository name
+
+  # For GitLab:
+  # gitlab_url: "https://gitlab.com"  # Or your GitLab instance URL
+  # gitlab_repo_owner: "myorg"
+  # gitlab_repo_name: "myproject"
 
   # Google Sheets settings (optional)
   # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
   # If you do not set, would upload to the default google-sheet.
   # IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com
 
-# Output directory for reports (optional, for multi-team isolation)
-# If not specified, defaults to "reports/github"
-# Example for team-specific isolation: "reports/team-a/github"
-# output_dir: "reports/team-a/github"
+# Output directory for reports
+# SIMPLE SCENARIO (single project): Optional, defaults to "reports/github" or "reports/gitlab"
+# COMPLEX SCENARIO (multi-project aggregation): REQUIRED! Must be "reports/{project-name}/github" or "reports/{project-name}/gitlab"
+#   where {project-name} matches the subdirectory name in aggregation config
+#
+# Example for aggregation:
+# output_dir: "reports/internal-services/github"  # For config/my-team/internal-services/pr_report_config.yaml
+# output_dir: "reports/frontend/github"           # For config/my-team/frontend/pr_report_config.yaml
+#
+# output_dir: "reports/github"  # Simple scenario (optional)
 
 phases:
   - name: "No AI Period"

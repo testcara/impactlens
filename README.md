@@ -1,6 +1,6 @@
 # ImpactLens
 
-A data-driven tool that delivers actionable insights for measuring AI coding assistant impact and enabling objective performance reviews through Jira and GitHub metrics analysis.
+A data-driven tool that delivers actionable insights for measuring AI coding assistant impact and enabling objective performance reviews through Jira, GitHub, and GitLab metrics analysis.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ A data-driven tool that delivers actionable insights for measuring AI coding ass
 
 ## Overview
 
-ImpactLens helps engineering leaders and teams measure the real-world impact of AI coding assistants by analyzing development metrics from Jira and GitHub. Get objective insights into productivity changes, team performance, and AI tool effectiveness.
+ImpactLens helps engineering leaders and teams measure the real-world impact of AI coding assistants by analyzing development metrics from Jira, GitHub, and GitLab. Get objective insights into productivity changes, team performance, and AI tool effectiveness.
 
 **Business Value:**
 
@@ -53,8 +53,8 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
        └───────┬────────┘            └────────┬──────────┘
                │                              │
        ┌───────▼────────┐            ┌────────▼──────────┐
-       │  Jira Client   │            │  GitHub Client    │
-       │  (REST/GraphQL)│            │   (GraphQL)       │
+       │  Jira Client   │            │ GitHub/GitLab     │
+       │  (REST/GraphQL)│            │ Client (GraphQL)  │
        └───────┬────────┘            └────────┬──────────┘
                │                              │
                └──────────┬───────────────────┘
@@ -85,7 +85,7 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 **Key Components:**
 
 - **CLI Interface**: Unified command-line interface (`cli.py`)
-- **Clients**: API integrations (Jira REST/GraphQL, GitHub GraphQL, Google Sheets)
+- **Clients**: API integrations (Jira REST/GraphQL, GitHub/GitLab GraphQL, Google Sheets)
 - **Core Logic**: Metrics calculators and report generators
 - **Output**: TSV reports, Google Sheets upload, AI-powered insights
 
@@ -218,7 +218,7 @@ ImpactLens supports two configuration scenarios:
 
 1. Create config directory: `mkdir -p config/my-team`
 2. Copy templates and edit with your team settings:
-   - `project`: Jira project key or GitHub repo owner/name
+   - `project`: Jira project key or GitHub/GitLab repo (owner/name format)
    - `phases`: Analysis periods (e.g., before/after AI adoption)
    - `team_members`: Team scope with optional leave_days and capacity
 3. Submit via PR → CI auto-generates reports
