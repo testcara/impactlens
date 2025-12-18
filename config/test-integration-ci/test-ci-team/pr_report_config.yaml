@@ -27,3 +27,11 @@ output_dir: "reports/test-ci-team1/github"
 
 # Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
 log_level: "WARNING"
+
+# Email anonymous IDs to team members (optional)
+# When enabled, each team member receives ONLY THEIR OWN anonymous ID (e.g., Developer-A3F2)
+# - Privacy protected: Members cannot see others' IDs
+# - Opt-in sharing: They can choose to share their ID with their manager
+# - This allows connecting individual work to anonymized reports while preserving privacy
+email_anonymous_id:
+  enabled: true  # Set to false to disable

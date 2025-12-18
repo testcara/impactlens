@@ -285,6 +285,11 @@ def jira_full(
         "--hide-individual-names",
         help="Anonymize individual names in combined reports and hide sensitive fields",
     ),
+    email_anonymous_id: bool = typer.Option(
+        False,
+        "--email-anonymous-id",
+        help="Email each member ONLY their own anonymous ID (requires --hide-individual-names)",
+    ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
     ),
@@ -346,6 +351,23 @@ def jira_full(
 
     if run_script("impactlens.scripts.generate_jira_report", args, "Jira combine") != 0:
         failed_steps.append("Jira combine")
+
+    # Step 2.5: Email Notifications (opt-in, only with anonymization)
+    if email_anonymous_id:
+        if not hide_individual_names:
+            console.print(
+                "\n[bold yellow]⚠️  --email-anonymous-id requires --hide-individual-names[/bold yellow]"
+            )
+            console.print("[yellow]   Email notifications skipped.[/yellow]")
+        else:
+            console.print("\n[bold]Step 2.5/3:[/bold] Sending email notifications...")
+            from impactlens.utils.smtp_config import send_email_notifications_cli
+
+            send_email_notifications_cli(
+                config_file_path=config_file_path,
+                report_context="Jira Report Generated",
+                console=console,
+            )
 
     # Step 3: Claude Insights (opt-in)
     if with_claude_insights:
@@ -557,6 +579,11 @@ def pr_full(
         "--hide-individual-names",
         help="Anonymize individual names in combined reports and hide sensitive fields",
     ),
+    email_anonymous_id: bool = typer.Option(
+        False,
+        "--email-anonymous-id",
+        help="Email each member ONLY their own anonymous ID (requires --hide-individual-names)",
+    ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
     ),
@@ -620,6 +647,23 @@ def pr_full(
 
     if run_script("impactlens.scripts.generate_pr_report", args, "PR combine") != 0:
         failed_steps.append("PR combine")
+
+    # Step 2.5: Email Notifications (opt-in, only with anonymization)
+    if email_anonymous_id:
+        if not hide_individual_names:
+            console.print(
+                "\n[bold yellow]⚠️  --email-anonymous-id requires --hide-individual-names[/bold yellow]"
+            )
+            console.print("[yellow]   Email notifications skipped.[/yellow]")
+        else:
+            console.print("\n[bold]Step 2.5/3:[/bold] Sending email notifications...")
+            from impactlens.utils.smtp_config import send_email_notifications_cli
+
+            send_email_notifications_cli(
+                config_file_path=config_file_path,
+                report_context="PR Report Generated",
+                console=console,
+            )
 
     # Step 3: Claude Insights (opt-in)
     if with_claude_insights:
@@ -685,6 +729,11 @@ def full_workflow(
         False,
         "--hide-individual-names",
         help="Anonymize individual names in combined reports (Developer-1, Developer-2, etc.)",
+    ),
+    email_anonymous_id: bool = typer.Option(
+        False,
+        "--email-anonymous-id",
+        help="Email each member ONLY their own anonymous ID (requires --hide-individual-names)",
     ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
@@ -900,6 +949,28 @@ def full_workflow(
         console.print(
             "\n[bold yellow]ℹ️  PR Claude insights skipped[/bold yellow] (use --with-claude-insights to enable)"
         )
+
+    # Email Notifications (opt-in, only with anonymization, sent once at the end)
+    if email_anonymous_id:
+        if not hide_individual_names:
+            console.print(
+                "\n[bold yellow]⚠️  --email-anonymous-id requires --hide-individual-names[/bold yellow]"
+            )
+            console.print("[yellow]   Email notifications skipped.[/yellow]")
+        else:
+            console.print("\n" + "=" * 60)
+            console.print("[bold]EMAIL NOTIFICATIONS[/bold]")
+            console.print("=" * 60)
+
+            from impactlens.utils.smtp_config import send_email_notifications_cli
+
+            # Use jira config if available, otherwise pr config
+            config_to_use = jira_config_path or pr_config_path
+            send_email_notifications_cli(
+                config_file_path=config_to_use,
+                report_context="Full Report Generated (Jira + PR)",
+                console=console,
+            )
 
     # Final Summary
     console.print("\n" + "=" * 60)
