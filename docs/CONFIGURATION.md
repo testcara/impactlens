@@ -31,7 +31,7 @@ ImpactLens supports two configuration scenarios based on your team's complexity:
 
 ### Scenario 1: Simple Team (Single Project/Repo)
 
-**Use when:** Your team works on a single Jira project and/or single GitHub repository.
+**Use when:** Your team works on a single Jira project and/or single GitHub/GitLab repository.
 
 **Directory Structure:**
 
@@ -45,7 +45,8 @@ config/my-team/
 
 See [Configuration Reference](#configuration-reference) for all available options. Key settings:
 
-- **project**: Jira project key or GitHub repo owner/name
+- **project**: Jira project key or GitHub/GitLab repo (owner/name format)
+- **github_host** / **gitlab_host**: Optional, defaults to github.com or gitlab.com (for enterprise instances)
 - **phases**: Analysis periods (e.g., before/after AI adoption)
 - **team_members**: Team scope with optional leave_days and capacity
 - **output_dir**: Where to save reports (e.g., `reports/my-team/jira`)
@@ -78,7 +79,7 @@ Reports are posted as PR comments, uploaded to Google Sheets (anonymized), and a
 **Use when:**
 
 - Team members work across multiple Jira projects (e.g., "KONFLUX" + "RHTAP")
-- Team maintains multiple GitHub repos (e.g., frontend + backend)
+- Team maintains multiple GitHub/GitLab repos (e.g., frontend + backend)
 - You need unified team-wide metrics across all projects/repos
 
 **Why 3 report types:**
@@ -104,23 +105,42 @@ config/platform-team/
 
 **Sub-Project Configs:**
 
-Each sub-project uses standard config (same as Scenario 1). Key requirement: **Use same email across projects for proper member aggregation**.
+Each sub-project uses standard config (same as Scenario 1). **Critical requirements for aggregation:**
 
-Example:
+1. **Use same email across projects** for proper member aggregation
+2. **Specify `output_dir` in ALL sub-project configs** with format: `reports/{project-name}/{source}`
+
+⚠️ **Important:** The `{project-name}` must match the subdirectory name used in aggregation config.
+
+**Example:**
 
 ```yaml
-# frontend/jira_report_config.yaml
+# frontend/pr_report_config.yaml
+project: myorg/frontend-app
+output_dir: reports/frontend/github  # Must specify for aggregation!
 team_members:
   - member: charlie
     email: charlie@company.com
-    capacity: 0.5  # Part-time on frontend
+    capacity: 0.5
 
-# backend/jira_report_config.yaml
+# frontend/jira_report_config.yaml
+project: FRONTEND
+output_dir: reports/frontend/jira  # Must specify for aggregation!
 team_members:
   - member: charlie
     email: charlie@company.com  # Same email → will be aggregated
-    capacity: 0.5  # Part-time on backend
+    capacity: 0.5
+
+# backend/pr_report_config.yaml
+project: myorg/backend-service
+output_dir: reports/backend/github  # Must specify for aggregation!
+team_members:
+  - member: charlie
+    email: charlie@company.com  # Same email across all projects
+    capacity: 0.5
 ```
+
+**Why `output_dir` is required:** Aggregation looks for combined reports at `reports/{project-name}/*/combined_*.tsv`. Without explicit `output_dir`, reports may be saved to unexpected locations and aggregation will fail to find them.
 
 **Aggregation Config:**
 
