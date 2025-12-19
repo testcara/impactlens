@@ -140,12 +140,18 @@ def send_email_notifications_cli(
             # Convert dict to list of dicts for notify_team_members
             team_members = list(team_members_dict.values()) if team_members_dict else []
 
-            # Pre-populate anonymizer with all team member names
+            # Pre-populate anonymizer with all team member identifiers
             # This ensures everyone gets a consistent anonymous ID
+            # IMPORTANT: Use normalized email prefix (e.g., "wlin" from "wlin@redhat.com")
+            # to match how reports generate hashes
+            from impactlens.utils.report_utils import normalize_username
+
             for member in team_members:
-                name = member.get("member") or member.get("name")
-                if name:
-                    _global_anonymizer.anonymize(name)
+                email = member.get("email")
+                if email:
+                    # Normalize email to extract username prefix (wlin@redhat.com -> wlin)
+                    normalized_identifier = normalize_username(email)
+                    _global_anonymizer.anonymize(normalized_identifier)
 
             # Test mode: filter to only wlin@redhat.com
             if test_mode:

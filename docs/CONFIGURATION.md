@@ -372,6 +372,49 @@ Avg Time to Merge    | 2.5d    | 2.3d     | 2.7d    | 2.1d   | 3.0d   | 2.5d
 
 ## Privacy & Anonymization
 
+### Email Notifications (Optional)
+
+When enabled, team members receive email notifications informing them of their anonymous identifier (e.g., `Developer-A3F2`) when reports are generated. This allows members to find their personal metrics in anonymized reports while maintaining privacy control.
+
+**Enable in Config:**
+
+```yaml
+# jira_report_config.yaml or pr_report_config.yaml
+email_anonymous_id:
+  enabled: true  # Set to false to disable
+```
+
+**SMTP Configuration (required in .env):**
+
+```bash
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-password  # Gmail App Password (not regular password)
+```
+
+**Gmail App Password Setup:**
+1. Go to Google Account → Security → 2-Step Verification
+2. Scroll to "App passwords" → Generate new app password
+3. Select "Mail" and your device → Copy the 16-character password
+4. Add to `.env` as `SMTP_PASSWORD`
+
+**Workflow Differences:**
+
+- **Single-team mode**: Use `impactlens full --hide-individual-names --email-anonymous-id`
+- **Multi-team mode**: Email notifications handled separately after aggregation to avoid duplicates
+  ```bash
+  # Generate reports (no email flag)
+  impactlens jira full --hide-individual-names
+  impactlens pr full --hide-individual-names
+
+  # Aggregate
+  impactlens aggregate --config aggregation_config.yaml
+
+  # Send emails (deduplicated automatically)
+  python -m impactlens.scripts.send_email_notifications --config-dir config/my-team
+  ```
+
+**Why the difference?** In multi-team scenarios, members may appear in multiple sub-projects. The standalone script automatically deduplicates by email address to ensure each person receives only one notification.
+
 ### CI Auto-Anonymization
 
 **What's anonymized:**
