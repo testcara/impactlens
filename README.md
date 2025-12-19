@@ -24,7 +24,7 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 - **Track AI Productivity Impact**: Compare development efficiency before and after AI tool adoption
 - **Performance Reviews**: Objective metrics for evaluating team and individual performance
 - **Data-Driven Insights**: Track closure time, merge time, throughput, and more to help making informed decisions
-- **Privacy Protection**: Automatic anonymization in CI for sharing reports while protecting individual privacy
+- **Privacy Protection**: Automatic anonymization in CI for sharing reports while protecting individual privacy. Optional email notifications send members their anonymous ID to find personal metrics
 - **CI-Driven Automation**: Submit config via PR → Reports auto-generated and posted as PR comments
 - **Multi-Repo Aggregation**: Combine reports from multiple repositories/projects into unified team-wide views
 - **Easy Sharing**: Auto-upload to Google Sheets for stakeholder visibility
