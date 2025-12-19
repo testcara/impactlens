@@ -113,10 +113,13 @@ impactlens/
 │   │   ├── get_pr_metrics.py
 │   │   ├── generate_*_report.py
 │   │   ├── generate_*_comparison_report.py
+│   │   ├── send_email_notifications.py
 │   │   ├── upload_to_sheets.py
 │   │   └── verify_setup.py
 │   └── utils/                    # Shared utilities
 │       ├── anonymization.py      # Privacy & anonymization utilities
+│       ├── email_notifier.py     # Email notification utilities
+│       ├── smtp_config.py        # SMTP configuration & email helpers
 │       ├── workflow_utils.py     # Config loading & workflow helpers
 │       └── report_utils.py       # Report generation utilities
 ├── .github/workflows/            # GitHub Actions CI
