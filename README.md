@@ -113,10 +113,13 @@ impactlens/
 │   │   ├── get_pr_metrics.py
 │   │   ├── generate_*_report.py
 │   │   ├── generate_*_comparison_report.py
+│   │   ├── send_email_notifications.py
 │   │   ├── upload_to_sheets.py
 │   │   └── verify_setup.py
 │   └── utils/                    # Shared utilities
 │       ├── anonymization.py      # Privacy & anonymization utilities
+│       ├── email_notifier.py     # Email notification utilities
+│       ├── smtp_config.py        # SMTP configuration & email helpers
 │       ├── workflow_utils.py     # Config loading & workflow helpers
 │       └── report_utils.py       # Report generation utilities
 ├── .github/workflows/            # GitHub Actions CI
@@ -180,6 +183,8 @@ impactlens/
 3. **View anonymized reports**: Auto-uploaded to [Default Google Sheet](https://docs.google.com/spreadsheets/d/1AnX3zGoVOv9QXgx3ck2IH8ksRnBoW2V4Uk4o-KoyV0k/edit?gid=0#gid=0) or download from workflow artifacts
 
 > 🔒 **Privacy Protection**: CI automatically anonymizes individual data (names → Developer-A3F2, hides emails/leave_days/capacity). For full data, run locally.
+>
+> 📧 **Optional Email Notifications (CI mode)**: Enable `email_anonymous_id: enabled: true` in your config to send team members their anonymous identifier via email. See [Email Notifications](docs/CONFIGURATION.md#email-notifications) for setup.
 >
 > **For custom Google Sheets**: Grant Editor access to `cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com`
 
