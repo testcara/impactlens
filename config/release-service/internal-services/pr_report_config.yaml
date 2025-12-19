@@ -58,3 +58,8 @@ team_members:
     email: sconroy@redhat.com
 
 output_dir: "reports/internal-services/github"
+
+# Email notification settings (optional)
+# When enabled, team members receive their anonymous ID via email
+email_anonymous_id:
+  enabled: true  # Set to false to disable email notifications
