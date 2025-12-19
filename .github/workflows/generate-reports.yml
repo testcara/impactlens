@@ -410,6 +410,36 @@ jobs:
             echo "⚠️  No combined reports found, skipping prompt generation"
           fi
 
+      - name: Send Email Notifications
+        id: email_notifications
+        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
+        continue-on-error: true  # Don't fail the workflow if email sending fails
+        env:
+          SMTP_USER: ${{ secrets.MAIL_APP_USER }}
+          SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
+          GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          CONFIG_DIR="${{ steps.config.outputs.config_dir }}"
+
+          echo "=========================================="
+          echo "Sending Email Notifications"
+          echo "=========================================="
+          echo "Config directory: $CONFIG_DIR"
+          echo ""
+
+          # Send email notifications to all team members with their anonymous identifiers
+          # This script handles deduplication automatically
+          # SMTP settings (host, port, from_email) are in config YAML files
+          # SMTP credentials (user, password) are from GitHub secrets
+          python -m impactlens.scripts.send_email_notifications \
+            --config-dir "$CONFIG_DIR" || {
+            echo "email_failed=true" >> $GITHUB_OUTPUT
+            exit 1
+          }
+
+          echo "email_failed=false" >> $GITHUB_OUTPUT
+          echo ""
+
       - name: Upload Reports as Artifacts
         if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         uses: actions/upload-artifact@v4
@@ -428,6 +458,7 @@ jobs:
           reports_dir: "reports"
           google_spreadsheet_id: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          email_failed: ${{ steps.email_notifications.outputs.email_failed }}
 
       - name: Comment on PR - Failure
         if: steps.pr_context.outputs.is_pr == 'true' && failure() && steps.check_files.outputs.skip != 'true'

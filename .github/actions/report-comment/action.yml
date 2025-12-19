@@ -13,6 +13,10 @@ inputs:
   github_token:
     description: 'GitHub token for PR comments'
     required: true
+  email_failed:
+    description: 'Whether email notification failed (true/false)'
+    required: false
+    default: 'false'
 
 outputs:
   json_count:
@@ -139,6 +143,7 @@ runs:
           const phaseReportCount = '${{ steps.stats.outputs.phase_report_count }}' || '0';
           const totalTxt = '${{ steps.stats.outputs.total_txt }}' || '0';
           const jsonCount = '${{ steps.stats.outputs.json_count }}' || '0';
+          const emailFailed = '${{ inputs.email_failed }}' === 'true';
 
           const artifactsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
@@ -188,6 +193,13 @@ runs:
             body += `- **Raw Metrics Data**: ${jsonCount} JSON files (raw API responses)\n`;
           }
           body += '\n';
+
+          // Email notification status
+          if (emailFailed) {
+            body += '📧 **Email Notifications**: ⚠️ Failed to send (check SMTP configuration in repository secrets)\n\n';
+          } else {
+            body += '📧 **Email Notifications**: ✅ Sent to team members with anonymous identifiers\n\n';
+          }
 
           // Links
           body += '📥 **Access Reports**: ';

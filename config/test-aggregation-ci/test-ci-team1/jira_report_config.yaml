@@ -34,3 +34,8 @@ output_dir: "reports/test-ci-team1/jira"
 
 # Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
 log_level: "WARNING"
+
+# Email anonymous IDs to team members
+# Each member receives ONLY their own ID (privacy protected)
+email_anonymous_id:
+  enabled: true

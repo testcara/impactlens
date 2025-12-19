@@ -185,49 +185,22 @@ jobs:
             integration-test-pr-cache-${{ hashFiles('config/test-integration-ci/test-ci-team/pr_report_config.yaml') }}-
             integration-test-pr-cache-
 
-      - name: Run integration test - Jira reports
+      - name: Run integration test - Full workflow (Jira + PR + Email)
         if: steps.docs_check.outputs.code_changed == 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
-        run: |
-          if [ -z "$JIRA_API_TOKEN" ]; then
-            echo "⚠️  JIRA_API_TOKEN not set, skipping Jira integration test"
-            exit 0
-          fi
-
-          echo "=========================================="
-          echo "Running Jira Integration Test"
-          echo "=========================================="
-
-          # Add --no-upload only if Google Sheets is not configured
-          UPLOAD_ARGS=""
-          if [ -z "$GOOGLE_CREDENTIALS_FILE" ] || [ -z "$GOOGLE_SPREADSHEET_ID" ]; then
-            UPLOAD_ARGS="--no-upload"
-            echo "⚠️  Google Sheets not configured, skipping upload"
-          else
-            echo "✓ Google Sheets configured, will upload reports"
-          fi
-
-          python -m impactlens.cli jira full \
-            --config config/test-integration-ci/test-ci-team/jira_report_config.yaml \
-            $UPLOAD_ARGS \
-            --hide-individual-names
-
-          echo ""
-          echo "✓ Jira integration test completed"
-          ls -lh reports/test-ci-team/jira/ || echo "No reports generated"
-
-      - name: Run integration test - PR reports
-        if: steps.docs_check.outputs.code_changed == 'true'
-        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
+          SMTP_USER: ${{ secrets.MAIL_APP_USER }}
+          SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
+          GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           echo "=========================================="
-          echo "Running PR Integration Test"
+          echo "Running Full Integration Test"
           echo "=========================================="
+          echo "Testing: Jira + PR + Email Notification (test mode)"
+          echo ""
 
           # Add --no-upload only if Google Sheets is not configured
           UPLOAD_ARGS=""
@@ -238,18 +211,20 @@ jobs:
             echo "✓ Google Sheets configured, will upload reports"
           fi
 
-          echo "Command: python -m impactlens.cli pr full --config config/test-integration-ci/test-ci-team/pr_report_config.yaml $UPLOAD_ARGS --incremental"
-          echo ""
-
-          python -m impactlens.cli pr full \
-            --config config/test-integration-ci/test-ci-team/pr_report_config.yaml \
+          # Run full workflow with test mode (emails only to wlin@redhat.com)
+          python -m impactlens.cli full \
+            --config config/test-integration-ci/test-ci-team \
             $UPLOAD_ARGS \
             --incremental \
-            --hide-individual-names
+            --hide-individual-names \
+            --email-anonymous-id \
+            --test-mode
 
           echo ""
-          echo "✓ PR integration test completed"
-          ls -lh reports/test-ci-team/github/ || echo "No reports generated"
+          echo "✓ Full integration test completed (Jira + PR + Email)"
+          echo "Reports:"
+          ls -lh reports/test-ci-team/jira/ 2>/dev/null || echo "  No Jira reports"
+          ls -lh reports/test-ci-team/github/ 2>/dev/null || echo "  No PR reports"
 
       - name: Run integration test - Multi-team aggregation (Team 1)
         if: steps.docs_check.outputs.code_changed == 'true'
@@ -373,6 +348,27 @@ jobs:
           echo "✓ Aggregation integration test completed"
           echo "Generated aggregated reports:"
           ls -lh reports/test-ci-aggregated/ || echo "No aggregated reports generated"
+
+      - name: Run integration test - Multi-team email notifications
+        if: steps.docs_check.outputs.code_changed == 'true'
+        env:
+          SMTP_USER: ${{ secrets.MAIL_APP_USER }}
+          SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
+        run: |
+          echo "=========================================="
+          echo "Scenario 2: Multi-Team Aggregation - Email Notifications"
+          echo "=========================================="
+          echo "Testing email deduplication across multiple teams"
+          echo ""
+
+          # Send emails using the aggregation config (auto-deduplicates by email)
+          python -m impactlens.scripts.send_email_notifications \
+            --config-dir config/test-aggregation-ci \
+            --test-mode
+
+          echo ""
+          echo "✓ Multi-team email notification test completed"
+          echo "  (Emails deduplicated across all teams and sent once per person)"
 
       - name: Upload test reports as artifacts
         if: steps.docs_check.outputs.code_changed == 'true' && always()
