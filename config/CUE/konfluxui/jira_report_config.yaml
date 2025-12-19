@@ -69,3 +69,8 @@ team_members:
     capacity: 1
 
 output_dir: "reports/konfluxui/jira"
+
+# Email notification settings (optional)
+# When enabled, team members receive their anonymous ID via email
+email_anonymous_id:
+  enabled: true  # Set to false to disable email notifications

@@ -32,3 +32,8 @@ output_dir: "reports/securesign/jira"
 
 # Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
 log_level: "WARNING"
+
+# Email notification settings (optional)
+# When enabled, team members receive their anonymous ID via email
+email_anonymous_id:
+  enabled: true  # Set to false to disable email notifications
