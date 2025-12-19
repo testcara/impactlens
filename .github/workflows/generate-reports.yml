@@ -207,6 +207,8 @@ jobs:
           echo "=========================================="
 
       - name: Generate Individual Team Reports (for Aggregation)
+        # NOTE: For aggregation mode, we do NOT send emails here to avoid duplicates
+        # Emails will be sent once after aggregation using send_email_notifications.py
         if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation == 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
@@ -339,41 +341,64 @@ jobs:
           echo "Generated aggregated reports:"
           ls -lh reports/**/aggregated_*.tsv 2>/dev/null || echo "No aggregated reports found"
 
-      - name: Generate Jira Report
-        if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation != 'true' && (github.event.inputs.report_type == 'jira' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
+      - name: Generate Single Team Reports
+        # NOTE: For single team mode, we use --email-anonymous-id flag
+        # This sends emails immediately after report generation (only once)
+        if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation != 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
-        run: |
-          CONFIG_PATH="${{ steps.config.outputs.config_dir }}/jira_report_config.yaml"
-          if [ -f "$CONFIG_PATH" ]; then
-            echo "Generating Jira report with config: $CONFIG_PATH"
-            echo "Running command: python -m impactlens.cli jira full --config \"$CONFIG_PATH\" --hide-individual-names"
-            python -m impactlens.cli jira full \
-              --config "$CONFIG_PATH" \
-              --hide-individual-names
-          else
-            echo "Jira config not found at $CONFIG_PATH, skipping"
-          fi
-
-      - name: Generate PR Report
-        if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation != 'true' && (github.event.inputs.report_type == 'pr' || github.event.inputs.report_type == 'both' || github.event.inputs.report_type == '')
-        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+          SMTP_USER: ${{ secrets.MAIL_APP_USER }}
+          SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
+          GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          CONFIG_PATH="${{ steps.config.outputs.config_dir }}/pr_report_config.yaml"
-          if [ -f "$CONFIG_PATH" ]; then
-            echo "Generating PR report with config: $CONFIG_PATH"
-            echo "Running command: python -m impactlens.cli pr full --config \"$CONFIG_PATH\" --incremental --hide-individual-names"
-            python -m impactlens.cli pr full \
-              --config "$CONFIG_PATH" \
-              --incremental \
-              --hide-individual-names
-          else
-            echo "PR config not found at $CONFIG_PATH, skipping"
+          CONFIG_DIR="${{ steps.config.outputs.config_dir }}"
+          REPORT_TYPE="${{ github.event.inputs.report_type }}"
+
+          echo "=========================================="
+          echo "Generating Single Team Reports"
+          echo "=========================================="
+          echo "Config directory: $CONFIG_DIR"
+          echo "Report type: ${REPORT_TYPE:-both}"
+          echo ""
+
+          # Use impactlens full command for single team (generates Jira + PR + sends emails once)
+          if [ -z "$REPORT_TYPE" ] || [ "$REPORT_TYPE" = "both" ]; then
+            echo "Running: impactlens full --config \"$CONFIG_DIR\" --hide-individual-names --email-anonymous-id"
+            python -m impactlens.cli full \
+              --config "$CONFIG_DIR" \
+              --hide-individual-names \
+              --email-anonymous-id \
+              --incremental
+          elif [ "$REPORT_TYPE" = "jira" ]; then
+            CONFIG_PATH="$CONFIG_DIR/jira_report_config.yaml"
+            if [ -f "$CONFIG_PATH" ]; then
+              echo "Running: impactlens jira full --config \"$CONFIG_PATH\" --hide-individual-names --email-anonymous-id"
+              python -m impactlens.cli jira full \
+                --config "$CONFIG_PATH" \
+                --hide-individual-names \
+                --email-anonymous-id
+            else
+              echo "Jira config not found at $CONFIG_PATH, skipping"
+            fi
+          elif [ "$REPORT_TYPE" = "pr" ]; then
+            CONFIG_PATH="$CONFIG_DIR/pr_report_config.yaml"
+            if [ -f "$CONFIG_PATH" ]; then
+              echo "Running: impactlens pr full --config \"$CONFIG_PATH\" --incremental --hide-individual-names --email-anonymous-id"
+              python -m impactlens.cli pr full \
+                --config "$CONFIG_PATH" \
+                --incremental \
+                --hide-individual-names \
+                --email-anonymous-id
+            else
+              echo "PR config not found at $CONFIG_PATH, skipping"
+            fi
           fi
+
+          echo ""
+          echo "✓ Single team report generation completed"
 
       - name: Generate Analysis Prompts
         if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
@@ -410,9 +435,9 @@ jobs:
             echo "⚠️  No combined reports found, skipping prompt generation"
           fi
 
-      - name: Send Email Notifications
+      - name: Send Email Notifications (Aggregation Mode Only)
         id: email_notifications
-        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
+        if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation == 'true'
         continue-on-error: true  # Don't fail the workflow if email sending fails
         env:
           SMTP_USER: ${{ secrets.MAIL_APP_USER }}
@@ -422,13 +447,14 @@ jobs:
           CONFIG_DIR="${{ steps.config.outputs.config_dir }}"
 
           echo "=========================================="
-          echo "Sending Email Notifications"
+          echo "Sending Email Notifications (Aggregation Mode)"
           echo "=========================================="
           echo "Config directory: $CONFIG_DIR"
+          echo "Using send_email_notifications.py for multi-team deduplication"
           echo ""
 
-          # Send email notifications to all team members with their anonymous identifiers
-          # This script handles deduplication automatically
+          # For aggregation mode, use standalone script to send emails
+          # This handles deduplication across multiple teams automatically
           # SMTP settings (host, port, from_email) are in config YAML files
           # SMTP credentials (user, password) are from GitHub secrets
           python -m impactlens.scripts.send_email_notifications \
@@ -439,6 +465,7 @@ jobs:
 
           echo "email_failed=false" >> $GITHUB_OUTPUT
           echo ""
+          echo "✓ Email notifications sent (deduplicated across all teams)"
 
       - name: Upload Reports as Artifacts
         if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
@@ -458,7 +485,7 @@ jobs:
           reports_dir: "reports"
           google_spreadsheet_id: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          email_failed: ${{ steps.email_notifications.outputs.email_failed }}
+          email_failed: ${{ steps.email_notifications.outputs.email_failed || 'false' }}
 
       - name: Comment on PR - Failure
         if: steps.pr_context.outputs.is_pr == 'true' && failure() && steps.check_files.outputs.skip != 'true'
