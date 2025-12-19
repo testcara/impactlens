@@ -194,6 +194,7 @@ jobs:
           GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
           SMTP_USER: ${{ secrets.MAIL_APP_USER }}
           SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
+          GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           echo "=========================================="
           echo "Running Full Integration Test"
