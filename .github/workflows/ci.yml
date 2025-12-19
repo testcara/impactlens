@@ -348,6 +348,27 @@ jobs:
           echo "Generated aggregated reports:"
           ls -lh reports/test-ci-aggregated/ || echo "No aggregated reports generated"
 
+      - name: Run integration test - Multi-team email notifications
+        if: steps.docs_check.outputs.code_changed == 'true'
+        env:
+          SMTP_USER: ${{ secrets.MAIL_APP_USER }}
+          SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
+        run: |
+          echo "=========================================="
+          echo "Scenario 2: Multi-Team Aggregation - Email Notifications"
+          echo "=========================================="
+          echo "Testing email deduplication across multiple teams"
+          echo ""
+
+          # Send emails using the aggregation config (auto-deduplicates by email)
+          python -m impactlens.scripts.send_email_notifications \
+            --config-dir config/test-aggregation-ci \
+            --test-mode
+
+          echo ""
+          echo "✓ Multi-team email notification test completed"
+          echo "  (Emails deduplicated across all teams and sent once per person)"
+
       - name: Upload test reports as artifacts
         if: steps.docs_check.outputs.code_changed == 'true' && always()
         uses: actions/upload-artifact@v4
