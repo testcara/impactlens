@@ -184,6 +184,8 @@ impactlens/
 
 > 🔒 **Privacy Protection**: CI automatically anonymizes individual data (names → Developer-A3F2, hides emails/leave_days/capacity). For full data, run locally.
 >
+> 📧 **Optional Email Notifications (CI mode)**: Enable `email_anonymous_id: enabled: true` in your config to send team members their anonymous identifier via email. See [Email Notifications](docs/CONFIGURATION.md#email-notifications) for setup.
+>
 > **For custom Google Sheets**: Grant Editor access to `cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com`
 
 ---
