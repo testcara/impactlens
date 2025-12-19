@@ -19,6 +19,7 @@ from rich.table import Table
 from impactlens.utils.logger import set_log_level
 from impactlens.core.report_aggregator import ReportAggregator
 from impactlens.utils.workflow_utils import upload_to_google_sheets
+from impactlens.utils.smtp_config import send_email_notifications_cli
 
 # Main app
 app = typer.Typer(
@@ -290,6 +291,11 @@ def jira_full(
         "--email-anonymous-id",
         help="Email each member ONLY their own anonymous ID (requires --hide-individual-names)",
     ),
+    test_mode: bool = typer.Option(
+        False,
+        "--test-mode",
+        help="Test mode: only send emails to wlin@redhat.com (for testing without spamming team)",
+    ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
     ),
@@ -361,12 +367,12 @@ def jira_full(
             console.print("[yellow]   Email notifications skipped.[/yellow]")
         else:
             console.print("\n[bold]Step 2.5/3:[/bold] Sending email notifications...")
-            from impactlens.utils.smtp_config import send_email_notifications_cli
 
             send_email_notifications_cli(
                 config_file_path=config_file_path,
                 report_context="Jira Report Generated",
                 console=console,
+                test_mode=test_mode,
             )
 
     # Step 3: Claude Insights (opt-in)
@@ -584,6 +590,11 @@ def pr_full(
         "--email-anonymous-id",
         help="Email each member ONLY their own anonymous ID (requires --hide-individual-names)",
     ),
+    test_mode: bool = typer.Option(
+        False,
+        "--test-mode",
+        help="Test mode: only send emails to wlin@redhat.com (for testing without spamming team)",
+    ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
     ),
@@ -657,12 +668,12 @@ def pr_full(
             console.print("[yellow]   Email notifications skipped.[/yellow]")
         else:
             console.print("\n[bold]Step 2.5/3:[/bold] Sending email notifications...")
-            from impactlens.utils.smtp_config import send_email_notifications_cli
 
             send_email_notifications_cli(
                 config_file_path=config_file_path,
                 report_context="PR Report Generated",
                 console=console,
+                test_mode=test_mode,
             )
 
     # Step 3: Claude Insights (opt-in)
@@ -734,6 +745,11 @@ def full_workflow(
         False,
         "--email-anonymous-id",
         help="Email each member ONLY their own anonymous ID (requires --hide-individual-names)",
+    ),
+    test_mode: bool = typer.Option(
+        False,
+        "--test-mode",
+        help="Test mode: only send emails to wlin@redhat.com (for testing without spamming team)",
     ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
@@ -962,14 +978,13 @@ def full_workflow(
             console.print("[bold]EMAIL NOTIFICATIONS[/bold]")
             console.print("=" * 60)
 
-            from impactlens.utils.smtp_config import send_email_notifications_cli
-
             # Use jira config if available, otherwise pr config
             config_to_use = jira_config_path or pr_config_path
             send_email_notifications_cli(
                 config_file_path=config_to_use,
                 report_context="Full Report Generated (Jira + PR)",
                 console=console,
+                test_mode=test_mode,
             )
 
     # Final Summary

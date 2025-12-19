@@ -41,6 +41,7 @@ class EmailNotifier:
         # Use centralized config if no explicit values provided
         if all(v is None for v in [smtp_host, smtp_port, smtp_user, smtp_password, from_email]):
             from impactlens.utils.smtp_config import get_smtp_config
+
             config = get_smtp_config()
             self.smtp_host = config["smtp_host"]
             self.smtp_port = config["smtp_port"]
@@ -215,7 +216,9 @@ class EmailNotifier:
         results = {}
 
         print(f"\n{'='*60}")
-        print(f"Sending anonymized identifier notifications to {len(email_mapping)} team members...")
+        print(
+            f"Sending anonymized identifier notifications to {len(email_mapping)} team members..."
+        )
         print(f"{'='*60}\n")
 
         for member_name, email in email_mapping.items():

@@ -34,9 +34,9 @@ def collect_team_members_from_config(config_path: Path) -> List[Dict]:
         return []
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             config = yaml.safe_load(f)
-        return config.get('team_members', [])
+        return config.get("team_members", [])
     except Exception as e:
         print(f"Warning: Failed to load config {config_path}: {e}")
         return []
@@ -56,14 +56,14 @@ def load_email_config(config_path: Path) -> Dict:
         return None
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             config = yaml.safe_load(f)
         # Support multiple config names for backward compatibility
         email_config = (
-            config.get('email_anonymous_id') or
-            config.get('share_anonymous_id') or
-            config.get('email_notifications_for_identifier') or
-            config.get('email_notifications', {})
+            config.get("email_anonymous_id")
+            or config.get("share_anonymous_id")
+            or config.get("email_notifications_for_identifier")
+            or config.get("email_notifications", {})
         )
         return email_config
     except Exception as e:
@@ -80,16 +80,13 @@ def _add_members_to_dict(members: List[Dict], all_members_by_email: Dict[str, Di
         all_members_by_email: Dict to add members to (modified in place)
     """
     for member in members:
-        email = member.get('email')
-        name = member.get('member') or member.get('name')
+        email = member.get("email")
+        name = member.get("member") or member.get("name")
 
-        if email and name and '@' in email:
+        if email and name and "@" in email:
             # Deduplicate by email
             if email not in all_members_by_email:
-                all_members_by_email[email] = {
-                    'member': name,
-                    'email': email
-                }
+                all_members_by_email[email] = {"member": name, "email": email}
 
 
 def collect_all_team_members(config_dir: Path) -> tuple[List[Dict], Dict]:
@@ -117,17 +114,17 @@ def collect_all_team_members(config_dir: Path) -> tuple[List[Dict], Dict]:
         print(f"Aggregation mode detected: {aggregation_config}")
 
         try:
-            with open(aggregation_config, 'r') as f:
+            with open(aggregation_config, "r") as f:
                 agg_config = yaml.safe_load(f)
 
-            projects = agg_config.get('aggregation', {}).get('projects', [])
+            projects = agg_config.get("aggregation", {}).get("projects", [])
             print(f"Found {len(projects)} projects: {', '.join(projects)}")
 
             for project in projects:
                 project_dir = config_dir / project
 
                 # Try both jira and pr config files
-                for config_name in ['jira_report_config.yaml', 'pr_report_config.yaml']:
+                for config_name in ["jira_report_config.yaml", "pr_report_config.yaml"]:
                     config_path = project_dir / config_name
                     members = collect_team_members_from_config(config_path)
 
@@ -145,7 +142,7 @@ def collect_all_team_members(config_dir: Path) -> tuple[List[Dict], Dict]:
         # Single team mode: load from config_dir directly
         print(f"Single team mode: {config_dir}")
 
-        for config_name in ['jira_report_config.yaml', 'pr_report_config.yaml']:
+        for config_name in ["jira_report_config.yaml", "pr_report_config.yaml"]:
             config_path = config_dir / config_name
             members = collect_team_members_from_config(config_path)
 
@@ -164,19 +161,19 @@ def main():
         description="Send email notifications to team members about their anonymous identifiers"
     )
     parser.add_argument(
-        '--config-dir',
+        "--config-dir",
         required=True,
-        help='Config directory (e.g., config/team-a or config/aggregation)'
+        help="Config directory (e.g., config/team-a or config/aggregation)",
     )
     parser.add_argument(
-        '--test-mode',
-        action='store_true',
-        help='Test mode: only send emails to wlin@redhat.com (for testing without spamming team)'
+        "--test-mode",
+        action="store_true",
+        help="Test mode: only send emails to wlin@redhat.com (for testing without spamming team)",
     )
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='[Development only] Print emails without sending them'
+        "--dry-run",
+        action="store_true",
+        help="[Development only] Print emails without sending them",
     )
 
     args = parser.parse_args()
@@ -203,7 +200,7 @@ def main():
     print(f"Found {len(team_members)} unique team members\n")
 
     # Check if email notifications are enabled
-    if not email_config.get('enabled', True):
+    if not email_config.get("enabled", True):
         print("ℹ️  Email notifications are disabled in config (email_notifications.enabled = false)")
         print("=" * 60)
         sys.exit(0)
@@ -211,8 +208,10 @@ def main():
     # Test mode: filter to only wlin@redhat.com
     if args.test_mode:
         original_count = len(team_members)
-        team_members = [m for m in team_members if m.get('email') == 'wlin@redhat.com']
-        print(f"🧪 TEST MODE: Filtered {original_count} members to {len(team_members)} (only wlin@redhat.com)")
+        team_members = [m for m in team_members if m.get("email") == "wlin@redhat.com"]
+        print(
+            f"🧪 TEST MODE: Filtered {original_count} members to {len(team_members)} (only wlin@redhat.com)"
+        )
         print("   This prevents spamming the team during testing\n")
 
         if not team_members:
@@ -226,7 +225,7 @@ def main():
     print("Generating anonymous identifiers...")
     anon_count = 0
     for member in team_members:
-        name = member.get('member') or member.get('name')
+        name = member.get("member") or member.get("name")
         if name:
             _global_anonymizer.anonymize(name)
             anon_count += 1
@@ -275,7 +274,7 @@ def main():
     # Send notifications
     results = notifier.send_batch_notifications(
         name_mapping=_global_anonymizer.get_mapping(),
-        email_mapping={m.get('member') or m.get('name'): m.get('email') for m in team_members},
+        email_mapping={m.get("member") or m.get("name"): m.get("email") for m in team_members},
         pr_url=pr_url,
         report_context="ImpactLens Reports Generated",
         dry_run=args.dry_run,

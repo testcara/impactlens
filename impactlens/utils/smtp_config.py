@@ -6,8 +6,11 @@ to avoid code duplication across the codebase.
 """
 
 import os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 from pathlib import Path
+
+if TYPE_CHECKING:
+    from impactlens.utils.email_notifier import EmailNotifier
 
 
 def get_smtp_config() -> Dict[str, Any]:
@@ -34,8 +37,8 @@ def get_smtp_config() -> Dict[str, Any]:
 
     # From email with display name
     from_email_env = os.getenv("FROM_EMAIL")
-    from_email = from_email_env if from_email_env else (
-        f"ImpactLens <{smtp_user}>" if smtp_user else None
+    from_email = (
+        from_email_env if from_email_env else (f"ImpactLens <{smtp_user}>" if smtp_user else None)
     )
 
     return {
@@ -47,9 +50,7 @@ def get_smtp_config() -> Dict[str, Any]:
     }
 
 
-def create_email_notifier(
-    smtp_config: Optional[Dict[str, Any]] = None
-) -> "EmailNotifier":
+def create_email_notifier(smtp_config: Optional[Dict[str, Any]] = None) -> "EmailNotifier":
     """
     Create an EmailNotifier instance with SMTP configuration.
 
@@ -107,6 +108,7 @@ def send_email_notifications_cli(
     config_file_path: Optional[Path],
     report_context: str,
     console: Optional[Any] = None,
+    test_mode: bool = False,
 ) -> None:
     """
     Send email notifications to team members from CLI workflow.
@@ -119,6 +121,7 @@ def send_email_notifications_cli(
                           Can be Path object or string
         report_context: Context message for the email (e.g., "Jira Report Generated")
         console: Optional Rich console for formatted output
+        test_mode: If True, only send emails to wlin@redhat.com (for testing)
     """
     try:
         from impactlens.utils.email_notifier import notify_team_members
@@ -136,6 +139,28 @@ def send_email_notifications_cli(
             team_members_dict = load_team_members_from_yaml(config_file_path, detailed=True)
             # Convert dict to list of dicts for notify_team_members
             team_members = list(team_members_dict.values()) if team_members_dict else []
+
+            # Pre-populate anonymizer with all team member names
+            # This ensures everyone gets a consistent anonymous ID
+            for member in team_members:
+                name = member.get("member") or member.get("name")
+                if name:
+                    _global_anonymizer.anonymize(name)
+
+            # Test mode: filter to only wlin@redhat.com
+            if test_mode:
+                original_count = len(team_members)
+                team_members = [m for m in team_members if m.get("email") == "wlin@redhat.com"]
+                if console and original_count > 0:
+                    console.print(
+                        f"[yellow]🧪 TEST MODE: Filtered {original_count} members to {len(team_members)} "
+                        f"(only wlin@redhat.com)[/yellow]"
+                    )
+                if not team_members and console:
+                    console.print(
+                        "[yellow]⚠️  No test email (wlin@redhat.com) found in team members[/yellow]"
+                    )
+                    return
 
             # Get PR URL from environment (if in CI)
             pr_url = os.getenv("GITHUB_PR_URL")
@@ -162,7 +187,9 @@ def send_email_notifications_cli(
                 )
         else:
             if console:
-                console.print("[yellow]⚠️  No config file specified - cannot load team members[/yellow]")
+                console.print(
+                    "[yellow]⚠️  No config file specified - cannot load team members[/yellow]"
+                )
 
     except Exception as e:
         if console:
