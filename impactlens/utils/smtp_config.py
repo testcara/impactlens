@@ -135,6 +135,24 @@ def send_email_notifications_cli(
             if isinstance(config_file_path, str):
                 config_file_path = Path(config_file_path)
 
+            # Load config to check for email_anonymous_id.save_file setting
+            import yaml
+            config_save_file = None
+            try:
+                with open(config_file_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                    email_config = config.get("email_anonymous_id", {})
+                    if isinstance(email_config, dict) and email_config.get("save_file"):
+                        # Generate default save path based on output_dir
+                        output_dir = config.get("output_dir", "reports")
+                        # Get parent directory of output_dir for emails
+                        from pathlib import Path
+                        parent_dir = str(Path(output_dir).parent)
+                        config_save_file = f"{parent_dir}/emails"
+            except Exception as e:
+                if console:
+                    console.print(f"[yellow]Warning: Could not read save_file from config: {e}[/yellow]")
+
             # Load detailed team member info (returns dict)
             members_dict = load_members_from_yaml(config_file_path)
             # Convert dict to list of dicts for notify_members
@@ -157,11 +175,14 @@ def send_email_notifications_cli(
             pr_url = os.getenv("GITHUB_PR_URL")
 
             # Determine mode: save-to-file vs send
-            if mail_save_file:
+            # Priority: CLI argument > config file setting
+            effective_save_file = mail_save_file or config_save_file
+            if effective_save_file:
                 # Save to file mode
                 if console:
+                    source = "CLI argument" if mail_save_file else "config file"
                     console.print(
-                        f"[yellow]📁 SAVE MODE: Emails will be saved to {mail_save_file}/[/yellow]"
+                        f"[yellow]📁 SAVE MODE ({source}): Emails will be saved to {effective_save_file}/[/yellow]"
                     )
                 dry_run = False
             else:
@@ -179,7 +200,7 @@ def send_email_notifications_cli(
                 pr_url=pr_url,
                 report_context=report_context,
                 dry_run=dry_run,
-                save_to_file=mail_save_file,
+                save_to_file=effective_save_file,
             )
 
             success_count = sum(1 for v in results.values() if v)
