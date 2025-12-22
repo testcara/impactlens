@@ -60,13 +60,13 @@ class ConfigValidator:
         'jira_report_config.yaml': {
             'project': ['jira_url', 'jira_project_key'],
             'phases': True,
-            'team_members': True,
+            'members': True,
             # output_dir is optional - defaults to "reports"
         },
         'pr_report_config.yaml': {
             'project': ['github_repo_owner', 'github_repo_name'],
             'phases': True,
-            'team_members': True,
+            'members': True,
             # output_dir is optional - defaults to "reports"
         },
         'aggregation_config.yaml': {
@@ -97,7 +97,7 @@ class ConfigValidator:
         'github_repo_name',
         'jira_project_key',
         'name',
-        'member',
+        'github_username',
         'email',
         'description',
         'leave_days',
@@ -248,17 +248,17 @@ class ConfigValidator:
                                 f"must be YYYY-MM-DD"
                             )
 
-        # Validate team_members
-        if 'team_members' in config and isinstance(config['team_members'], list):
-            for i, member in enumerate(config['team_members']):
+        # Validate members
+        if 'members' in config and isinstance(config['members'], list):
+            for i, member in enumerate(config['members']):
                 if not isinstance(member, dict):
-                    self.errors.append(f"team_members[{i}] must be an object")
+                    self.errors.append(f"members[{i}] must be an object")
                     continue
 
-                # Check for required fields
-                if 'member' not in member and 'name' not in member:
+                # Check for required email field
+                if 'email' not in member:
                     self.errors.append(
-                        f"team_members[{i}] must have 'member' or 'name' field"
+                        f"members[{i}] must have 'email' field"
                     )
 
                 # Validate email format if present
@@ -266,7 +266,7 @@ class ConfigValidator:
                     email = member['email']
                     if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
                         self.warnings.append(
-                            f"team_members[{i}].email looks invalid: {email}"
+                            f"members[{i}].email looks invalid: {email}"
                         )
 
     def _check_for_secrets(self, obj: Any, path: List[str]):

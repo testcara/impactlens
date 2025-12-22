@@ -240,7 +240,6 @@ Examples:
 
     phases, default_assignee, reports_dir, project_settings = result
     config_file = custom_config_file if custom_config_file else default_config_file
-    print(f"-----cara---- {reports_dir}")
     # Handle --combine-only flag
     if args.combine_only:
         print_header("Combining Existing Jira Reports")
