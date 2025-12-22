@@ -175,6 +175,21 @@ jobs:
             echo "⚠️  GOOGLE_CREDENTIALS_BASE64 not set, uploads will be skipped"
           fi
 
+      - name: Clear Google Sheets before tests
+        if: steps.docs_check.outputs.code_changed == 'true'
+        env:
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
+        run: |
+          if [ -n "$GOOGLE_CREDENTIALS_FILE" ] && [ -n "$GOOGLE_SPREADSHEET_ID" ]; then
+            echo "Clearing Google Sheets before integration tests..."
+            python -m impactlens.cli clear-sheets \
+              --spreadsheet-id "$GOOGLE_SPREADSHEET_ID" \
+              --yes
+            echo "✓ Google Sheets cleared"
+          else
+            echo "⚠️  Skipping clear-sheets - Google Sheets not configured"
+          fi
+
       - name: Restore GitHub PR cache
         if: steps.docs_check.outputs.code_changed == 'true'
         uses: actions/cache@v4

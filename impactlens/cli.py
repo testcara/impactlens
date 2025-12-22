@@ -1042,6 +1042,45 @@ def verify():
 
 
 @app.command()
+def clear_sheets(
+    spreadsheet_id: Optional[str] = typer.Option(
+        None,
+        "--spreadsheet-id",
+        help="Google Spreadsheet ID (or use GOOGLE_SPREADSHEET_ID env var)",
+    ),
+    clear_first: bool = typer.Option(
+        False, "--clear-first-sheet", help="Also clear content from the first sheet"
+    ),
+    rename_first: Optional[str] = typer.Option(
+        None, "--rename-first-sheet", help="Rename the first sheet (e.g., 'Main')"
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+):
+    """Clear all sheets from Google Spreadsheet (DESTRUCTIVE!)."""
+    console.print(
+        Panel.fit(
+            "[bold red]Google Sheets Cleaner[/bold red]\n"
+            "[dim]Delete all sheets except the first one[/dim]",
+            border_style="red",
+        )
+    )
+
+    args = []
+    if spreadsheet_id:
+        args.extend(["--spreadsheet-id", spreadsheet_id])
+    if clear_first:
+        args.append("--clear-first-sheet")
+    if rename_first:
+        args.extend(["--rename-first-sheet", rename_first])
+    if yes:
+        args.append("--yes")
+
+    script = "impactlens.scripts.clear_google_sheets"
+    return_code = run_script(script, args, "Clearing Google Sheets")
+    sys.exit(return_code)
+
+
+@app.command()
 def version():
     """Show version information."""
     console.print(
@@ -1085,6 +1124,7 @@ def main(ctx: typer.Context):
         table.add_row("pr", "GitHub PR analysis (team, member, members, all, combine, full)")
         table.add_row("full", "Complete workflow: Jira + PR")
         table.add_row("aggregate (agg)", "Aggregate multiple project reports into unified reports")
+        table.add_row("clear-sheets", "Clear all sheets from Google Spreadsheet (DESTRUCTIVE!)")
         table.add_row("verify", "Verify setup and configuration")
         table.add_row("version", "Show version information")
 
