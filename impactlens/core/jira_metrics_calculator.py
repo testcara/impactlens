@@ -13,7 +13,7 @@ from pathlib import Path
 
 from impactlens.utils.logger import logger
 from impactlens.utils.report_utils import normalize_username
-from impactlens.utils.workflow_utils import load_team_members_from_yaml
+from impactlens.utils.workflow_utils import load_members_emails
 
 
 class JiraMetricsCalculator:
@@ -222,7 +222,7 @@ class JiraMetricsCalculator:
         self,
         project_key=None,
         assignee=None,
-        team_members_file=None,
+        members_file=None,
         start_date=None,
         end_date=None,
         status=None,
@@ -233,37 +233,36 @@ class JiraMetricsCalculator:
         Args:
             project_key: Jira project key
             assignee: Single assignee to filter by
-            team_members_file: Path to team members config file
+            members_file: Path to team members config file
             start_date: Start date (YYYY-MM-DD)
             end_date: End date (YYYY-MM-DD)
             status: Issue status
 
         Returns:
-            Tuple of (jql_query, team_members_list)
+            Tuple of (jql_query, members_list)
         """
         project_key = project_key or self.project_key
         jql_parts = [f'project = "{project_key}"']
 
-        team_members = []
+        members = []
 
         # Add assignee filter
         if assignee:
             jql_parts.append(f'assignee = "{assignee}"')
             logger.debug(f"Filtering by assignee: {assignee}")
-        elif team_members_file:
+        elif members_file:
             # Load team members from config file using YAML parser
             try:
-                team_members = load_team_members_from_yaml(Path(team_members_file))
+                # Just get emails list
+                members = load_members_emails(Path(members_file))
 
-                if team_members:
+                if members:
                     assignee_conditions = " OR ".join(
-                        [f'assignee = "{member}"' for member in team_members]
+                        [f'assignee = "{member}"' for member in members]
                     )
                     jql_parts.append(f"({assignee_conditions})")
-                    logger.info(
-                        f"Limiting to team members from config: {len(team_members)} members"
-                    )
-                    logger.debug(f"Team members: {', '.join(team_members)}")
+                    logger.info(f"Limiting to team members from config: {len(members)} members")
+                    logger.debug(f"Team members: {', '.join(members)}")
                 else:
                     logger.warning("No team members found in config file")
             except Exception as e:
@@ -285,7 +284,7 @@ class JiraMetricsCalculator:
             if status:
                 jql_parts.append(f'status = "{status}"')
 
-        return " AND ".join(jql_parts), team_members
+        return " AND ".join(jql_parts), members
 
     def fetch_all_issues(self, jql_query, batch_size=50):
         """

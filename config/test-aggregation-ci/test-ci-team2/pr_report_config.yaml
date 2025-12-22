@@ -15,9 +15,9 @@ phases:
 
 default_author: "" # "" represent team
 
-team_members:
-  - name: Katka92
-    email: kkanova@redhat.com
+members:
+  - email: kkanova@redhat.com
+    github_username: Katka92
 
 # Use test output directory to avoid polluting main reports
 output_dir: "reports/test-ci-team2/github"

@@ -291,10 +291,10 @@ def jira_full(
         "--email-anonymous-id",
         help="Email each member ONLY their own anonymous ID (requires --hide-individual-names)",
     ),
-    test_mode: bool = typer.Option(
-        False,
-        "--test-mode",
-        help="Test mode: only send emails to wlin@redhat.com (for testing without spamming team)",
+    mail_save_file: Optional[str] = typer.Option(
+        None,
+        "--mail-save-file",
+        help="Save emails to files instead of sending them (specify directory path)",
     ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
@@ -372,7 +372,7 @@ def jira_full(
                 config_file_path=config_file_path,
                 report_context="Jira Report Generated",
                 console=console,
-                test_mode=test_mode,
+                mail_save_file=mail_save_file,
             )
 
     # Step 3: Claude Insights (opt-in)
@@ -590,10 +590,10 @@ def pr_full(
         "--email-anonymous-id",
         help="Email each member ONLY their own anonymous ID (requires --hide-individual-names)",
     ),
-    test_mode: bool = typer.Option(
-        False,
-        "--test-mode",
-        help="Test mode: only send emails to wlin@redhat.com (for testing without spamming team)",
+    mail_save_file: Optional[str] = typer.Option(
+        None,
+        "--mail-save-file",
+        help="Save emails to files instead of sending them (specify directory path)",
     ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
@@ -673,7 +673,7 @@ def pr_full(
                 config_file_path=config_file_path,
                 report_context="PR Report Generated",
                 console=console,
-                test_mode=test_mode,
+                mail_save_file=mail_save_file,
             )
 
     # Step 3: Claude Insights (opt-in)
@@ -746,10 +746,10 @@ def full_workflow(
         "--email-anonymous-id",
         help="Email each member ONLY their own anonymous ID (requires --hide-individual-names)",
     ),
-    test_mode: bool = typer.Option(
-        False,
-        "--test-mode",
-        help="Test mode: only send emails to wlin@redhat.com (for testing without spamming team)",
+    mail_save_file: Optional[str] = typer.Option(
+        None,
+        "--mail-save-file",
+        help="Save emails to files instead of sending them (specify directory path)",
     ),
     with_claude_insights: bool = typer.Option(
         False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
@@ -984,7 +984,7 @@ def full_workflow(
                 config_file_path=config_to_use,
                 report_context="Full Report Generated (Jira + PR)",
                 console=console,
-                test_mode=test_mode,
+                mail_save_file=mail_save_file,
             )
 
     # Final Summary
@@ -1042,6 +1042,45 @@ def verify():
 
 
 @app.command()
+def clear_sheets(
+    spreadsheet_id: Optional[str] = typer.Option(
+        None,
+        "--spreadsheet-id",
+        help="Google Spreadsheet ID (or use GOOGLE_SPREADSHEET_ID env var)",
+    ),
+    clear_first: bool = typer.Option(
+        False, "--clear-first-sheet", help="Also clear content from the first sheet"
+    ),
+    rename_first: Optional[str] = typer.Option(
+        None, "--rename-first-sheet", help="Rename the first sheet (e.g., 'Main')"
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+):
+    """Clear all sheets from Google Spreadsheet (DESTRUCTIVE!)."""
+    console.print(
+        Panel.fit(
+            "[bold red]Google Sheets Cleaner[/bold red]\n"
+            "[dim]Delete all sheets except the first one[/dim]",
+            border_style="red",
+        )
+    )
+
+    args = []
+    if spreadsheet_id:
+        args.extend(["--spreadsheet-id", spreadsheet_id])
+    if clear_first:
+        args.append("--clear-first-sheet")
+    if rename_first:
+        args.extend(["--rename-first-sheet", rename_first])
+    if yes:
+        args.append("--yes")
+
+    script = "impactlens.scripts.clear_google_sheets"
+    return_code = run_script(script, args, "Clearing Google Sheets")
+    sys.exit(return_code)
+
+
+@app.command()
 def version():
     """Show version information."""
     console.print(
@@ -1085,6 +1124,7 @@ def main(ctx: typer.Context):
         table.add_row("pr", "GitHub PR analysis (team, member, members, all, combine, full)")
         table.add_row("full", "Complete workflow: Jira + PR")
         table.add_row("aggregate (agg)", "Aggregate multiple project reports into unified reports")
+        table.add_row("clear-sheets", "Clear all sheets from Google Spreadsheet (DESTRUCTIVE!)")
         table.add_row("verify", "Verify setup and configuration")
         table.add_row("version", "Show version information")
 

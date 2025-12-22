@@ -21,7 +21,8 @@ from impactlens.core.pr_metrics_calculator import PRMetricsCalculator
 from impactlens.core.pr_report_generator import PRReportGenerator
 from impactlens.utils.logger import logger
 from impactlens.utils.report_utils import get_identifier_for_display
-from impactlens.utils.workflow_utils import load_team_members_from_yaml
+from impactlens.utils.workflow_utils import load_members_from_yaml
+from impactlens.utils.common_args import add_pr_metrics_args
 
 
 def main():
@@ -47,68 +48,15 @@ Examples:
         """,
     )
 
-    parser.add_argument("--start", type=str, required=True, help="Start date (YYYY-MM-DD)")
-    parser.add_argument("--end", type=str, required=True, help="End date (YYYY-MM-DD)")
-    parser.add_argument("--author", type=str, help="Filter by PR author (GitHub username)")
+    add_pr_metrics_args(parser)
     parser.add_argument(
         "--output", type=str, help="Output JSON file path (default: auto-generated)"
     )
-    parser.add_argument(
-        "--use-graphql",
-        action="store_true",
-        default=True,
-        help="Use GraphQL API (faster, default: True)",
-    )
-    parser.add_argument(
-        "--use-rest",
-        action="store_true",
-        help="Use REST API (legacy mode, slower)",
-    )
-    parser.add_argument(
-        "--no-cache",
-        action="store_true",
-        help="Disable caching (GraphQL only)",
-    )
-    parser.add_argument(
-        "--clear-cache",
-        action="store_true",
-        help="Clear cache before fetching (GraphQL only)",
-    )
-    parser.add_argument(
-        "--incremental",
-        action="store_true",
-        help="Incremental mode: only fetch PRs updated since last run (GraphQL only)",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        help="Output directory for reports (default: reports/github)",
-        default="reports/github",
-    )
-    parser.add_argument(
-        "--hide-individual-names",
-        action="store_true",
-        help="Anonymize individual names in filenames (Developer-A3F2, etc.)",
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to config file (for email lookup when anonymizing)",
-    )
-    parser.add_argument(
-        "--leave-days",
-        type=str,
-        help="Days on leave during period (for accurate throughput)",
-        default=None,
-    )
-    parser.add_argument(
-        "--capacity",
-        type=str,
-        help="Work capacity 0.0-1.0 or team total FTE (e.g., '6.0' for 6-person team)",
-        default=None,
-    )
-
     args = parser.parse_args()
+
+    # Handle legacy github_username parameter (if it exists)
+    if hasattr(args, "github_username") and args.github_username:
+        args.author = args.github_username
 
     # Validate dates
     try:
@@ -118,19 +66,21 @@ Examples:
         print("Error: Dates must be in YYYY-MM-DD format")
         return 1
 
-    # For anonymization consistency: use email if available, otherwise use author
-    # This ensures the same person gets the same hash in both Jira and PR reports
-    anonymization_identifier = args.author
+    # For or anonymization consistency: use email for hash matching
+    # Email is required in config for cross-platform identification
+    anonymization_identifier = None
     if args.author and args.config:
-        # Try to find email for this author from config
         config_path = Path(args.config)
         if config_path.exists():
-            members_detailed = load_team_members_from_yaml(config_path, detailed=True)
+            members_detailed = load_members_from_yaml(config_path)
             for member_id, member_info in members_detailed.items():
-                if member_info.get("name") == args.author:
-                    # Found the member, use email for anonymization if available
-                    if member_info.get("email"):
-                        anonymization_identifier = member_info.get("email")
+                if member_info.get("github_username") == args.author:
+                    email = member_info.get("email")
+                    if not email:
+                        raise ValueError(
+                            f"Email is required for member '{args.author}' in config file"
+                        )
+                    anonymization_identifier = email
                     break
 
     print("\n📊 Collecting GitHub PR metrics...")

@@ -108,7 +108,7 @@ def send_email_notifications_cli(
     config_file_path: Optional[Path],
     report_context: str,
     console: Optional[Any] = None,
-    test_mode: bool = False,
+    mail_save_file: Optional[str] = None,
 ) -> None:
     """
     Send email notifications to team members from CLI workflow.
@@ -121,24 +121,24 @@ def send_email_notifications_cli(
                           Can be Path object or string
         report_context: Context message for the email (e.g., "Jira Report Generated")
         console: Optional Rich console for formatted output
-        test_mode: If True, only send emails to wlin@redhat.com (for testing)
+        mail_save_file: If specified, save emails to this directory instead of sending
     """
     try:
-        from impactlens.utils.email_notifier import notify_team_members
+        from impactlens.utils.email_notifier import notify_members
         from impactlens.utils.anonymization import _global_anonymizer
-        from impactlens.utils.workflow_utils import load_team_members_from_yaml
+        from impactlens.utils.workflow_utils import load_members_from_yaml
         import os
 
         # Load team members from config
         if config_file_path:
-            # Convert to Path if string (load_team_members_from_yaml expects Path object)
+            # Convert to Path if string (load_members_from_yaml expects Path object)
             if isinstance(config_file_path, str):
                 config_file_path = Path(config_file_path)
 
             # Load detailed team member info (returns dict)
-            team_members_dict = load_team_members_from_yaml(config_file_path, detailed=True)
-            # Convert dict to list of dicts for notify_team_members
-            team_members = list(team_members_dict.values()) if team_members_dict else []
+            members_dict = load_members_from_yaml(config_file_path)
+            # Convert dict to list of dicts for notify_members
+            members = list(members_dict.values()) if members_dict else []
 
             # Pre-populate anonymizer with all team member identifiers
             # This ensures everyone gets a consistent anonymous ID
@@ -146,44 +146,40 @@ def send_email_notifications_cli(
             # to match how reports generate hashes
             from impactlens.utils.report_utils import normalize_username
 
-            for member in team_members:
+            for member in members:
                 email = member.get("email")
                 if email:
                     # Normalize email to extract username prefix (wlin@redhat.com -> wlin)
                     normalized_identifier = normalize_username(email)
                     _global_anonymizer.anonymize(normalized_identifier)
 
-            # Test mode: filter to only wlin@redhat.com
-            if test_mode:
-                original_count = len(team_members)
-                team_members = [m for m in team_members if m.get("email") == "wlin@redhat.com"]
-                if console and original_count > 0:
-                    console.print(
-                        f"[yellow]🧪 TEST MODE: Filtered {original_count} members to {len(team_members)} "
-                        f"(only wlin@redhat.com)[/yellow]"
-                    )
-                if not team_members and console:
-                    console.print(
-                        "[yellow]⚠️  No test email (wlin@redhat.com) found in team members[/yellow]"
-                    )
-                    return
-
             # Get PR URL from environment (if in CI)
             pr_url = os.getenv("GITHUB_PR_URL")
 
-            # Check if we're in dry-run mode (missing SMTP config)
-            dry_run = not is_smtp_configured()
-
-            if dry_run and console:
-                console.print("[yellow]ℹ️  SMTP not configured - running in dry-run mode[/yellow]")
+            # Determine mode: save-to-file vs send
+            if mail_save_file:
+                # Save to file mode
+                if console:
+                    console.print(
+                        f"[yellow]📁 SAVE MODE: Emails will be saved to {mail_save_file}/[/yellow]"
+                    )
+                dry_run = False
+            else:
+                # Check if we're in dry-run mode (missing SMTP config)
+                dry_run = not is_smtp_configured()
+                if dry_run and console:
+                    console.print(
+                        "[yellow]ℹ️  SMTP not configured - running in dry-run mode[/yellow]"
+                    )
 
             # Send notifications
-            results = notify_team_members(
+            results = notify_members(
                 anonymizer=_global_anonymizer,
-                team_members=team_members,
+                members=members,
                 pr_url=pr_url,
                 report_context=report_context,
                 dry_run=dry_run,
+                save_to_file=mail_save_file,
             )
 
             success_count = sum(1 for v in results.values() if v)

@@ -51,6 +51,7 @@ from clients.sheets_client import (
 )
 from utils.core_utils import read_tsv_report, normalize_username, read_ai_analysis_report
 from utils.workflow_utils import extract_sheet_prefix
+from impactlens.utils.common_args import add_upload_to_sheets_args
 
 try:
     from googleapiclient.errors import HttpError
@@ -98,31 +99,7 @@ Note:
         """,
     )
 
-    parser.add_argument(
-        "--report", type=str, required=True, help="Path to TSV/CSV report file to upload"
-    )
-    parser.add_argument(
-        "--credentials",
-        type=str,
-        help="Path to Google credentials JSON file (or set GOOGLE_CREDENTIALS_FILE env var)",
-    )
-    parser.add_argument(
-        "--spreadsheet-id",
-        type=str,
-        help="Existing spreadsheet ID to update (or set GOOGLE_SPREADSHEET_ID env var)",
-    )
-    parser.add_argument(
-        "--sheet-name", type=str, help="Name for the sheet tab (default: derived from filename)"
-    )
-    parser.add_argument(
-        "--no-format", action="store_true", help="Skip formatting (frozen header, bold, etc)"
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to config file or directory (used to extract sheet prefix)",
-    )
-
+    add_upload_to_sheets_args(parser)
     args = parser.parse_args()
 
     # Get spreadsheet ID from env var if not provided

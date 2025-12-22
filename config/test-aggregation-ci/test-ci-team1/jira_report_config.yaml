@@ -15,18 +15,10 @@ phases:
 
 default_assignee: "" # "" represent team
 
-team_members:
-  - member: wlin
-    email: wlin@redhat.com
-    leave_days: 0
-    capacity: 1.0
-  - member: sbudhwar
-    email: sbudhwar@redhat.com
-    leave_days: 0
-    capacity: 1.0
-  - member: kkanova
-    email: kkanova@redhat.com
-    leave_days: 0
+members:
+  - email: wlin@redhat.com
+  - email: sbudhwar@redhat.com
+  - email: kkanova@redhat.com
     capacity: 0.5
 
 # Use test output directory to avoid polluting main reports

@@ -14,6 +14,7 @@ from pathlib import Path
 from impactlens.core.report_aggregator import ReportAggregator
 from impactlens.utils.logger import logger, Colors, set_log_level
 from impactlens.utils.workflow_utils import upload_to_google_sheets
+from impactlens.utils.common_args import add_aggregate_reports_args
 
 
 def main():
@@ -34,20 +35,7 @@ Examples:
         """,
     )
 
-    parser.add_argument(
-        "--config", type=str, required=True, help="Path to aggregation config file (YAML)"
-    )
-
-    parser.add_argument("--jira-only", action="store_true", help="Aggregate only Jira reports")
-
-    parser.add_argument("--pr-only", action="store_true", help="Aggregate only PR reports")
-
-    parser.add_argument(
-        "--no-upload",
-        action="store_true",
-        help="Skip uploading aggregated reports to Google Sheets",
-    )
-
+    add_aggregate_reports_args(parser)
     args = parser.parse_args()
 
     # Validate config file exists

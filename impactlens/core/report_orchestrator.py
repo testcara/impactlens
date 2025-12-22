@@ -124,7 +124,7 @@ class JiraReportOrchestrator(ReportOrchestrator):
     """Orchestrator for Jira report generation."""
 
     def __init__(
-        self, config: AnalysisConfig, reports_dir: Path, limit_team_members: Optional[Path] = None
+        self, config: AnalysisConfig, reports_dir: Path, limit_members: Optional[Path] = None
     ):
         """
         Initialize Jira orchestrator.
@@ -132,10 +132,10 @@ class JiraReportOrchestrator(ReportOrchestrator):
         Args:
             config: Analysis configuration
             reports_dir: Directory to store reports
-            limit_team_members: Optional path to team members config file
+            limit_members: Optional path to team members config file
         """
         super().__init__(config, reports_dir)
-        self.limit_team_members = limit_team_members
+        self.limit_members = limit_members
 
     def generate_phase_report(self, phase: Phase, assignee: Optional[str] = None, **kwargs) -> bool:
         """Generate Jira report for a single phase."""
@@ -151,8 +151,8 @@ class JiraReportOrchestrator(ReportOrchestrator):
 
         if assignee:
             args.extend(["--assignee", assignee])
-        elif self.limit_team_members and self.limit_team_members.exists():
-            args.extend(["--limit-team-members", str(self.limit_team_members)])
+        elif self.limit_members and self.limit_members.exists():
+            args.extend(["--limit-team-members", str(self.limit_members)])
 
         try:
             subprocess.run(args, check=True)

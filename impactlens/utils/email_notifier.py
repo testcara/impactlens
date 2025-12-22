@@ -12,6 +12,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, List, Optional
 from datetime import datetime
+from pathlib import Path
 
 
 class EmailNotifier:
@@ -144,6 +145,7 @@ class EmailNotifier:
         pr_url: Optional[str] = None,
         report_context: Optional[str] = None,
         dry_run: bool = False,
+        save_to_file: Optional[str] = None,
     ) -> bool:
         """
         Send email notification to a team member.
@@ -155,6 +157,7 @@ class EmailNotifier:
             pr_url: Optional PR URL that triggered the report
             report_context: Optional additional context
             dry_run: If True, print email instead of sending
+            save_to_file: If specified, save email to this directory instead of sending
 
         Returns:
             True if email was sent successfully, False otherwise
@@ -174,6 +177,28 @@ class EmailNotifier:
             # Attach HTML content
             html_part = MIMEText(html_content, "html")
             msg.attach(html_part)
+
+            # Save to file mode
+            if save_to_file:
+                save_dir = Path(save_to_file)
+                save_dir.mkdir(parents=True, exist_ok=True)
+
+                # Generate filename from email address and timestamp
+                timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+                filename = f"{to_email.replace('@', '_at_')}_{timestamp}.html"
+                file_path = save_dir / filename
+
+                # Save HTML content to file
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(f"To: {to_email}\n")
+                    f.write(f"From: {self.from_email}\n")
+                    f.write(f"Subject: {msg['Subject']}\n")
+                    f.write(f"Anonymous ID: {anonymous_id}\n")
+                    f.write(f"\n{'='*60}\n\n")
+                    f.write(html_content)
+
+                print(f"✓ Email saved to file: {file_path} (ID: {anonymous_id})")
+                return True
 
             if dry_run:
                 print(f"\n{'='*60}")
@@ -207,6 +232,7 @@ class EmailNotifier:
         pr_url: Optional[str] = None,
         report_context: Optional[str] = None,
         dry_run: bool = False,
+        save_to_file: Optional[str] = None,
     ) -> Dict[str, bool]:
         """
         Send email notifications to multiple team members.
@@ -217,15 +243,17 @@ class EmailNotifier:
             pr_url: Optional PR URL that triggered the report
             report_context: Optional additional context
             dry_run: If True, print emails instead of sending
+            save_to_file: If specified, save emails to this directory instead of sending
 
         Returns:
             Dict mapping email addresses to success status
         """
         results = {}
 
+        mode_msg = "Saving" if save_to_file else "Sending"
         print(f"\n{'='*60}")
         print(
-            f"Sending anonymized identifier notifications to {len(email_mapping)} team members..."
+            f"{mode_msg} anonymized identifier notifications to {len(email_mapping)} team members..."
         )
         print(f"{'='*60}\n")
 
@@ -246,60 +274,70 @@ class EmailNotifier:
                 pr_url=pr_url,
                 report_context=report_context,
                 dry_run=dry_run,
+                save_to_file=save_to_file,
             )
             results[email] = success
 
         # Summary
         success_count = sum(1 for v in results.values() if v)
+        action = "saved" if save_to_file else "sent"
         print(f"\n{'='*60}")
-        print(f"Email notification summary: {success_count}/{len(results)} sent successfully")
+        print(f"Email notification summary: {success_count}/{len(results)} {action} successfully")
         print(f"{'='*60}\n")
 
         return results
 
 
-def notify_team_members(
+def notify_members(
     anonymizer,
-    team_members: List[Dict],
+    members: List[Dict],
     pr_url: Optional[str] = None,
     report_context: Optional[str] = None,
     dry_run: bool = False,
+    save_to_file: Optional[str] = None,
 ) -> Dict[str, bool]:
     """
     Convenience function to notify team members about their anonymous identifiers.
 
     Args:
         anonymizer: NameAnonymizer instance with the name mappings
-        team_members: List of team member dicts with 'name' or 'member' and 'email' keys
+        members: List of team member dicts with 'email' key (email is the unique identifier)
         pr_url: Optional PR URL that triggered the report
         report_context: Optional additional context
         dry_run: If True, print emails instead of sending
+        save_to_file: If specified, save emails to this directory instead of sending
 
     Returns:
         Dict mapping email addresses to success status
 
     Example:
         >>> from impactlens.utils.anonymization import NameAnonymizer
+        >>> from impactlens.utils.report_utils import normalize_username
         >>> anonymizer = NameAnonymizer()
-        >>> anonymizer.anonymize("alice")
-        >>> team_members = [
-        ...     {"member": "alice", "email": "alice@example.com"},
-        ...     {"member": "bob", "email": "bob@example.com"}
+        >>> # Anonymize using email prefix (normalized)
+        >>> anonymizer.anonymize(normalize_username("alice@example.com"))
+        >>> members = [
+        ...     {"email": "alice@example.com", "github_username": "alice"},
+        ...     {"email": "bob@example.com", "github_username": "bob"}
         ... ]
-        >>> results = notify_team_members(
+        >>> results = notify_members(
         ...     anonymizer,
-        ...     team_members,
+        ...     members,
         ...     pr_url="https://github.com/org/repo/pull/123",
         ...     dry_run=True
         ... )
     """
     # Build email mapping from team members
+    # Use normalized email (email prefix) as the identifier to match anonymizer
+    from impactlens.utils.report_utils import normalize_username
+
     email_mapping = {}
-    for member in team_members:
-        name = member.get("member") or member.get("name")
+    for member in members:
         email = member.get("email")
-        if name and email:
-            email_mapping[name] = email
+        if email and "@" in email:
+            # Normalize email to get identifier (e.g., wlin@redhat.com -> wlin)
+            identifier = normalize_username(email)
+            email_mapping[identifier] = email
 
     # Get name mapping from anonymizer
     name_mapping = anonymizer.get_mapping()
@@ -314,4 +352,5 @@ def notify_team_members(
         pr_url=pr_url,
         report_context=report_context,
         dry_run=dry_run,
+        save_to_file=save_to_file,
     )

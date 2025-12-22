@@ -175,6 +175,21 @@ jobs:
             echo "⚠️  GOOGLE_CREDENTIALS_BASE64 not set, uploads will be skipped"
           fi
 
+      - name: Clear Google Sheets before tests
+        if: steps.docs_check.outputs.code_changed == 'true'
+        env:
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
+        run: |
+          if [ -n "$GOOGLE_CREDENTIALS_FILE" ] && [ -n "$GOOGLE_SPREADSHEET_ID" ]; then
+            echo "Clearing Google Sheets before integration tests..."
+            python -m impactlens.cli clear-sheets \
+              --spreadsheet-id "$GOOGLE_SPREADSHEET_ID" \
+              --yes
+            echo "✓ Google Sheets cleared"
+          else
+            echo "⚠️  Skipping clear-sheets - Google Sheets not configured"
+          fi
+
       - name: Restore GitHub PR cache
         if: steps.docs_check.outputs.code_changed == 'true'
         uses: actions/cache@v4
@@ -211,14 +226,14 @@ jobs:
             echo "✓ Google Sheets configured, will upload reports"
           fi
 
-          # Run full workflow with test mode (emails only to wlin@redhat.com)
+          # Run full workflow with mail-save-file mode (emails saved to files)
           python -m impactlens.cli full \
             --config config/test-integration-ci/test-ci-team \
             $UPLOAD_ARGS \
             --incremental \
             --hide-individual-names \
             --email-anonymous-id \
-            --test-mode
+            --mail-save-file reports/test-ci-team/emails
 
           echo ""
           echo "✓ Full integration test completed (Jira + PR + Email)"
@@ -364,7 +379,7 @@ jobs:
           # Send emails using the aggregation config (auto-deduplicates by email)
           python -m impactlens.scripts.send_email_notifications \
             --config-dir config/test-aggregation-ci \
-            --test-mode
+            --mail-save-file reports/test-ci-aggregated/emails
 
           echo ""
           echo "✓ Multi-team email notification test completed"

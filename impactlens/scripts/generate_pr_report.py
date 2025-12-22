@@ -16,14 +16,14 @@ import traceback
 from pathlib import Path
 from typing import List, Optional
 
+from impactlens.utils.common_args import add_pr_report_args
 from impactlens.utils.workflow_utils import (
     Colors,
     get_project_root,
     cleanup_old_reports,
     upload_to_google_sheets,
     find_latest_comparison_report,
-    load_team_members,
-    load_team_members_from_yaml,
+    load_members_from_yaml,
     load_and_resolve_config,
     aggregate_member_values_for_phases,
 )
@@ -130,7 +130,7 @@ def generate_comparison_report(
 
 
 def generate_all_members_reports(
-    team_members_file: Path,
+    members_file: Path,
     script_name: str,
     no_upload: bool = False,
     upload_members: bool = False,
@@ -141,7 +141,7 @@ def generate_all_members_reports(
     Generate reports for all team members.
 
     Args:
-        team_members_file: Path to config file with team members
+        members_file: Path to config file with team members
         script_name: Script module name to invoke
         no_upload: If True, skip all uploads
         upload_members: If True, upload member reports (default: False, only team report is uploaded)
@@ -151,9 +151,9 @@ def generate_all_members_reports(
     print_header("Generating reports for all team members")
 
     # Load detailed member information (includes both name and email)
-    members_detailed = load_team_members_from_yaml(team_members_file, detailed=True)
+    members_detailed = load_members_from_yaml(members_file)
     if not members_detailed:
-        print(f"{Colors.RED}Error: No team members found in {team_members_file}{Colors.NC}")
+        print(f"{Colors.RED}Error: No team members found in {members_file}{Colors.NC}")
         return 1
 
     # Generate team overall report first (always upload unless --no-upload)
@@ -179,7 +179,7 @@ def generate_all_members_reports(
     for member_id, member_info in members_detailed.items():
         # Use 'name' (GitHub username) for API query
         # The script will automatically look up email from config for anonymization
-        github_username = member_info.get("name") or member_id
+        github_username = member_info.get("github_username") or member_id
         member_email = member_info.get("email")
 
         # Get display identifier for member (use email for anonymization if available)
@@ -238,47 +238,8 @@ Examples:
         """,
     )
 
-    parser.add_argument(
-        "author",
-        nargs="?",
-        help="GitHub author username to filter PRs (optional)",
-    )
-    parser.add_argument(
-        "--all-members",
-        action="store_true",
-        help="Generate reports for all team members from config",
-    )
-    parser.add_argument(
-        "--combine-only",
-        action="store_true",
-        help="Combine existing TSV reports without regenerating",
-    )
-    parser.add_argument(
-        "--incremental",
-        action="store_true",
-        help="Only fetch new/updated PRs (faster for repeated runs)",
-    )
-    parser.add_argument(
-        "--no-upload",
-        action="store_true",
-        help="Skip uploading report to Google Sheets",
-    )
-    parser.add_argument(
-        "--upload-members",
-        action="store_true",
-        help="Upload individual member reports to Google Sheets (default: only team and combined reports)",
-    )
-    parser.add_argument(
-        "--hide-individual-names",
-        action="store_true",
-        help="Anonymize individual names in combined reports (Developer-A3F2, etc.)",
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to custom config file (default: config/pr_report_config.yaml)",
-    )
-
+    parser = argparse.ArgumentParser(...)
+    add_pr_report_args(parser)
     args = parser.parse_args()
 
     project_root = get_project_root()
@@ -384,9 +345,9 @@ Examples:
     anonymization_identifier = author
     if author:
         # Try to find email for this author from config
-        members_detailed = load_team_members_from_yaml(config_file, detailed=True)
+        members_detailed = load_members_from_yaml(config_file)
         for member_id, member_info in members_detailed.items():
-            if member_info.get("name") == author:
+            if member_info.get("github_username") == author:
                 # Found the member, use email for anonymization if available
                 if member_info.get("email"):
                     anonymization_identifier = member_info.get("email")
