@@ -1,0 +1,11 @@
+aggregation:
+  # Name for the aggregated report
+  name: "CUE Team"
+
+  # Output directory for aggregated reports
+  output_dir: "reports/cue-aggregated"
+
+  projects:
+    - "konfluxui"
+    - "rhtapui"
+    - "securesign"

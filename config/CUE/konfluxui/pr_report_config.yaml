@@ -1,0 +1,54 @@
+# Project configuration (non-sensitive settings)
+project:
+  github_url: "https://github.com"
+  github_repo_owner: "konflux-ci"
+  github_repo_name: "konflux-ui"
+
+phases:
+  - name: "No AI Period"
+    start: "2025-01-01"
+    end: "2025-05-31"
+  - name: "Cursor Period"
+    start: "2025-06-01"
+    end: "2025-07-31"
+  - name: "Full AI Period"
+    start: "2025-08-01"
+    end: "2025-12-04"
+
+default_author: "" # "" represent team
+
+team_members:
+  - name: sahil143
+    email: sbudhwar@redhat.com
+  - name: testcara
+    email: wlin@redhat.com
+    leave_days:
+      - 26
+      - 20
+      - 11.5
+    capacity: 0.8
+  - name: rrosatti
+    email: rgalvao@redhat.com
+  - name: marcin-michal
+    email: mmarcin@redhat.com
+  - name: StanislavJochman
+    email: sjochman@redhat.com
+  - name: JoaoPedroPP
+    email: jpolonip@redhat.com
+  - name: janaki29
+    email: djanaki@redhat.com
+  - name: rakshett
+    email: rakshett@redhat.com
+  - name: milantaky
+    email: mtakac@redhat.com
+  - name: abhinandan13jan
+    email: abhindas@redhat.com
+    capacity:
+      - 1.0
+      - 0.5
+      - 0.0
+  - name: Katka92
+    email: kkanova@redhat.com
+    capacity: 0.5
+
+output_dir: "reports/konfluxui/github"
