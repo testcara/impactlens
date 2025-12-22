@@ -438,7 +438,6 @@ def combine_comparison_reports(
         pattern = str(reports_dir / "pr_comparison_*_*.tsv")
 
     all_files = glob.glob(pattern)
-    print(f"-----cara2 {all_files}")
 
     # Include all reports (both general and individual members)
     report_files = all_files

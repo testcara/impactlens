@@ -118,25 +118,24 @@ Each sub-project uses standard config (same as Scenario 1). **Critical requireme
 # frontend/pr_report_config.yaml
 project: myorg/frontend-app
 output_dir: reports/frontend/github  # Must specify for aggregation!
-team_members:
-  - member: charlie
-    email: charlie@company.com
+members:
+  - email: charlie@company.com
+    github_username: charlie-gh
     capacity: 0.5
 
 # frontend/jira_report_config.yaml
 project: FRONTEND
 output_dir: reports/frontend/jira  # Must specify for aggregation!
-team_members:
-  - member: charlie
-    email: charlie@company.com  # Same email → will be aggregated
+members:
+  - email: charlie@company.com  # Same email → will be aggregated
     capacity: 0.5
 
 # backend/pr_report_config.yaml
 project: myorg/backend-service
 output_dir: reports/backend/github  # Must specify for aggregation!
-team_members:
-  - member: charlie
-    email: charlie@company.com  # Same email across all projects
+members:
+  - email: charlie@company.com  # Same email across all projects
+    github_username: charlie-gh
     capacity: 0.5
 ```
 
@@ -230,6 +229,7 @@ project:
 
 ```yaml
 project:
+  github_url: "https://github.com"  # Optional: defaults to https://github.com
   github_repo_owner: "your-org"
   github_repo_name: "your-repo"
 ```
@@ -260,13 +260,11 @@ phases:
 **Jira:**
 
 ```yaml
-team_members:
-  - member: alice # Jira username or display name
-    email: alice@company.com
+members:
+  - email: alice@company.com
     leave_days: 10 # Optional: days on leave
     capacity: 1.0 # Optional: 1.0 = full time
-  - member: bob
-    email: bob@company.com
+  - email: bob@company.com
     leave_days: [5, 8] # Optional: per-phase values
     capacity: [1.0, 0.5] # Optional: left team in phase 2
 ```
@@ -274,11 +272,11 @@ team_members:
 **PR:**
 
 ```yaml
-team_members:
-  - name: alice-github # GitHub username
-    email: alice@company.com # Recommended: same email as Jira for consistent anonymization
-  - name: bob-github
-    email: bob@company.com
+members:
+  - email: alice@company.com # Same email as Jira for consistent anonymization
+    github_username: alice-github # GitHub username
+  - email: bob@company.com
+    github_username: bob-github
 ```
 
 **Leave Days & Capacity:**
@@ -374,17 +372,26 @@ Avg Time to Merge    | 2.5d    | 2.3d     | 2.7d    | 2.1d   | 3.0d   | 2.5d
 
 ### Email Notifications (Optional)
 
-When enabled, team members receive email notifications informing them of their anonymous identifier (e.g., `Developer-A3F2`) when reports are generated. This allows members to find their personal metrics in anonymized reports while maintaining privacy control.
+When enabled, team members receive email notifications informing them of their **permanent anonymous identifier** (e.g., `Developer-A3F2`) when reports are generated. This allows members to find their personal metrics in anonymized reports while maintaining privacy control.
+
+**Important**: Your anonymous ID is **permanent and consistent** across all reports. Once you receive it, you only need the email once. After that, you can disable email notifications to avoid repeated emails.
 
 **Enable in Config:**
 
 ```yaml
 # jira_report_config.yaml or pr_report_config.yaml
 email_anonymous_id:
-  enabled: true  # Set to false to disable
+  enabled: true  # Set to false to disable email notifications
 ```
 
-**SMTP Configuration (required in .env):**
+**To Disable After Receiving Your ID:**
+
+```yaml
+email_anonymous_id:
+  enabled: false  # Disable future email notifications
+```
+
+**SMTP Configuration (required in .env for sending emails):**
 
 ```bash
 SMTP_USER=your-email@gmail.com
@@ -397,21 +404,41 @@ SMTP_PASSWORD=your-app-password  # Gmail App Password (not regular password)
 3. Select "Mail" and your device → Copy the 16-character password
 4. Add to `.env` as `SMTP_PASSWORD`
 
-**Workflow Differences:**
+**Command Line Options:**
 
-- **Single-team mode**: Use `impactlens full --hide-individual-names --email-anonymous-id`
-- **Multi-team mode**: Email notifications handled separately after aggregation to avoid duplicates
-  ```bash
-  # Generate reports (no email flag)
-  impactlens jira full --hide-individual-names
-  impactlens pr full --hide-individual-names
+- `--email-anonymous-id`: Enable email notifications for this run
+- `--mail-save-file <directory>`: Save emails as HTML files instead of sending (useful for testing)
 
-  # Aggregate
-  impactlens aggregate --config aggregation_config.yaml
+**Workflow Examples:**
 
-  # Send emails (deduplicated automatically)
-  python -m impactlens.scripts.send_email_notifications --config-dir config/my-team
-  ```
+**Single-team mode:**
+```bash
+# Send actual emails
+impactlens full --hide-individual-names --email-anonymous-id
+
+# Test mode: save emails as files without sending
+impactlens full --hide-individual-names --email-anonymous-id \
+  --mail-save-file reports/test-emails
+```
+
+**Multi-team mode:** Email notifications handled separately after aggregation to avoid duplicates
+```bash
+# Generate reports (no email flag to avoid duplicates)
+impactlens jira full --hide-individual-names
+impactlens pr full --hide-individual-names
+
+# Aggregate
+impactlens aggregate --config aggregation_config.yaml
+
+# Send emails once (deduplicated automatically by email address)
+python -m impactlens.scripts.send_email_notifications \
+  --config-dir config/my-team
+
+# Or test mode: save to files
+python -m impactlens.scripts.send_email_notifications \
+  --config-dir config/my-team \
+  --mail-save-file reports/test-emails
+```
 
 **Why the difference?** In multi-team scenarios, members may appear in multiple sub-projects. The standalone script automatically deduplicates by email address to ensure each person receives only one notification.
 
@@ -549,8 +576,9 @@ cat config/platform-team/aggregation_config.yaml
 
 - Config file exists (not just `.example` template)
 - YAML syntax is correct (proper indentation)
-- `team_members` section is not empty
-- Member names match Jira/GitHub usernames
+- `members` section is not empty
+- Email addresses are correctly configured
+- GitHub usernames match actual GitHub accounts (for PR configs)
 
 ---
 

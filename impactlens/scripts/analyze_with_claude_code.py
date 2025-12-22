@@ -438,7 +438,7 @@ Examples:
     logger.info("")
 
     # Find report file
-    report_path = find_latest_report(args.report)
+    report_path = find_latest_report(args.reports_dir)
     logger.info(f"📊 Report: {Path(report_path).name}")
     logger.info("")
 

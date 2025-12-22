@@ -197,7 +197,8 @@ class EmailNotifier:
                     f.write(f"\n{'='*60}\n\n")
                     f.write(html_content)
 
-                print(f"✓ Email saved to file: {file_path} (ID: {anonymous_id})")
+                # Log email address but not ID to avoid exposing email-to-ID mapping
+                print(f"✓ Email saved to file for {to_email}: {file_path.name}")
                 return True
 
             if dry_run:
@@ -218,10 +219,12 @@ class EmailNotifier:
                     server.login(self.smtp_user, self.smtp_password)
                 server.send_message(msg)
 
-            print(f"✓ Email notification sent to {to_email} (ID: {anonymous_id})")
+            # Log email address but not ID to avoid exposing email-to-ID mapping
+            print(f"✓ Email notification sent to {to_email}")
             return True
 
         except Exception as e:
+            # Log email address for debugging, but not ID
             print(f"✗ Failed to send email to {to_email}: {e}")
             return False
 
@@ -259,12 +262,14 @@ class EmailNotifier:
 
         for member_name, email in email_mapping.items():
             if not email or email.lower() == "general" or "@" not in email:
-                print(f"⊘ Skipping {member_name}: No valid email address")
+                # Don't log member identifier to avoid exposing mapping
+                print(f"⊘ Skipping member: No valid email address")
                 continue
 
             anonymous_id = name_mapping.get(member_name)
             if not anonymous_id:
-                print(f"⊘ Skipping {member_name}: No anonymous ID found")
+                # Don't log member identifier to avoid exposing mapping
+                print(f"⊘ Skipping member: No anonymous ID found")
                 continue
 
             success = self.send_notification(

@@ -420,7 +420,7 @@ jobs:
 
                 echo "  Output directory: $output_dir"
                 python -m impactlens.scripts.analyze_with_claude_code \
-                  --report "$report" \
+                  --reports-dir "$report" \
                   --prompt-only \
                   --output-dir "$output_dir" || echo "Warning: Failed to generate prompt for $report"
 

@@ -156,59 +156,27 @@ impactlens/
 
 ## Quick Start
 
-### ⚡ GitHub Actions CI (Recommended - Zero Config)
+### ⚡ GitHub Actions CI (Recommended)
 
 **Perfect for:** Teams wanting automated reports with zero local setup and privacy protection.
 
-1. **Clone & create team config**:
+**How it works:** Create team config → Submit via PR → CI auto-generates reports → View in PR comments or Google Sheets
 
-   ```bash
-   git clone https://github.com/testcara/impactlens.git
-   cd impactlens
-   mkdir -p config/my-team
-   cp config/*_config.yaml.example config/my-team/
-   # Edit configs with your team settings
-   ```
-
-2. **Generate reports via PR**:
-
-   ```bash
-   git checkout -b report/my-team-2024-12
-   git add -f config/my-team/
-   git commit -m "chore: generate AI impact report for my-team"
-   git push origin report/my-team-2024-12
-   # Create PR → CI auto-generates reports → View in PR comments
-   ```
-
-3. **View anonymized reports**: Auto-uploaded to [Default Google Sheet](https://docs.google.com/spreadsheets/d/1AnX3zGoVOv9QXgx3ck2IH8ksRnBoW2V4Uk4o-KoyV0k/edit?gid=0#gid=0) or download from workflow artifacts
-
-> 🔒 **Privacy Protection**: CI automatically anonymizes individual data (names → Developer-A3F2, hides emails/leave_days/capacity). For full data, run locally.
+> 🔒 **Privacy Protection**: CI automatically anonymizes individual data (names → Developer-A3F2, hides emails/leave_days/capacity).
 >
-> 📧 **Optional Email Notifications (CI mode)**: Enable `email_anonymous_id: enabled: true` in your config to send team members their anonymous identifier via email. See [Email Notifications](docs/CONFIGURATION.md#email-notifications) for setup.
->
-> **For custom Google Sheets**: Grant Editor access to `cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com`
+> 📧 **Find Your Metrics**: Enable `email_anonymous_id: true` in config to receive your hash ID via email and locate your data in anonymized reports.
+
+➡️ **See [Configuration Guide](docs/CONFIGURATION.md)** for detailed setup instructions
 
 ---
 
-### 💻 Local Development (Full Data Access)
+### 💻 Local Development
 
-For detailed individual data, run locally with Docker or CLI:
+**Perfect for:** Developers who prefer local execution, need offline access, or want to customize workflows.
 
-```bash
-git clone https://github.com/testcara/impactlens.git
-cd impactlens
+**Quick setup:** Clone repo → Configure `.env` → Run via Docker or CLI
 
-# Docker (no Python needed)
-cp .env.example .env && vim .env
-docker-compose run impactlens full
-
-# CLI (Python developers)
-python3 -m venv venv && source venv/bin/activate
-pip install -e . && cp .env.example .env && source .env
-impactlens full
-```
-
-➡️ **For detailed configuration and advanced features**, see **[Configuration Guide](docs/CONFIGURATION.md)**
+➡️ **See [Local Development Guide](docs/LOCAL_DEVELOPMENT.md)** for detailed setup and usage
 
 ## Configuration
 
