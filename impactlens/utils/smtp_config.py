@@ -108,7 +108,7 @@ def send_email_notifications_cli(
     config_file_path: Optional[Path],
     report_context: str,
     console: Optional[Any] = None,
-    test_mode: bool = False,
+    mail_save_file: Optional[str] = None,
 ) -> None:
     """
     Send email notifications to team members from CLI workflow.
@@ -121,7 +121,7 @@ def send_email_notifications_cli(
                           Can be Path object or string
         report_context: Context message for the email (e.g., "Jira Report Generated")
         console: Optional Rich console for formatted output
-        test_mode: If True, only send emails to wlin@redhat.com (for testing)
+        mail_save_file: If specified, save emails to this directory instead of sending
     """
     try:
         from impactlens.utils.email_notifier import notify_members
@@ -153,29 +153,24 @@ def send_email_notifications_cli(
                     normalized_identifier = normalize_username(email)
                     _global_anonymizer.anonymize(normalized_identifier)
 
-            # Test mode: filter to only wlin@redhat.com
-            if test_mode:
-                original_count = len(members)
-                members = [m for m in members if m.get("email") == "wlin@redhat.com"]
-                if console and original_count > 0:
-                    console.print(
-                        f"[yellow]🧪 TEST MODE: Filtered {original_count} members to {len(members)} "
-                        f"(only wlin@redhat.com)[/yellow]"
-                    )
-                if not members and console:
-                    console.print(
-                        "[yellow]⚠️  No test email (wlin@redhat.com) found in team members[/yellow]"
-                    )
-                    return
-
             # Get PR URL from environment (if in CI)
             pr_url = os.getenv("GITHUB_PR_URL")
 
-            # Check if we're in dry-run mode (missing SMTP config)
-            dry_run = not is_smtp_configured()
-
-            if dry_run and console:
-                console.print("[yellow]ℹ️  SMTP not configured - running in dry-run mode[/yellow]")
+            # Determine mode: save-to-file vs send
+            if mail_save_file:
+                # Save to file mode
+                if console:
+                    console.print(
+                        f"[yellow]📁 SAVE MODE: Emails will be saved to {mail_save_file}/[/yellow]"
+                    )
+                dry_run = False
+            else:
+                # Check if we're in dry-run mode (missing SMTP config)
+                dry_run = not is_smtp_configured()
+                if dry_run and console:
+                    console.print(
+                        "[yellow]ℹ️  SMTP not configured - running in dry-run mode[/yellow]"
+                    )
 
             # Send notifications
             results = notify_members(
@@ -184,6 +179,7 @@ def send_email_notifications_cli(
                 pr_url=pr_url,
                 report_context=report_context,
                 dry_run=dry_run,
+                save_to_file=mail_save_file,
             )
 
             success_count = sum(1 for v in results.values() if v)

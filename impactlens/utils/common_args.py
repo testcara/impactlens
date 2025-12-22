@@ -355,9 +355,10 @@ def add_aggregation_args(parser: argparse.ArgumentParser) -> None:
 def add_email_notification_args(parser: argparse.ArgumentParser) -> None:
     """Add arguments for email notifications."""
     parser.add_argument(
-        "--test-mode",
-        action="store_true",
-        help="Test mode: only send emails to wlin@redhat.com (for testing without spamming team)",
+        "--mail-save-file",
+        type=str,
+        default=None,
+        help="Save emails to files instead of sending them (specify directory path)",
     )
 
 

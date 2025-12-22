@@ -81,12 +81,11 @@ def _add_members_to_dict(members: List[Dict], all_members_by_email: Dict[str, Di
     """
     for member in members:
         email = member.get("email")
-        name = member.get("member") or member.get("name")
 
-        if email and name and "@" in email:
-            # Deduplicate by email
+        if email and "@" in email:
+            # Deduplicate by email - keep the member dict as-is
             if email not in all_members_by_email:
-                all_members_by_email[email] = {"member": name, "email": email}
+                all_members_by_email[email] = member
 
 
 def collect_all_members(config_dir: Path) -> tuple[List[Dict], Dict]:
@@ -166,9 +165,10 @@ def main():
         help="Config directory (e.g., config/team-a or config/aggregation)",
     )
     parser.add_argument(
-        "--test-mode",
-        action="store_true",
-        help="Test mode: only send emails to wlin@redhat.com (for testing without spamming team)",
+        "--mail-save-file",
+        type=str,
+        default=None,
+        help="Save emails to files instead of sending them (specify directory path)",
     )
     parser.add_argument(
         "--dry-run",
@@ -205,29 +205,22 @@ def main():
         print("=" * 60)
         sys.exit(0)
 
-    # Test mode: filter to only wlin@redhat.com
-    if args.test_mode:
-        original_count = len(members)
-        members = [m for m in members if m.get("email") == "wlin@redhat.com"]
-        print(
-            f"🧪 TEST MODE: Filtered {original_count} members to {len(members)} (only wlin@redhat.com)"
-        )
-        print("   This prevents spamming the team during testing\n")
+    # Mail save file mode
+    if args.mail_save_file:
+        print(f"📁 SAVE MODE: Emails will be saved to {args.mail_save_file}/\n")
 
-        if not members:
-            print("⚠️  No test email (wlin@redhat.com) found in team members")
-            print("   Add wlin@redhat.com to your config for testing")
-            print("=" * 60)
-            sys.exit(0)
-
-    # Pre-populate the anonymizer with all team member names
+    # Pre-populate the anonymizer with all team member identifiers
     # This ensures everyone gets a consistent anonymous ID
+    # Use normalized email prefix as identifier (e.g., wlin@redhat.com -> wlin)
+    from impactlens.utils.report_utils import normalize_username
+
     print("Generating anonymous identifiers...")
     anon_count = 0
     for member in members:
-        name = member.get("member") or member.get("name")
-        if name:
-            _global_anonymizer.anonymize(name)
+        email = member.get("email")
+        if email and "@" in email:
+            identifier = normalize_username(email)
+            _global_anonymizer.anonymize(identifier)
             anon_count += 1
     print(f"  Generated {anon_count} anonymous identifiers\n")
 
@@ -245,8 +238,8 @@ def main():
     smtp_config = get_smtp_config()
     print_smtp_config_summary(smtp_config)
 
-    # Check SMTP configuration
-    if not is_smtp_configured() and not args.dry_run:
+    # Check SMTP configuration (skip if in save-to-file mode)
+    if not args.mail_save_file and not is_smtp_configured() and not args.dry_run:
         print("\n" + "=" * 60)
         print("⚠️  SMTP Configuration Required")
         print("=" * 60)
@@ -271,13 +264,22 @@ def main():
     # Create EmailNotifier with SMTP configuration
     notifier = create_email_notifier(smtp_config)
 
+    # Build email mapping using normalized email prefix as identifier
+    email_mapping = {}
+    for m in members:
+        email = m.get("email")
+        if email and "@" in email:
+            identifier = normalize_username(email)
+            email_mapping[identifier] = email
+
     # Send notifications
     results = notifier.send_batch_notifications(
         name_mapping=_global_anonymizer.get_mapping(),
-        email_mapping={m.get("member") or m.get("name"): m.get("email") for m in members},
+        email_mapping=email_mapping,
         pr_url=pr_url,
         report_context="ImpactLens Reports Generated",
         dry_run=args.dry_run,
+        save_to_file=args.mail_save_file,
     )
 
     # Summary

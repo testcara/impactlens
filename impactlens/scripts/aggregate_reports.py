@@ -14,7 +14,7 @@ from pathlib import Path
 from impactlens.core.report_aggregator import ReportAggregator
 from impactlens.utils.logger import logger, Colors, set_log_level
 from impactlens.utils.workflow_utils import upload_to_google_sheets
-from impactlens.scripts.common_args import add_aggregate_reports_args
+from impactlens.utils.common_args import add_aggregate_reports_args
 
 
 def main():

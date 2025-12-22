@@ -23,7 +23,7 @@ members:
     github_username: sahil143
 
 # Use test output directory to avoid polluting main reports
-output_dir: "reports/test-ci-team1/github"
+output_dir: "reports/test-ci-team/github"
 
 # Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
 log_level: "WARNING"

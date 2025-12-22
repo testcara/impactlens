@@ -20,7 +20,7 @@ members:
   - email: sbudhwar@redhat.com
 
 # Use test output directory to avoid polluting main reports
-output_dir: "reports/test-ci-team1/jira"
+output_dir: "reports/test-ci-team/jira"
 
 # Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
 log_level: "WARNING"
