@@ -25,69 +25,35 @@ phases:
 
 default_assignee: "" # "" represent team
 
-team_members:
-  - member: David
-    email: damoreno@redhat.com
-    leave_days: 0
-    capacity: 1
-  - member: Elena
-    email: elgerman@redhat.com
-    leave_days: 0
+members:
+  - email: damoreno@redhat.com
+  - email: elgerman@redhat.com
     capacity:
       - 0
       - 0.58
-  - member: Fitz
-    email: fnikolov@redhat.com
-    leave_days: 0
-    capacity:
-      - 0
-      - 1
-  - member: Happy
-    email: hbhati@redhat.com
-    leave_days: 0
-    capacity: 1
-  - member: Jindirch
-    email: jluza@redhat.com
-    leave_days: 0
+  - email: fnikolov@redhat.com
+  - email: hbhati@redhat.com
+  - email: jluza@redhat.com
     capacity:
       - 0
       - 0.33
-  - member: Jing
-    email: jinqi@redhat.com
-    leave_days: 0
-    capacity: 1
-  - member: Johnny
-    email: jbieren@redhat.com
-    leave_days: 0
-    capacity: 1
-  - member: Leandro
-    email: lmendes@redhat.com
-    leave_days: 0
-    capacity: 1
-  - member: Lubo
-    email: lgallovi@redhat.com
-    leave_days: 0
+  - email: jinqi@redhat.com
+  - email: jbieren@redhat.com
+  - email: lmendes@redhat.com
+  - email: lgallovi@redhat.com
     capacity:
       - 0
       - 0.33
-  - member: Martin
-    email: mmalina@redhat.com
-    leave_days: 0
-    capacity: 1
-  - member: Scott
-    email: swickers@redhat.com
-    leave_days: 0
+  - email: mmalina@redhat.com
+  - email: swickers@redhat.com
     capacity:
       - 0
       - 0.33
-  - member: Sean
-    email: sconroy@redhat.com
-    leave_days: 0
-    capacity: 1
+  - email: sconroy@redhat.com
 
 output_dir: "reports/release-service/jira"
 
 # Email notification settings (optional)
 # When enabled, team members receive their anonymous ID via email
-email_anonymous_id:
-  enabled: true  # Set to false to disable email notifications
+email_anonymous_id: false # Set to false to disable email notifications
+replace_existing_reports: true

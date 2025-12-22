@@ -26,40 +26,40 @@ phases:
 
 default_author: "" # "" represent team
 
-team_members:
+members:
   # For consistent anonymization across Jira and PR reports:
   # - Add 'email' field with the same email used in Jira config
   # - This ensures the same person gets the same anonymous hash in both reports
   # - The 'name' field is the GitHub username
 
-  - name: davidmogar
-    email: damoreno@redhat.com
-  - name: elenagerman
-    email: elgerman@redhat.com
-  - name: FilipNikolovski
-    email: fnikolov@redhat.com
-  - name: happybhati
-    email: hbhati@redhat.com
-  - name: midnightercz
-    email: jluza@redhat.com
-  - name: jinqi7
-    email: jinqi@redhat.com
-  - name: johnbieren
-    email: jbieren@redhat.com
-  - name: theflockers
-    email: lmendes@redhat.com
-  - name: querti
-    email: lgallovi@redhat.com
-  - name: mmalina
-    email: mmalina@redhat.com
-  - name: swickersh
-    email: swickers@redhat.com
-  - name: seanconroy2021
-    email: sconroy@redhat.com
+  - email: damoreno@redhat.com
+    github_username: davidmogar
+  - email: elgerman@redhat.com
+    github_username: elenagerman
+  - email: fnikolov@redhat.com
+    github_username: FilipNikolovski
+  - email: hbhati@redhat.com
+    github_username: happybhati
+  - email: jluza@redhat.com
+    github_username: midnightercz
+  - email: jinqi@redhat.com
+    github_username: jinqi7
+  - email: jbieren@redhat.com
+    github_username: johnbieren
+  - email: lmendes@redhat.com
+    github_username: theflockers
+  - email: lgallovi@redhat.com
+    github_username: querti
+  - email: mmalina@redhat.com
+    github_username: mmalina
+  - email: swickers@redhat.com
+    github_username: swickersh
+  - email: sconroy@redhat.com
+    github_username: seanconroy2021
 
 output_dir: "reports/release-service-catalog/github"
 
 # Email notification settings (optional)
 # When enabled, team members receive their anonymous ID via email
-email_anonymous_id:
-  enabled: true  # Set to false to disable email notifications
+email_anonymous_id: false # Set to false to disable email notifications
+replace_existing_reports: true
