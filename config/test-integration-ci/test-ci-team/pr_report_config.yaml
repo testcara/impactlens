@@ -16,11 +16,11 @@ phases:
 
 default_author: "" # "" represent team
 
-team_members:
-  - name: testcara
-    email: wlin@redhat.com
-  - name: sahil143
-    email: sbudhwar@redhat.com
+members:
+  - email: wlin@redhat.com
+    github_username: testcara
+  - email: sbudhwar@redhat.com
+    github_username: sahil143
 
 # Use test output directory to avoid polluting main reports
 output_dir: "reports/test-ci-team1/github"
@@ -34,4 +34,4 @@ log_level: "WARNING"
 # - Opt-in sharing: They can choose to share their ID with their manager
 # - This allows connecting individual work to anonymized reports while preserving privacy
 email_anonymous_id:
-  enabled: true  # Set to false to disable
+  enabled: true # Set to false to disable

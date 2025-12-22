@@ -13,13 +13,10 @@ phases:
     start: "2025-11-01"
     end: "2025-11-30"
 
-
 default_assignee: "" # "" represent team
 
-team_members:
-  - member: kkanova
-    email: kkanova@redhat.com
-    leave_days: 0
+members:
+  - email: kkanova@redhat.com
     capacity: 0.5
 
 # Use test output directory to avoid polluting main reports

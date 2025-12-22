@@ -12,7 +12,8 @@ from pathlib import Path
 
 from impactlens.core.jira_metrics_calculator import JiraMetricsCalculator
 from impactlens.core.jira_report_generator import JiraReportGenerator
-from impactlens.utils.workflow_utils import get_project_root, load_team_members_from_yaml
+from impactlens.utils.workflow_utils import get_project_root, load_members_from_yaml
+from impactlens.utils.common_args import add_jira_metrics_args
 
 
 def main():
@@ -20,63 +21,21 @@ def main():
     parser = argparse.ArgumentParser(
         description="Analyze Jira issue state transitions and closure time"
     )
-    parser.add_argument(
-        "--start", type=str, help="Start date (format: YYYY-MM-DD)", required=False, default=None
-    )
-    parser.add_argument(
-        "--end", type=str, help="End date (format: YYYY-MM-DD)", required=False, default=None
-    )
-    parser.add_argument("--status", type=str, help="Issue status (default: Done)", default="Done")
-    parser.add_argument(
-        "--project", type=str, help="Project key (overrides PROJECT_KEY in config)", default=None
-    )
-    parser.add_argument(
-        "--assignee", type=str, help="Specify assignee (username or email)", default=None
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to custom config YAML file. Settings from this file override defaults from config/jira_report_config.yaml",
-        default=None,
-    )
-    parser.add_argument(
-        "--leave-days",
-        type=str,
-        help="Number of leave days for this phase (e.g., '26' or '11.5')",
-        default=None,
-    )
-    parser.add_argument(
-        "--capacity",
-        type=str,
-        help="Work capacity for this member (0.0 to 1.0, e.g., '0.8' for 80%% time)",
-        default=None,
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        help="Output directory for reports (default: reports/jira)",
-        default="reports/jira",
-    )
-    parser.add_argument(
-        "--hide-individual-names",
-        action="store_true",
-        help="Anonymize individual names in filenames (Developer-A3F2, etc.)",
-    )
-
+    add_jira_metrics_args(parser)
     args = parser.parse_args()
 
     # Load config if specified (will be merged with defaults)
-    team_members_file = None
+    members_file = None
     if args.config:
-        team_members_file = Path(args.config)
-        if not team_members_file.exists():
+        members_file = Path(args.config)
+        if not members_file.exists():
             print(f"Error: Config file not found: {args.config}")
             return 1
 
     # Determine which config file to use for leave_days lookup
     project_root = get_project_root()
     default_config_path = project_root / "config" / "jira_report_config.yaml"
-    config_path = team_members_file if team_members_file else default_config_path
+    config_path = members_file if members_file else default_config_path
 
     # Get leave_days from command line argument
     leave_days = 0
@@ -101,10 +60,10 @@ def main():
     report_gen = JiraReportGenerator()
 
     # Build JQL query
-    jql_query, team_members = calculator.build_jql_query(
+    jql_query, members = calculator.build_jql_query(
         project_key=args.project,
         assignee=args.assignee,
-        team_members_file=team_members_file,
+        members_file=members_file,
         start_date=args.start,
         end_date=args.end,
         status=args.status,

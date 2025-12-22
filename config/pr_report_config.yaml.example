@@ -17,17 +17,6 @@ project:
   # If you do not set, would upload to the default google-sheet.
   # IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com
 
-# Output directory for reports
-# SIMPLE SCENARIO (single project): Optional, defaults to "reports/github" or "reports/gitlab"
-# COMPLEX SCENARIO (multi-project aggregation): REQUIRED! Must be "reports/{project-name}/github" or "reports/{project-name}/gitlab"
-#   where {project-name} matches the subdirectory name in aggregation config
-#
-# Example for aggregation:
-# output_dir: "reports/internal-services/github"  # For config/my-team/internal-services/pr_report_config.yaml
-# output_dir: "reports/frontend/github"           # For config/my-team/frontend/pr_report_config.yaml
-#
-# output_dir: "reports/github"  # Simple scenario (optional)
-
 phases:
   - name: "No AI Period"
     start: "2024-10-24"
@@ -41,7 +30,7 @@ phases:
 
 default_author: "" # "" represent team
 
-team_members:
+members:
   # For consistent anonymization across Jira and PR reports:
   # - Add 'email' field with the same email used in Jira config
   # - This ensures the same person gets the same anonymous hash in both reports
@@ -51,32 +40,43 @@ team_members:
   # - leave_days: Days on leave during the phase (single value or per-phase list)
   # - capacity: Work capacity 0.0-1.0 (1.0=full time, 0.5=half time, single value or per-phase list)
 
-  - name: sahil143
-    email: sbudhwar@redhat.com  # Same email as in Jira config
+  - email: sbudhwar@redhat.com  # Same email as in Jira config
+    github_username: sahil143
     leave_days: 0 # Optional when it is 0
     capacity: 1 # Optional when it is 1
-  - name: testcara
-    email: wlin@redhat.com
+  - email: wlin@redhat.com
+    github_username: testcara
     leave_days:
       - 26
       - 20
       - 11.5
     capacity: 0.8
-  - name: rrosatti
-    email: rgalvao@redhat.com
-  - name: marcin-michal
-    email: mmarcin@redhat.com
-  - name: StanislavJochman
-    email: sjochman@redhat.com
-  - name: JoaoPedroPP
-    email: jpolonip@redhat.com
-  - name: janaki29
-    email: djanaki@redhat.com
-  - name: rakshett
-    email: rakshett@redhat.com  # Same email as in Jira config
-  - name: milantaky
-    email: mtakac@redhat.com  # Same email as in Jira config
-  - name: abhinandan13jan
-    email: abhindas@redhat.com  # Same email as in Jira config
-  - name: Katka92
-    email: kkanova@redhat.com  # Same email as in Jira config
+  - email: rgalvao@redhat.com
+    github_username: rrosatti
+  - email: mmarcin@redhat.com
+    github_username: marcin-michal
+  - email: sjochman@redhat.com
+    github_username: StanislavJochman
+  - email: jpolonip@redhat.com
+    github_username: JoaoPedroPP
+  - email: djanaki@redhat.com
+    github_username: janaki29
+  - email: rakshett@redhat.com
+    github_username: rakshett
+  - email: mtakac@redhat.com
+    github_username: milantaky
+  - email: abhindas@redhat.com
+    github_username: abhinandan13jan
+  - email: kkanova@redhat.com
+    github_username: Katka92
+
+# Output directory for reports
+# SIMPLE SCENARIO (single project): Optional, defaults to "reports/github" or "reports/gitlab"
+# COMPLEX SCENARIO (multi-project aggregation): REQUIRED! Must be "reports/{project-name}/github" or "reports/{project-name}/gitlab"
+#   where {project-name} matches the subdirectory name in aggregation config
+#
+# Example for aggregation:
+# output_dir: "reports/internal-services/github"  # For config/my-team/internal-services/pr_report_config.yaml
+# output_dir: "reports/frontend/github"           # For config/my-team/frontend/pr_report_config.yaml
+#
+# output_dir: "reports/github"  # Simple scenario (optional)

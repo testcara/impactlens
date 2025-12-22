@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from impactlens.core.jira_report_generator import JiraReportGenerator
+from impactlens.utils.common_args import add_jira_comparison_report_args
 from impactlens.utils.report_utils import (
     normalize_username,
     generate_comparison_report,
@@ -21,8 +22,8 @@ from impactlens.utils.report_utils import (
 from impactlens.utils.workflow_utils import (
     load_config_file,
     get_project_root,
-    load_team_members_from_yaml,
-    resolve_member_identifier,
+    load_members_emails,
+    load_members_from_yaml,
 )
 
 
@@ -55,35 +56,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Generate Jira AI Impact Comparison Report from phase reports"
     )
-    parser.add_argument(
-        "--assignee",
-        type=str,
-        help="Filter by assignee (e.g., sbudhwar or sbudhwar@redhat.com)",
-        default=None,
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        help="Output filename (default: auto-generated)",
-        default=None,
-    )
-    parser.add_argument(
-        "--reports-dir",
-        type=str,
-        help="Reports directory (default: reports/jira)",
-        default="reports/jira",
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to custom config YAML file",
-        default=None,
-    )
-    parser.add_argument(
-        "--hide-individual-names",
-        action="store_true",
-        help="Look for anonymized report files (Developer-XXXX)",
-    )
+    parser = argparse.ArgumentParser(...)
+    add_jira_comparison_report_args(parser)
     args = parser.parse_args()
 
     # Load phase configuration to get phase names
@@ -101,18 +75,15 @@ def main():
     # Use custom config if provided, otherwise use default
     config_file = custom_config_file if custom_config_file else default_config_file
 
-    # Resolve member identifier (supports both "wlin" and "wlin@redhat.com")
-    resolved_assignee = args.assignee
+    # Assignee must be an email address
     if args.assignee:
-        email, _ = resolve_member_identifier(args.assignee, config_file)
-        if email:
-            resolved_assignee = email
-            if email != args.assignee:
-                print(f"Resolved '{args.assignee}' to '{email}'")
+        # Validate that assignee exists in config
+        if args.assignee not in load_members_emails(config_file):
+            raise ValueError(f"Email '{args.assignee}' not found in config file {config_file}")
 
     # Find matching reports using resolved assignee
     report_files = find_reports(
-        resolved_assignee,
+        args.assignee,
         reports_dir=args.reports_dir,
         hide_individual_names=args.hide_individual_names,
     )
@@ -163,8 +134,8 @@ def main():
 
     # Get identifier for filename (normalized and optionally anonymized)
     identifier = (
-        get_identifier_for_file(resolved_assignee, args.hide_individual_names)
-        if resolved_assignee
+        get_identifier_for_file(args.assignee, args.hide_individual_names)
+        if args.assignee
         else None
     )
 

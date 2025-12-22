@@ -426,7 +426,7 @@ class GitHubClient:
         return {
             "pr_number": pr_number,
             "title": pr["title"],
-            "author": pr["user"]["login"],
+            "github_username": pr["user"]["login"],
             "created_at": pr["created_at"],
             "merged_at": pr["merged_at"],
             "url": pr["html_url"],

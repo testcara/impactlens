@@ -258,9 +258,9 @@ class EmailNotifier:
         return results
 
 
-def notify_team_members(
+def notify_members(
     anonymizer,
-    team_members: List[Dict],
+    members: List[Dict],
     pr_url: Optional[str] = None,
     report_context: Optional[str] = None,
     dry_run: bool = False,
@@ -270,7 +270,7 @@ def notify_team_members(
 
     Args:
         anonymizer: NameAnonymizer instance with the name mappings
-        team_members: List of team member dicts with 'name' or 'member' and 'email' keys
+        members: List of team member dicts with 'name' or 'member' and 'email' keys
         pr_url: Optional PR URL that triggered the report
         report_context: Optional additional context
         dry_run: If True, print emails instead of sending
@@ -282,20 +282,20 @@ def notify_team_members(
         >>> from impactlens.utils.anonymization import NameAnonymizer
         >>> anonymizer = NameAnonymizer()
         >>> anonymizer.anonymize("alice")
-        >>> team_members = [
+        >>> members = [
         ...     {"member": "alice", "email": "alice@example.com"},
         ...     {"member": "bob", "email": "bob@example.com"}
         ... ]
-        >>> results = notify_team_members(
+        >>> results = notify_members(
         ...     anonymizer,
-        ...     team_members,
+        ...     members,
         ...     pr_url="https://github.com/org/repo/pull/123",
         ...     dry_run=True
         ... )
     """
     # Build email mapping from team members
     email_mapping = {}
-    for member in team_members:
+    for member in members:
         name = member.get("member") or member.get("name")
         email = member.get("email")
         if name and email:

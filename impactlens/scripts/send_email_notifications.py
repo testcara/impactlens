@@ -16,11 +16,11 @@ from pathlib import Path
 from typing import Dict, List
 import yaml
 
-from impactlens.utils.email_notifier import notify_team_members
+from impactlens.utils.email_notifier import notify_members
 from impactlens.utils.anonymization import _global_anonymizer
 
 
-def collect_team_members_from_config(config_path: Path) -> List[Dict]:
+def collect_members_from_config(config_path: Path) -> List[Dict]:
     """
     Collect team members from a single config file.
 
@@ -36,7 +36,7 @@ def collect_team_members_from_config(config_path: Path) -> List[Dict]:
     try:
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
-        return config.get("team_members", [])
+        return config.get("members", [])
     except Exception as e:
         print(f"Warning: Failed to load config {config_path}: {e}")
         return []
@@ -89,7 +89,7 @@ def _add_members_to_dict(members: List[Dict], all_members_by_email: Dict[str, Di
                 all_members_by_email[email] = {"member": name, "email": email}
 
 
-def collect_all_team_members(config_dir: Path) -> tuple[List[Dict], Dict]:
+def collect_all_members(config_dir: Path) -> tuple[List[Dict], Dict]:
     """
     Collect all unique team members and email config from config directory.
 
@@ -101,7 +101,7 @@ def collect_all_team_members(config_dir: Path) -> tuple[List[Dict], Dict]:
         config_dir: Path to config directory
 
     Returns:
-        Tuple of (team_members list, email_config dict)
+        Tuple of (members list, email_config dict)
     """
     all_members_by_email: Dict[str, Dict] = {}  # email -> member info
     email_config = {}  # Will use first valid email config found
@@ -126,7 +126,7 @@ def collect_all_team_members(config_dir: Path) -> tuple[List[Dict], Dict]:
                 # Try both jira and pr config files
                 for config_name in ["jira_report_config.yaml", "pr_report_config.yaml"]:
                     config_path = project_dir / config_name
-                    members = collect_team_members_from_config(config_path)
+                    members = collect_members_from_config(config_path)
 
                     # Load email config from first available config
                     if not email_config:
@@ -144,7 +144,7 @@ def collect_all_team_members(config_dir: Path) -> tuple[List[Dict], Dict]:
 
         for config_name in ["jira_report_config.yaml", "pr_report_config.yaml"]:
             config_path = config_dir / config_name
-            members = collect_team_members_from_config(config_path)
+            members = collect_members_from_config(config_path)
 
             # Load email config from first available config
             if not email_config:
@@ -190,14 +190,14 @@ def main():
     print(f"Config directory: {config_dir}\n")
 
     # Collect all team members and email config (deduplicated)
-    team_members, email_config = collect_all_team_members(config_dir)
+    members, email_config = collect_all_members(config_dir)
 
-    if not team_members:
+    if not members:
         print("No team members found in config files")
         print("=" * 60)
         sys.exit(0)
 
-    print(f"Found {len(team_members)} unique team members\n")
+    print(f"Found {len(members)} unique team members\n")
 
     # Check if email notifications are enabled
     if not email_config.get("enabled", True):
@@ -207,14 +207,14 @@ def main():
 
     # Test mode: filter to only wlin@redhat.com
     if args.test_mode:
-        original_count = len(team_members)
-        team_members = [m for m in team_members if m.get("email") == "wlin@redhat.com"]
+        original_count = len(members)
+        members = [m for m in members if m.get("email") == "wlin@redhat.com"]
         print(
-            f"🧪 TEST MODE: Filtered {original_count} members to {len(team_members)} (only wlin@redhat.com)"
+            f"🧪 TEST MODE: Filtered {original_count} members to {len(members)} (only wlin@redhat.com)"
         )
         print("   This prevents spamming the team during testing\n")
 
-        if not team_members:
+        if not members:
             print("⚠️  No test email (wlin@redhat.com) found in team members")
             print("   Add wlin@redhat.com to your config for testing")
             print("=" * 60)
@@ -224,7 +224,7 @@ def main():
     # This ensures everyone gets a consistent anonymous ID
     print("Generating anonymous identifiers...")
     anon_count = 0
-    for member in team_members:
+    for member in members:
         name = member.get("member") or member.get("name")
         if name:
             _global_anonymizer.anonymize(name)
@@ -274,7 +274,7 @@ def main():
     # Send notifications
     results = notifier.send_batch_notifications(
         name_mapping=_global_anonymizer.get_mapping(),
-        email_mapping={m.get("member") or m.get("name"): m.get("email") for m in team_members},
+        email_mapping={m.get("member") or m.get("name"): m.get("email") for m in members},
         pr_url=pr_url,
         report_context="ImpactLens Reports Generated",
         dry_run=args.dry_run,

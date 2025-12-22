@@ -14,7 +14,6 @@ from impactlens.utils.workflow_utils import (
     cleanup_old_reports,
     upload_to_google_sheets,
     find_latest_comparison_report,
-    load_team_members,
 )
 from impactlens.utils.anonymization import (
     NameAnonymizer,
@@ -36,7 +35,6 @@ __all__ = [
     "cleanup_old_reports",
     "upload_to_google_sheets",
     "find_latest_comparison_report",
-    "load_team_members",
     "NameAnonymizer",
     "anonymize_names_in_list",
     "anonymize_member_data",

@@ -15,15 +15,9 @@ phases:
 
 default_assignee: "" # "" represent team
 
-team_members:
-  - member: wlin
-    email: wlin@redhat.com
-    leave_days: 0
-    capacity: 1.0
-  - member: sbudhwar
-    email: sbudhwar@redhat.com
-    leave_days: 0
-    capacity: 1.0
+members:
+  - email: wlin@redhat.com
+  - email: sbudhwar@redhat.com
 
 # Use test output directory to avoid polluting main reports
 output_dir: "reports/test-ci-team1/jira"
@@ -37,4 +31,4 @@ log_level: "WARNING"
 # - Opt-in sharing: They can choose to share their ID with their manager
 # - This allows connecting individual work to anonymized reports while preserving privacy
 email_anonymous_id:
-  enabled: true  # Set to false to disable
+  enabled: true # Set to false to disable

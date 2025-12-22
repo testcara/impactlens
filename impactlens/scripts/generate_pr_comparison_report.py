@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from impactlens.core.pr_report_generator import PRReportGenerator
+from impactlens.utils.common_args import add_pr_comparison_report_args
 from impactlens.utils.report_utils import (
     generate_comparison_report,
     get_identifier_for_file,
@@ -22,7 +23,7 @@ from impactlens.utils.report_utils import (
 from impactlens.utils.workflow_utils import (
     load_config_file,
     get_project_root,
-    load_team_members_from_yaml,
+    load_members_from_yaml,
 )
 
 
@@ -95,36 +96,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Generate PR AI Impact Comparison Report from phase reports"
     )
-    parser.add_argument(
-        "--author",
-        type=str,
-        help="Filter by author (GitHub username)",
-        default=None,
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        help="Output filename (default: auto-generated)",
-        default=None,
-    )
-    parser.add_argument(
-        "--reports-dir",
-        type=str,
-        help="Reports directory (default: reports/github)",
-        default="reports/github",
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to custom config YAML file",
-        default=None,
-    )
-    parser.add_argument(
-        "--hide-individual-names",
-        action="store_true",
-        help="Look for anonymized report files (Developer-XXXX)",
-    )
-
+    add_pr_comparison_report_args(parser)
     args = parser.parse_args()
 
     # Load phase configuration to get phase names
@@ -147,9 +119,9 @@ def main():
         # Try to find email for this author from config
         config_file = custom_config_file if custom_config_file else default_config_file
         if config_file.exists():
-            members_detailed = load_team_members_from_yaml(config_file, detailed=True)
+            members_detailed = load_members_from_yaml(config_file)
             for member_id, member_info in members_detailed.items():
-                if member_info.get("name") == args.author:
+                if member_info.get("github_username") == args.author:
                     # Found the member, use email for anonymization if available
                     if member_info.get("email"):
                         anonymization_identifier = member_info.get("email")

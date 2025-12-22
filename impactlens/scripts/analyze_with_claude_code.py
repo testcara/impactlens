@@ -427,64 +427,9 @@ Examples:
         """,
     )
 
-    parser.add_argument(
-        "--report",
-        type=str,
-        required=True,
-        help="Path to TSV report (supports wildcards for latest)",
-    )
+    from impactlens.utils.common_args import add_claude_analysis_args
 
-    parser.add_argument(
-        "--prompt-template",
-        type=str,
-        default="config/analysis_prompt_template.yaml",
-        help="Path to prompt template YAML file",
-    )
-
-    parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="reports",
-        help="Output directory for analysis",
-    )
-
-    parser.add_argument(
-        "--save-analysis",
-        type=str,
-        help="Analysis text to save directly (optional, skips Claude Code call)",
-    )
-
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=300,
-        help="Timeout for Claude Code analysis in seconds (default: 300)",
-    )
-
-    parser.add_argument(
-        "--prompt-only",
-        action="store_true",
-        help="Prompt preview mode: only generate and display prompt without calling Claude",
-    )
-
-    parser.add_argument(
-        "--no-upload",
-        action="store_true",
-        help="Skip uploading analysis to Google Sheets (default: auto-upload)",
-    )
-
-    parser.add_argument(
-        "--claude-api-mode",
-        action="store_true",
-        help="Use Anthropic API instead of Claude Code CLI (requires ANTHROPIC_API_KEY)",
-    )
-
-    parser.add_argument(
-        "--anthropic-api-key",
-        type=str,
-        help="Anthropic API key (if not provided, reads from ANTHROPIC_API_KEY env var)",
-    )
-
+    add_claude_analysis_args(parser)
     args = parser.parse_args()
 
     logger.info("=" * 80)

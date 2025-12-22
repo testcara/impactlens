@@ -16,15 +16,16 @@ import traceback
 from pathlib import Path
 from typing import List, Optional
 
+from impactlens.utils.common_args import add_jira_report_args
 from impactlens.utils.workflow_utils import (
     Colors,
     get_project_root,
     cleanup_old_reports,
     upload_to_google_sheets,
     find_latest_comparison_report,
-    load_team_members,
+    load_members_emails,
     load_and_resolve_config,
-    load_team_members_from_yaml,
+    load_members_from_yaml,
     aggregate_member_values_for_phases,
 )
 from impactlens.utils.report_utils import (
@@ -125,7 +126,7 @@ def generate_comparison_report(
 
 
 def generate_all_members_reports(
-    team_members_file: Path,
+    members_file: Path,
     script_name: str,
     no_upload: bool = False,
     upload_members: bool = False,
@@ -136,7 +137,7 @@ def generate_all_members_reports(
     Generate reports for all team members.
 
     Args:
-        team_members_file: Path to config file with team members
+        members_file: Path to config file with team members
         script_name: Script module name to invoke
         no_upload: If True, skip all uploads
         upload_members: If True, upload member reports (default: False, only team report is uploaded)
@@ -145,9 +146,9 @@ def generate_all_members_reports(
     """
     print_header("Generating reports for all team members")
 
-    members = load_team_members(team_members_file)
+    members = load_members_emails(members_file)
     if not members:
-        print(f"{Colors.RED}Error: No team members found in {team_members_file}{Colors.NC}")
+        print(f"{Colors.RED}Error: No team members found in {members_file}{Colors.NC}")
         return 1
 
     # Generate team overall report first (always upload unless --no-upload)
@@ -221,44 +222,8 @@ Examples:
   python3 -m impactlens.script.generate_jira_report --combine-only       # Combine only
         """,
     )
-
-    parser.add_argument(
-        "assignee",
-        nargs="?",
-        help="Assignee email to filter issues (optional)",
-    )
-    parser.add_argument(
-        "--all-members",
-        action="store_true",
-        help="Generate reports for all team members from config",
-    )
-    parser.add_argument(
-        "--combine-only",
-        action="store_true",
-        help="Combine existing TSV reports without regenerating",
-    )
-    parser.add_argument(
-        "--no-upload",
-        action="store_true",
-        help="Skip uploading report to Google Sheets",
-    )
-    parser.add_argument(
-        "--upload-members",
-        action="store_true",
-        help="Upload individual member reports to Google Sheets (default: only team and combined reports)",
-    )
-    parser.add_argument(
-        "--hide-individual-names",
-        action="store_true",
-        help="Anonymize individual names in combined reports (Developer-A3F2, etc.) and hide sensitive fields (leave_days, capacity)",
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to custom config YAML file. Settings override defaults from config/jira_report_config.yaml",
-        default=None,
-    )
-
+    parser = argparse.ArgumentParser(...)
+    add_jira_report_args(parser)
     args = parser.parse_args()
 
     project_root = get_project_root()
@@ -275,7 +240,7 @@ Examples:
 
     phases, default_assignee, reports_dir, project_settings = result
     config_file = custom_config_file if custom_config_file else default_config_file
-
+    print(f"-----cara---- {reports_dir}")
     # Handle --combine-only flag
     if args.combine_only:
         print_header("Combining Existing Jira Reports")
