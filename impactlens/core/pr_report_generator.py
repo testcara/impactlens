@@ -61,7 +61,7 @@ class PRReportGenerator:
         lines.append("")
 
         lines.append("--- PR Summary ---")
-        lines.append(f"Total PRs Merged (excl. bot-authored): {stats['total_prs']}")
+        lines.append(f"Total PRs Merged (team members): {stats['total_prs']}")
         lines.append(f"AI Adoption Rate: {stats['ai_adoption_rate']:.1f}%")
         lines.append(f"AI-Assisted PRs: {stats['ai_assisted_prs']}")
         lines.append(f"Non-AI PRs: {stats['non_ai_prs']}")
@@ -432,7 +432,7 @@ class PRReportGenerator:
 
         # Total PRs
         total_prs = [str(r["total_prs"]) for r in reports]
-        lines.append("Total PRs Merged (excl. bot-authored)\t" + "\t".join(total_prs))
+        lines.append("Total PRs Merged (team members)\t" + "\t".join(total_prs))
 
         # Daily Throughput - 4 variants (same order as Jira metrics)
         # Variant 1: Skip leave days

@@ -7,6 +7,7 @@ import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from impactlens.utils.logger import logger
+from impactlens.utils.pr_utils import extract_ai_info_from_commits
 
 
 class GitHubClient:
@@ -107,7 +108,12 @@ class GitHubClient:
         return username.lower() in GitHubClient.BOT_USERS or username.lower().endswith("[bot]")
 
     def fetch_merged_prs(
-        self, start_date: str, end_date: str, per_page: int = 100
+        self,
+        start_date: str,
+        end_date: str,
+        author: Optional[str] = None,
+        team_members: Optional[List[str]] = None,
+        per_page: int = 100,
     ) -> List[Dict[str, Any]]:
         """
         Fetch all merged PRs within a date range.
@@ -115,6 +121,8 @@ class GitHubClient:
         Args:
             start_date: Start date in YYYY-MM-DD format
             end_date: End date in YYYY-MM-DD format
+            author: Optional author filter (GitHub username)
+            team_members: Optional list of team member GitHub usernames (used when author=None for team reports)
             per_page: Results per page (max 100)
 
         Returns:
@@ -149,9 +157,17 @@ class GitHubClient:
                     continue
 
                 # Skip PRs created by bots
-                author = pr.get("user", {}).get("login", "")
-                if self.is_bot_user(author):
-                    logger.debug(f"Skipping bot-authored PR #{pr.get('number')} by {author}")
+                pr_author = pr.get("user", {}).get("login", "")
+                if self.is_bot_user(pr_author):
+                    logger.debug(f"Skipping bot-authored PR #{pr.get('number')} by {pr_author}")
+                    continue
+
+                # Filter by author if specified
+                if author and pr_author != author:
+                    continue
+
+                # Filter by team members if specified (for team reports when author=None)
+                if not author and team_members and pr_author not in team_members:
                     continue
 
                 merged_date = datetime.strptime(pr["merged_at"], "%Y-%m-%dT%H:%M:%SZ")
@@ -302,36 +318,7 @@ class GitHubClient:
             }
         """
         commits = self.get_pr_commits(pr_number)
-
-        ai_tools = set()
-        ai_commits = 0
-
-        for commit in commits:
-            message = commit["commit"]["message"]
-
-            # Check for "Assisted-by" trailer
-            if "Assisted-by: Claude" in message or "assisted-by: claude" in message.lower():
-                ai_tools.add("Claude")
-                ai_commits += 1
-
-            if "Assisted-by: Cursor" in message or "assisted-by: cursor" in message.lower():
-                ai_tools.add("Cursor")
-                ai_commits += 1
-
-            # Also check for Co-Authored-By patterns
-            if "Co-Authored-By: Claude" in message:
-                ai_tools.add("Claude")
-                ai_commits += 1
-
-        total_commits = len(commits)
-
-        return {
-            "has_ai_assistance": len(ai_tools) > 0,
-            "ai_tools": sorted(list(ai_tools)),
-            "ai_commits_count": ai_commits,
-            "total_commits": total_commits,
-            "ai_percentage": (ai_commits / total_commits * 100) if total_commits > 0 else 0,
-        }
+        return extract_ai_info_from_commits(commits)
 
     def get_pr_detailed_metrics(self, pr: Dict[str, Any]) -> Dict[str, Any]:
         """
