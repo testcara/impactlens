@@ -122,6 +122,23 @@ Examples:
         print("  export GITHUB_REPO_NAME='repo'")
         return 1
 
+    # Load team members for filtering (when author=None, i.e., team report)
+    team_members = None
+    if not args.author and args.config:
+        config_path = Path(args.config)
+        if config_path.exists():
+            members_detailed = load_members_from_yaml(config_path)
+            if members_detailed:
+                # Extract GitHub usernames from team members
+                team_members = []
+                for member_id, member_info in members_detailed.items():
+                    github_username = member_info.get("github_username") or member_id
+                    if github_username:
+                        team_members.append(github_username)
+                if team_members:
+                    print(f"📋 Loaded {len(team_members)} team members from config")
+                    print(f"   Team report will only include PRs from these members")
+
     # Fetch merged PRs
     print("\n📥 Fetching merged PRs...")
     try:
@@ -130,17 +147,23 @@ Examples:
                 args.start,
                 args.end,
                 author=args.author,
+                team_members=team_members,
                 use_cache=not args.no_cache,
                 incremental=args.incremental,
             )
             print(f"✓ Fetched and analyzed {len(prs_with_metrics)} PRs")
         else:
             # REST API: fetch PRs first, then analyze each one
-            prs = client.fetch_merged_prs(args.start, args.end)
+            prs = client.fetch_merged_prs(
+                args.start, args.end, author=args.author, team_members=team_members
+            )
 
             if args.author:
-                prs = [pr for pr in prs if pr["user"]["login"] == args.author]
                 print(f"✓ Filtered to {len(prs)} PRs by author '{args.author}'")
+            elif team_members:
+                print(f"✓ Filtered to {len(prs)} PRs by {len(team_members)} team members")
+            else:
+                print(f"✓ Fetched {len(prs)} PRs (all repository PRs)")
 
             if not prs:
                 print("\n⚠ No merged PRs found for the specified period")
