@@ -269,7 +269,8 @@ impactlens full --with-claude-insights --claude-api-mode
 ### GitHub PR Metrics
 
 - **Total PRs** - Number of pull requests
-- **AI Adoption Rate** - Percentage of PRs with AI assistance
+- **AI Adoption Rate** - Percentage of PRs with AI assistance (detected via commit messages)
+- **Claude PRs / Cursor PRs** - Count of PRs using each AI tool
 - **Time to Merge** - Average time from PR creation to merge
 - **Time to First Review** - Average time until first review
 - **Changes Requested** - Average number of change requests per PR

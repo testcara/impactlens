@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set
 from impactlens.utils.logger import logger
+from impactlens.utils.pr_utils import extract_ai_info_from_commits
 
 
 class GitHubGraphQLClient:
@@ -156,6 +157,7 @@ class GitHubGraphQLClient:
         start_date: str,
         end_date: str,
         author: Optional[str] = None,
+        team_members: Optional[List[str]] = None,
         use_cache: bool = True,
         incremental: bool = False,
     ) -> List[Dict[str, Any]]:
@@ -166,6 +168,7 @@ class GitHubGraphQLClient:
             start_date: Start date in YYYY-MM-DD format
             end_date: End date in YYYY-MM-DD format
             author: Optional author filter (GitHub username)
+            team_members: Optional list of team member GitHub usernames to filter by (used when author=None for team reports)
             use_cache: Use cached data if available
             incremental: Only fetch PRs updated since last run
 
@@ -190,7 +193,9 @@ class GitHubGraphQLClient:
 
         # Fetch from GraphQL
         logger.info(f"Fetching PRs from GitHub GraphQL API ({query_start_date} to {end_date})")
-        prs = self._fetch_prs_graphql_paginated(query_start_date, end_date, author)
+        if team_members:
+            logger.info(f"Filtering to team members: {len(team_members)} members")
+        prs = self._fetch_prs_graphql_paginated(query_start_date, end_date, author, team_members)
 
         # Merge with cache in incremental mode
         if incremental and use_cache:
@@ -211,7 +216,11 @@ class GitHubGraphQLClient:
         return prs
 
     def _fetch_prs_graphql_paginated(
-        self, start_date: str, end_date: str, author: Optional[str] = None
+        self,
+        start_date: str,
+        end_date: str,
+        author: Optional[str] = None,
+        team_members: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Fetch PRs using GraphQL with pagination.
@@ -220,6 +229,7 @@ class GitHubGraphQLClient:
             start_date: Start date
             end_date: End date
             author: Optional author filter
+            team_members: Optional list of team member GitHub usernames (used when author=None)
 
         Returns:
             List of PR dictionaries
@@ -318,6 +328,11 @@ class GitHubGraphQLClient:
 
                 # Filter by author if specified
                 if author and pr_author != author:
+                    filtered_reasons["author_mismatch"] += 1
+                    continue
+
+                # Filter by team members if specified (for team reports when author=None)
+                if not author and team_members and pr_author not in team_members:
                     filtered_reasons["author_mismatch"] += 1
                     continue
 
@@ -560,33 +575,12 @@ class GitHubGraphQLClient:
         }
 
     def _extract_ai_info(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Extract AI assistance information from commit messages."""
-        ai_tools: Set[str] = set()
-        ai_commits = 0
-        total_commits = len(commits)
+        """
+        Extract AI assistance information from commit messages.
 
-        for commit in commits:
-            message = commit.get("commit", {}).get("message", "")
-
-            # Check for AI assistance markers
-            if (
-                "assisted-by: claude" in message.lower()
-                or "co-authored-by: claude" in message.lower()
-            ):
-                ai_tools.add("Claude")
-                ai_commits += 1
-
-            if "assisted-by: cursor" in message.lower():
-                ai_tools.add("Cursor")
-                ai_commits += 1
-
-        return {
-            "has_ai_assistance": len(ai_tools) > 0,
-            "ai_tools": sorted(list(ai_tools)),
-            "ai_commits_count": ai_commits,
-            "total_commits": total_commits,
-            "ai_percentage": (ai_commits / total_commits * 100) if total_commits > 0 else 0,
-        }
+        This is a wrapper around the shared utility function.
+        """
+        return extract_ai_info_from_commits(commits)
 
     def _process_reviews(
         self, reviews: List[Dict[str, Any]], created_at: datetime
