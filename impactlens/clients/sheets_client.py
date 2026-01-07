@@ -19,6 +19,7 @@ Setup:
 
 import os
 import sys
+import traceback
 from datetime import datetime
 
 try:
@@ -372,3 +373,88 @@ def build_service(credentials, timeout=60):
     service = build("sheets", "v4", http=authorized_http)
 
     return service
+
+
+def upload_image_to_sheet(
+    service,
+    spreadsheet_id,
+    image_path,
+    sheet_name,
+    row=0,
+    col=0,
+    width=600,
+    height=400
+):
+    """
+    Upload an image to a Google Sheet.
+
+    Args:
+        service: Google Sheets API service
+        spreadsheet_id: Target spreadsheet ID
+        image_path: Path to the image file
+        sheet_name: Name of the sheet tab
+        row: Row index (0-based) where image should be placed
+        col: Column index (0-based) where image should be placed
+        width: Image width in pixels (default: 600)
+        height: Image height in pixels (default: 400)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import base64
+    from pathlib import Path
+
+    try:
+        # Read image and convert to base64
+        with open(image_path, 'rb') as f:
+            image_data = base64.b64encode(f.read()).decode('utf-8')
+
+        # Get sheet ID
+        sheets = get_existing_sheets(service, spreadsheet_id)
+        sheet_id = None
+        for sheet in sheets:
+            if sheet['title'] == sheet_name:
+                sheet_id = sheet['id']
+                break
+
+        if sheet_id is None:
+            print(f"Error: Sheet '{sheet_name}' not found")
+            return False
+
+        # Calculate pixel offset (approximate: 1 row ≈ 21 pixels, 1 col ≈ 100 pixels)
+        offset_x = col * 100
+        offset_y = row * 21
+
+        # Create request to insert image
+        requests = [{
+            "updateCells": {
+                "rows": [{
+                    "values": [{
+                        "userEnteredValue": {
+                            "formulaValue": f'=IMAGE("data:image/png;base64,{image_data}")'
+                        }
+                    }]
+                }],
+                "fields": "userEnteredValue",
+                "start": {
+                    "sheetId": sheet_id,
+                    "rowIndex": row,
+                    "columnIndex": col
+                }
+            }
+        }]
+
+        # Execute the batch update
+        body = {'requests': requests}
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body=body
+        ).execute()
+
+        print(f"✓ Uploaded image to {sheet_name} at row {row}, col {col}")
+        return True
+
+    except Exception as e:
+        print(f"Error uploading image: {e}")
+        traceback.print_exc()
+        return False

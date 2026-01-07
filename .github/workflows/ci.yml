@@ -225,6 +225,7 @@ jobs:
             --incremental \
             --hide-individual-names \
             --email-anonymous-id \
+            --generate-boxplot \
             --mail-save-file reports/test-ci-team/emails
 
           echo ""
@@ -366,7 +367,8 @@ jobs:
           python -m impactlens.cli pr full \
             --config config/test-aggregation-ci/test-ci-team1/pr_report_config.yaml \
             $UPLOAD_ARGS \
-            --hide-individual-names || echo "⚠️  Team 1 PR generation failed (continuing)"
+            --hide-individual-names \
+            --generate-boxplot || echo "⚠️  Team 1 PR generation failed (continuing)"
 
           echo "✓ Team 1 reports completed"
           ls -lh reports/test-ci-team1/ || true
@@ -400,7 +402,8 @@ jobs:
           python -m impactlens.cli pr full \
             --config config/test-aggregation-ci/test-ci-team2/pr_report_config.yaml \
             $UPLOAD_ARGS \
-            --hide-individual-names || echo "⚠️  Team 2 PR generation failed (continuing)"
+            --hide-individual-names \
+            --generate-boxplot || echo "⚠️  Team 2 PR generation failed (continuing)"
 
           echo "✓ Team 2 reports completed"
           ls -lh reports/test-ci-team2/ || true
@@ -477,6 +480,7 @@ jobs:
         if: steps.docs_check.outputs.code_changed == 'true'
         run: .github/scripts/test-prompt-generation.sh "reports/test-ci-team*"
 
+
       - name: Upload test reports as artifacts
         if: steps.docs_check.outputs.code_changed == 'true' && always()
         uses: actions/upload-artifact@v4
@@ -508,4 +512,18 @@ jobs:
             ls -1 reports/test-ci-aggregated/ 2>/dev/null | sed 's/^/     /' || echo "     (none generated)"
             echo ""
           fi
+
+          # Show box plot status
+          echo "📈 Box Plot Visualizations:"
+          for team_dir in reports/test-ci-team*/github/box-plots; do
+            if [ -d "$team_dir" ]; then
+              team_name=$(basename $(dirname $(dirname "$team_dir")))
+              plot_count=$(ls -1 "$team_dir"/*.png 2>/dev/null | wc -l)
+              if [ $plot_count -gt 0 ]; then
+                echo "   - $team_name: $plot_count plots generated"
+              fi
+            fi
+          done
+          echo ""
+
           echo "✅ Multi-team aggregation test completed successfully"

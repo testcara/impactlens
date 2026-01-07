@@ -545,12 +545,21 @@ def pr_all(
 def pr_combine(
     config: Optional[str] = typer.Option(None, "--config", help="Custom config file path"),
     no_upload: bool = typer.Option(False, "--no-upload", help="Skip uploading to Google Sheets"),
+    generate_boxplot: bool = typer.Option(
+        False,
+        "--generate-boxplot",
+        help="Generate box plot visualizations comparing metrics across phases",
+    ),
 ):
     """COMBINE existing PR reports without regenerating."""
+    description = "Combining existing reports into a single TSV file"
+    if generate_boxplot:
+        description += " and generating box plots"
+
     console.print(
         Panel.fit(
             "[bold magenta]Combine PR Reports[/bold magenta]\n"
-            "[dim]Combining existing reports into a single TSV file[/dim]",
+            f"[dim]{description}[/dim]",
             border_style="magenta",
         )
     )
@@ -560,6 +569,8 @@ def pr_combine(
         args.extend(["--config", config])
     if no_upload:
         args.append("--no-upload")
+    if generate_boxplot:
+        args.append("--generate-boxplot")
 
     script = "impactlens.scripts.generate_pr_report"
     return_code = run_script(script, args, "Combining PR reports")
@@ -603,6 +614,11 @@ def pr_full(
         "--claude-api-mode",
         help="Use Anthropic API instead of Claude Code CLI (requires ANTHROPIC_API_KEY)",
     ),
+    generate_boxplot: bool = typer.Option(
+        False,
+        "--generate-boxplot",
+        help="Generate box plot visualizations comparing metrics across phases",
+    ),
 ):
     """
     Complete PR workflow: generate all reports and combine.
@@ -613,9 +629,12 @@ def pr_full(
     - Directory: config/team-a (auto-finds pr_report_config.yaml)
     - Specific file: config/team-a/pr_report_config.yaml
     """
-    workflow_steps = "Team → Members → Combine → Upload"
+    workflow_steps = "Team → Members → Combine"
+    if generate_boxplot:
+        workflow_steps += " → Box Plots"
     if with_claude_insights:
-        workflow_steps = "Team → Members → Combine → Claude Insights → Upload"
+        workflow_steps += " → Claude Insights"
+    workflow_steps += " → Upload"
 
     console.print(
         Panel.fit(
@@ -655,6 +674,8 @@ def pr_full(
         args.append("--no-upload")
     if hide_individual_names:
         args.append("--hide-individual-names")
+    if generate_boxplot:
+        args.append("--generate-boxplot")
 
     if run_script("impactlens.scripts.generate_pr_report", args, "PR combine") != 0:
         failed_steps.append("PR combine")
@@ -759,6 +780,11 @@ def full_workflow(
         False,
         "--claude-api-mode",
         help="Use Anthropic API instead of Claude Code CLI (requires ANTHROPIC_API_KEY)",
+    ),
+    generate_boxplot: bool = typer.Option(
+        False,
+        "--generate-boxplot",
+        help="Generate box plot visualizations comparing PR metrics across phases",
     ),
     log_level: str = typer.Option(
         "WARNING",
@@ -880,6 +906,8 @@ def full_workflow(
         pr_combine_args.append("--no-upload")
     if hide_individual_names:
         pr_combine_args.append("--hide-individual-names")
+    if generate_boxplot:
+        pr_combine_args.append("--generate-boxplot")
     if pr_config_path:
         pr_combine_args.extend(["--config", str(pr_config_path)])
 

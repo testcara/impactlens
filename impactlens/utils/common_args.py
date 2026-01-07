@@ -348,6 +348,20 @@ def add_aggregation_args(parser: argparse.ArgumentParser) -> None:
 
 
 # ============================================================================
+# Visualization Arguments
+# ============================================================================
+
+
+def add_visualization_args(parser: argparse.ArgumentParser) -> None:
+    """Add arguments for statistical visualization (box plots)."""
+    parser.add_argument(
+        "--generate-boxplot",
+        action="store_true",
+        help="Generate box plot visualizations for metrics comparison across phases",
+    )
+
+
+# ============================================================================
 # Email Notification Arguments
 # ============================================================================
 
@@ -405,6 +419,7 @@ def add_pr_report_args(parser: argparse.ArgumentParser) -> None:
     add_report_generation_args(parser)
     add_upload_args(parser)
     add_anonymization_arg(parser)
+    add_visualization_args(parser)
 
 
 def add_jira_comparison_report_args(parser: argparse.ArgumentParser) -> None:

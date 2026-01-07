@@ -34,6 +34,7 @@ from impactlens.utils.report_utils import (
     build_pr_project_prefix,
 )
 from impactlens.core.report_aggregator import ReportAggregator
+from impactlens.utils.logger import logger
 
 
 def print_header(title: str, subtitle: Optional[str] = None) -> None:
@@ -44,6 +45,183 @@ def print_header(title: str, subtitle: Optional[str] = None) -> None:
         print(f"{Colors.BLUE}{subtitle}{Colors.NC}")
     print(f"{Colors.BLUE}{'=' * 40}{Colors.NC}")
     print()
+
+
+def generate_boxplots_from_config(
+    config_file: Path,
+    reports_dir: Path,
+    phases: List[tuple],
+    skip_upload: bool = False,
+    project_settings: Optional[dict] = None,
+) -> bool:
+    """
+    Generate box plot visualizations using config phases.
+
+    Args:
+        config_file: Path to PR config file (for Google Sheets ID)
+        reports_dir: Directory containing PR JSON reports
+        phases: List of (name, start_date, end_date) tuples from config
+        skip_upload: If True, skip uploading to Google Sheets
+        project_settings: Project settings from config (for sheet naming)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        from datetime import datetime
+        from impactlens.utils.visualization import extract_pr_data_from_json, generate_boxplot
+
+        logger.info("=" * 80)
+        logger.info("Generating Box Plot Visualizations")
+        logger.info("=" * 80)
+
+        # Create output directory
+        output_dir = reports_dir / "box-plots"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Output directory: {output_dir}")
+        logger.info(f"Analyzing {len(phases)} phases:")
+        for phase_name, start_date, end_date in phases:
+            logger.info(f"  - {phase_name}: {start_date} to {end_date}")
+        logger.info("")
+
+        # Convert date formats for file matching (YYYY-MM-DD -> YYYYMMDD)
+        def date_to_filename_format(date_str: str) -> str:
+            """Convert YYYY-MM-DD to YYYYMMDD"""
+            return date_str.replace("-", "")
+
+        # Core metrics to visualize
+        metrics = [
+            ("time_to_merge_hours", "Time to Merge", "hours"),
+            ("time_to_first_review_hours", "Time to First Review", "hours"),
+            ("changes_requested_count", "Changes Requested", "count"),
+        ]
+
+        # Process each metric
+        for metric_key, metric_name, metric_unit in metrics:
+            logger.info(f"Generating box plot for: {metric_name}")
+
+            # Extract data for each phase
+            phase_data = {}
+            for phase_name, start_date, end_date in phases:
+                # Find JSON reports matching this phase
+                start_fmt = date_to_filename_format(start_date)
+                end_fmt = date_to_filename_format(end_date)
+                date_range = f"{start_fmt}_{end_fmt}"
+
+                # Pattern: pr_metrics_*_YYYYMMDD_YYYYMMDD.json
+                pattern = f"pr_metrics_*_{date_range}.json"
+                json_files = list(reports_dir.glob(pattern))
+
+                if not json_files:
+                    logger.warning(f"  No JSON reports found for {phase_name} (pattern: {pattern})")
+                    phase_data[phase_name] = []
+                    continue
+
+                # Extract metric values
+                values = extract_pr_data_from_json(json_files, metric_key)
+                phase_data[phase_name] = values
+                logger.info(f"  {phase_name}: {len(values)} data points from {len(json_files)} reports")
+
+            # Skip if no data
+            if not any(phase_data.values()):
+                logger.warning(f"  No data for {metric_name}, skipping")
+                continue
+
+            # Generate box plot
+            plot_filename = f"{metric_key}_boxplot.png"
+            plot_path = output_dir / plot_filename
+
+            generate_boxplot(
+                data_groups=phase_data,
+                metric_name=metric_name,
+                metric_unit=metric_unit,
+                output_path=plot_path,
+                title=f"{metric_name} Comparison Across Phases"
+            )
+
+            logger.info(f"  ✓ Box plot saved: {plot_filename}")
+            logger.info("")
+
+        # Upload to Google Sheets if requested
+        if not skip_upload:
+            logger.info("=" * 80)
+            logger.info("Uploading Box Plots to Google Sheets")
+            logger.info("=" * 80)
+
+            try:
+                import os
+                from impactlens.clients.sheets_client import (
+                    get_credentials,
+                    build_service,
+                    create_new_sheet_tab,
+                    upload_image_to_sheet,
+                    get_spreadsheet_id,
+                )
+
+                # Get spreadsheet ID
+                spreadsheet_id = get_spreadsheet_id(config_file)
+                if not spreadsheet_id:
+                    logger.warning("No spreadsheet ID configured, skipping upload")
+                    return True
+
+                # Get credentials and build service
+                credentials = get_credentials()
+                service = build_service(credentials)
+
+                # Create sheet name with project info and timestamp
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+                if project_settings:
+                    repo_owner = project_settings.get("github_repo_owner") or project_settings.get("gitlab_repo_owner", "unknown")
+                    repo_name = project_settings.get("github_repo_name") or project_settings.get("gitlab_repo_name", "unknown")
+                    sheet_name = f"Box Plots - {repo_owner}/{repo_name} - {timestamp}"
+                else:
+                    sheet_name = f"Box Plots - {timestamp}"
+
+                logger.info(f"Creating sheet tab: {sheet_name}")
+                create_new_sheet_tab(service, spreadsheet_id, sheet_name)
+
+                # Upload plots
+                plot_files = sorted([f for f in output_dir.iterdir() if f.suffix == '.png'])
+                row = 0
+                for plot_file in plot_files:
+                    logger.info(f"Uploading: {plot_file.name}")
+                    upload_image_to_sheet(
+                        service,
+                        spreadsheet_id,
+                        str(plot_file),
+                        sheet_name,
+                        row=row,
+                        col=0,
+                        width=600,
+                        height=400
+                    )
+                    row += 25  # Move to next row (leave space for image)
+
+                logger.info(f"✓ Uploaded {len(plot_files)} plots to Google Sheets")
+                logger.info(f"View at: https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
+
+            except Exception as e:
+                logger.error(f"Failed to upload to Google Sheets: {e}")
+                traceback.print_exc()
+                # Don't fail the whole process if upload fails
+
+        logger.info("=" * 80)
+        logger.info("✓ Box Plot Generation Complete")
+        logger.info("=" * 80)
+        logger.info(f"Output directory: {output_dir}")
+        logger.info("Generated plots:")
+        for item in sorted(output_dir.iterdir()):
+            if item.suffix == '.png':
+                logger.info(f"  - {item.name}")
+        logger.info("")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to generate box plots: {e}")
+        traceback.print_exc()
+        return False
 
 
 def generate_phase_metrics(
@@ -296,6 +474,30 @@ Examples:
         except Exception as e:
             print(f"{Colors.RED}Error combining reports: {e}{Colors.NC}")
             return 1
+
+        # Generate box plots if requested
+        if args.generate_boxplot:
+            print()
+            print(f"{Colors.BLUE}{'=' * 40}{Colors.NC}")
+            print(f"{Colors.BLUE}Generating box plot visualizations...{Colors.NC}")
+            print(f"{Colors.BLUE}{'=' * 40}{Colors.NC}")
+            print()
+            try:
+                success = generate_boxplots_from_config(
+                    config_file=config_file,
+                    reports_dir=reports_dir,
+                    phases=phases,
+                    skip_upload=args.no_upload,
+                    project_settings=project_settings,
+                )
+                if success:
+                    print(f"{Colors.GREEN}✓ Box plots generated successfully{Colors.NC}")
+                else:
+                    print(f"{Colors.YELLOW}⚠ Box plot generation had issues (check logs){Colors.NC}")
+            except Exception as e:
+                print(f"{Colors.RED}Error generating box plots: {e}{Colors.NC}")
+                traceback.print_exc()
+                # Don't fail the whole script if box plot generation fails
 
         # Check if aggregation config exists and run aggregation
         # Look for aggregation_config.yaml in two places:
