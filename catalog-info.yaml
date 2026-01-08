@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: impactlens
+  description: Tool to evaluate ai impacts for team and individuals productivity
+spec:
+  type: service
+  lifecycle: production
+  owner: testcara
