@@ -257,6 +257,7 @@ class JiraReportGenerator:
             "closing_time_stats": {},
             "state_statistics": {},
             "velocity_stats": velocity_stats or {},
+            "issue_types": {},
             # Add time range information (needed for comparison reports)
             "time_range": {
                 "start_date": start_date,
@@ -294,6 +295,16 @@ class JiraReportGenerator:
                 "average_hours": avg_seconds / 3600,
                 "total_seconds": stats["total_seconds"],
                 "avg_transitions_per_issue": stats["total_count"] / stats["issue_count"],
+            }
+
+        # Add issue type statistics with counts and percentages
+        issue_types = metrics.get("issue_types", {})
+        total_issues = metrics.get("total_issues", 0)
+        for issue_type, count in issue_types.items():
+            percentage = (count / total_issues * 100) if total_issues > 0 else 0
+            output_data["issue_types"][issue_type] = {
+                "count": count,
+                "percentage": percentage,
             }
 
         return output_data
@@ -449,6 +460,14 @@ class JiraReportGenerator:
         data["daily_throughput_skip_leave"] = json_data.get("daily_throughput_skip_leave")
         data["daily_throughput_capacity"] = json_data.get("daily_throughput_capacity")
         data["daily_throughput_both"] = json_data.get("daily_throughput_both")
+
+        # Extract issue types with count and percentage
+        issue_types = json_data.get("issue_types", {})
+        for issue_type, stats in issue_types.items():
+            data["issue_types"][issue_type] = {
+                "count": stats.get("count", 0),
+                "percentage": stats.get("percentage", 0),
+            }
 
         return data
 
