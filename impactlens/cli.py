@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+import yaml
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -82,6 +83,61 @@ def resolve_config_path(
         console.print(f"[{color}]Using config file: {config}[/{color}]")
 
     return resolved_path
+
+
+def should_send_email_notification(
+    email_anonymous_id_flag: bool,
+    config_file_path: Optional[Path],
+) -> bool:
+    """
+    Determine if email notifications should be sent.
+
+    Priority:
+    1. If --email-anonymous-id flag is explicitly provided, use it (True)
+    2. Otherwise, check config file's email_anonymous_id.enabled setting
+    3. Default to False if config not found or no setting
+
+    Args:
+        email_anonymous_id_flag: Value of the --email-anonymous-id CLI flag
+        config_file_path: Path to the config file
+
+    Returns:
+        True if emails should be sent, False otherwise
+    """
+    # If flag is explicitly set, use it
+    if email_anonymous_id_flag:
+        console.print(
+            "[bold green]✓[/bold green] Email notification enabled via --email-anonymous-id flag"
+        )
+        return True
+
+    # Otherwise, check config file
+    if not config_file_path:
+        console.print("[dim]No config file provided - email notifications disabled[/dim]")
+        return False
+
+    try:
+        with open(config_file_path, "r") as f:
+            config = yaml.safe_load(f)
+        # Support multiple config names for backward compatibility
+        email_config = (
+            config.get("email_anonymous_id")
+            or config.get("share_anonymous_id")
+            or config.get("email_notifications_for_identifier")
+            or config.get("email_notifications", {})
+        )
+
+        is_enabled = email_config.get("enabled", False) if email_config else False
+
+        if is_enabled:
+            console.print("[bold green]✓[/bold green] Email notifications enabled in config")
+        else:
+            console.print("[dim]Email notifications disabled in config (enabled: false)[/dim]")
+
+        return is_enabled
+    except Exception as e:
+        console.print(f"[dim]Failed to read email config: {e} - notifications disabled[/dim]")
+        return False
 
 
 def resolve_config_paths_for_full(
@@ -359,7 +415,7 @@ def jira_full(
         failed_steps.append("Jira combine")
 
     # Step 2.5: Email Notifications (opt-in, only with anonymization)
-    if email_anonymous_id:
+    if should_send_email_notification(email_anonymous_id, config_file_path):
         if not hide_individual_names:
             console.print(
                 "\n[bold yellow]⚠️  --email-anonymous-id requires --hide-individual-names[/bold yellow]"
@@ -660,7 +716,7 @@ def pr_full(
         failed_steps.append("PR combine")
 
     # Step 2.5: Email Notifications (opt-in, only with anonymization)
-    if email_anonymous_id:
+    if should_send_email_notification(email_anonymous_id, config_file_path):
         if not hide_individual_names:
             console.print(
                 "\n[bold yellow]⚠️  --email-anonymous-id requires --hide-individual-names[/bold yellow]"
@@ -967,7 +1023,8 @@ def full_workflow(
         )
 
     # Email Notifications (opt-in, only with anonymization, sent once at the end)
-    if email_anonymous_id:
+    config_to_use = jira_config_path or pr_config_path
+    if should_send_email_notification(email_anonymous_id, config_to_use):
         if not hide_individual_names:
             console.print(
                 "\n[bold yellow]⚠️  --email-anonymous-id requires --hide-individual-names[/bold yellow]"

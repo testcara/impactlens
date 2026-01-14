@@ -2,107 +2,106 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Check if only docs/config changed
-      id: docs_check
-      run: |
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
-          echo "Changed files:"
-          echo "$FILES"
+      - name: Check if only docs/config changed
+        id: docs_check
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+            echo "Changed files:"
+            echo "$FILES"
 
-          # Categorize changed files
-          TEST_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/test-(integration|aggregation)-ci/.*\.(yaml|yml)$' || true)
-          USER_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/.*\.(yaml|yml)$' | grep -v -E '^config/test-' | grep -v -E '\.example$' || true)
-          NON_CONFIG_NON_DOC_FILES=$(echo "$FILES" | grep -vE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore|config/.*\.(yaml|yml)$)' || true)
+            # Categorize changed files
+            TEST_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/test-(integration|aggregation)-ci/.*\.(yaml|yml)$' || true)
+            USER_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/.*\.(yaml|yml)$' | grep -v -E '^config/test-' | grep -v -E '\.example$' || true)
+            NON_CONFIG_NON_DOC_FILES=$(echo "$FILES" | grep -vE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore|config/.*\.(yaml|yml)$)' || true)
 
-          # Skip tests if:
-          # 1. Only docs/examples changed
-          # 2. Only USER config files changed (not test configs)
-          if [ -n "$TEST_CONFIG_FILES" ]; then
-            # Test configs changed - must run integration tests
-            echo "code_changed=true" >> $GITHUB_OUTPUT
-            echo "✅ Test config files changed - running integration tests"
-          elif [ -z "$NON_CONFIG_NON_DOC_FILES" ]; then
-            echo "code_changed=false" >> $GITHUB_OUTPUT
-            if [ -n "$USER_CONFIG_FILES" ]; then
-              echo "✅ User config-only PR - skipping CI tests"
-              echo "   (Config validation runs in separate workflow)"
+            # Skip tests if:
+            # 1. Only docs/examples changed
+            # 2. Only USER config files changed (not test configs)
+            if [ -n "$TEST_CONFIG_FILES" ]; then
+              # Test configs changed - must run integration tests
+              echo "code_changed=true" >> $GITHUB_OUTPUT
+              echo "✅ Test config files changed - running integration tests"
+            elif [ -z "$NON_CONFIG_NON_DOC_FILES" ]; then
+              echo "code_changed=false" >> $GITHUB_OUTPUT
+              if [ -n "$USER_CONFIG_FILES" ]; then
+                echo "✅ User config-only PR - skipping CI tests"
+                echo "   (Config validation runs in separate workflow)"
+              else
+                echo "✅ Documentation-only PR - skipping tests"
+              fi
             else
-              echo "✅ Documentation-only PR - skipping tests"
+              echo "code_changed=true" >> $GITHUB_OUTPUT
             fi
           else
             echo "code_changed=true" >> $GITHUB_OUTPUT
           fi
-        else
-          echo "code_changed=true" >> $GITHUB_OUTPUT
-        fi
 
-    - name: Skip tests (docs/config only)
-      if: steps.docs_check.outputs.code_changed == 'false'
-      run: |
-        echo "✓ Skipping tests - only documentation or config files changed"
-        echo "  Config-only PRs are validated in the 'Config-Only PR Enforcement' workflow"
-        exit 0
+      - name: Skip tests (docs/config only)
+        if: steps.docs_check.outputs.code_changed == 'false'
+        run: |
+          echo "✓ Skipping tests - only documentation or config files changed"
+          echo "  Config-only PRs are validated in the 'Config-Only PR Enforcement' workflow"
+          exit 0
 
-    - name: Set up Python ${{ matrix.python-version }}
-      if: steps.docs_check.outputs.code_changed == 'true'
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
+        if: steps.docs_check.outputs.code_changed == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install tox
-      if: steps.docs_check.outputs.code_changed == 'true'
-      run: |
-        python -m pip install --upgrade pip
-        pip install tox tox-gh-actions
+      - name: Install tox
+        if: steps.docs_check.outputs.code_changed == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox tox-gh-actions
 
-    - name: Run tests with tox (Python ${{ matrix.python-version }})
-      if: steps.docs_check.outputs.code_changed == 'true'
-      run: |
-        echo "=========================================="
-        echo "Running tests on Python ${{ matrix.python-version }}"
-        echo "=========================================="
-        tox -e py$(echo "${{ matrix.python-version }}" | tr -d '.')
+      - name: Run tests with tox (Python ${{ matrix.python-version }})
+        if: steps.docs_check.outputs.code_changed == 'true'
+        run: |
+          echo "=========================================="
+          echo "Running tests on Python ${{ matrix.python-version }}"
+          echo "=========================================="
+          tox -e py$(echo "${{ matrix.python-version }}" | tr -d '.')
 
-    - name: Run lint checks (Python 3.11 only)
-      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
-      run: |
-        echo "Running lint checks..."
-        tox -e lint
+      - name: Run lint checks (Python 3.11 only)
+        if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
+        run: |
+          echo "Running lint checks..."
+          tox -e lint
 
-    - name: Skip lint checks (Python ${{ matrix.python-version }})
-      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version != '3.11'
-      run: |
-        echo "⏭️  Skipping lint checks (only runs on Python 3.11)"
+      - name: Skip lint checks (Python ${{ matrix.python-version }})
+        if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version != '3.11'
+        run: |
+          echo "⏭️  Skipping lint checks (only runs on Python 3.11)"
 
-    - name: Run type checking (Python 3.11 only)
-      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
-      continue-on-error: true
-      run: |
-        echo "Running type checks..."
-        tox -e type
+      - name: Run type checking (Python 3.11 only)
+        if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
+        continue-on-error: true
+        run: |
+          echo "Running type checks..."
+          tox -e type
 
-    - name: Skip type checking (Python ${{ matrix.python-version }})
-      if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version != '3.11'
-      run: |
-        echo "⏭️  Skipping type checks (only runs on Python 3.11)"
-
+      - name: Skip type checking (Python ${{ matrix.python-version }})
+        if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version != '3.11'
+        run: |
+          echo "⏭️  Skipping type checks (only runs on Python 3.11)"
 
   integration-test-basic:
     name: Integration Test (Basic)
@@ -153,7 +152,7 @@ jobs:
         if: steps.docs_check.outputs.code_changed == 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         if: steps.docs_check.outputs.code_changed == 'true'
@@ -224,7 +223,6 @@ jobs:
             $UPLOAD_ARGS \
             --incremental \
             --hide-individual-names \
-            --email-anonymous-id \
             --mail-save-file reports/test-ci-team/emails
 
           echo ""
@@ -250,7 +248,7 @@ jobs:
         if: steps.docs_check.outputs.code_changed == 'true' && always()
         uses: ./.github/actions/report-comment
         with:
-          reports_dir: 'reports/test-ci-team'
+          reports_dir: "reports/test-ci-team"
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Integration test summary
@@ -265,7 +263,6 @@ jobs:
           echo "  - Reports: reports/test-ci-team/"
           echo ""
           echo "✅ Basic integration test completed successfully"
-
 
   integration-test-aggregation:
     name: Integration Test (Multi-Team Aggregation)
@@ -316,7 +313,7 @@ jobs:
         if: steps.docs_check.outputs.code_changed == 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         if: steps.docs_check.outputs.code_changed == 'true'
