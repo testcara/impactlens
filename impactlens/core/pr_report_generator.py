@@ -11,6 +11,7 @@ from datetime import datetime
 
 from impactlens.utils.report_utils import (
     add_metric_change,
+    add_throughput_metric_change,
     format_metric_changes,
     get_identifier_for_file,
     get_identifier_for_display,
@@ -565,6 +566,10 @@ class PRReportGenerator:
 
             # Collect all metric changes using shared utility functions
             metric_changes = []
+
+            # Daily throughput metrics - use shared utility function
+            # (Both Jira and PR reports now have the same throughput data structure)
+            add_throughput_metric_change(metric_changes, first_report, last_report)
 
             # Time to merge
             add_metric_change(

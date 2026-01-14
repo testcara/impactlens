@@ -14,6 +14,7 @@ from impactlens.core.jira_metrics_calculator import JiraMetricsCalculator
 from impactlens.core.jira_report_generator import JiraReportGenerator
 from impactlens.utils.workflow_utils import get_project_root, load_members_from_yaml
 from impactlens.utils.common_args import add_jira_metrics_args
+from impactlens.utils.core_utils import calculate_days_between, calculate_throughput_variants
 
 
 def main():
@@ -86,6 +87,29 @@ def main():
         # Calculate metrics
         metrics = calculator.calculate_metrics(all_issues)
 
+    # Calculate throughput variants and add to metrics (same flow as PR report)
+    # This allows us to use the same utility functions in both Jira and PR reports
+    if args.start and args.end:
+        analysis_days = calculate_days_between(args.start, args.end)
+        total_issues = metrics.get("total_issues", 0)
+
+        # Calculate all throughput variants using shared function
+        variants = calculate_throughput_variants(
+            total_issues, analysis_days, leave_days=leave_days, capacity=capacity
+        )
+
+        # Add throughput fields to metrics (same structure as PR reports)
+        metrics["daily_throughput"] = total_issues / analysis_days if analysis_days > 0 else 0
+        metrics["daily_throughput_skip_leave"] = variants.get("skip_leave")
+        metrics["daily_throughput_capacity"] = variants.get("capacity")
+        metrics["daily_throughput_both"] = variants.get("both")
+    else:
+        # No date range provided, set throughput to None
+        metrics["daily_throughput"] = 0
+        metrics["daily_throughput_skip_leave"] = None
+        metrics["daily_throughput_capacity"] = None
+        metrics["daily_throughput_both"] = None
+
     # Generate text report
     report_text = report_gen.generate_text_report(
         metrics,
@@ -141,6 +165,8 @@ def main():
             assignee=args.assignee,
             velocity_stats=velocity_stats,
             hide_individual_names=args.hide_individual_names,
+            leave_days=leave_days,
+            capacity=capacity,
         )
 
         # Save JSON output

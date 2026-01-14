@@ -216,6 +216,10 @@ def format_metric_changes(metric_changes, top_n=5):
                     f"• {metric['name']}: {metric['before']:.2f}{metric['unit']} → "
                     f"{metric['after']:.2f}{metric['unit']} ({metric['change']:+.1f}% change)"
                 )
+            # Add variants if available (for grouped metrics like Daily Throughput)
+            if "variants" in metric and metric["variants"]:
+                for variant in metric["variants"]:
+                    output.append(variant)
     else:
         output.append("• No increases detected")
 
@@ -228,10 +232,229 @@ def format_metric_changes(metric_changes, top_n=5):
                 f"• {metric['name']}: {metric['before']:.2f}{metric['unit']} → "
                 f"{metric['after']:.2f}{metric['unit']} ({metric['change']:+.1f}% change)"
             )
+            # Add variants if available (for grouped metrics like Daily Throughput)
+            if "variants" in metric and metric["variants"]:
+                for variant in metric["variants"]:
+                    output.append(variant)
     else:
         output.append("• No decreases detected")
 
     return output
+
+
+def find_comparison_reports(
+    report_type,
+    identifier=None,
+    reports_dir="reports",
+    hide_individual_names=False,
+):
+    """
+    Find all matching report files for comparison.
+
+    This is a shared utility for both Jira and PR comparison scripts.
+
+    Args:
+        report_type: "jira" or "pr"
+        identifier: Optional identifier (assignee for Jira, author for PR)
+        reports_dir: Directory to search for reports
+        hide_individual_names: Whether names are anonymized
+
+    Returns:
+        List of sorted report file paths
+    """
+    if not os.path.exists(reports_dir):
+        return []
+
+    # Determine file prefix based on report type
+    if report_type == "jira":
+        file_prefix = "jira_metrics_"
+    elif report_type == "pr":
+        file_prefix = "pr_metrics_"
+    else:
+        raise ValueError(f"Invalid report_type: {report_type}. Must be 'jira' or 'pr'")
+
+    files = []
+    for filename in os.listdir(reports_dir):
+        if not filename.startswith(file_prefix):
+            continue
+        if not filename.endswith(".json"):
+            continue
+
+        if identifier:
+            # Get file identifier (normalized and optionally anonymized)
+            file_id = get_identifier_for_file(identifier, hide_individual_names)
+            if f"{file_prefix}{file_id}_" in filename:
+                files.append(os.path.join(reports_dir, filename))
+        else:
+            if f"{file_prefix}general_" in filename:
+                files.append(os.path.join(reports_dir, filename))
+
+    return sorted(files)
+
+
+def validate_report_files(
+    report_files, identifier, reports_dir, report_type, hide_individual_names
+):
+    """
+    Validate that we have enough report files for comparison.
+
+    Args:
+        report_files: List of report file paths
+        identifier: Optional identifier (assignee/author)
+        reports_dir: Directory containing reports
+        report_type: "jira" or "pr"
+        hide_individual_names: Whether names are anonymized
+
+    Returns:
+        0 if valid, error code (1) if invalid
+
+    Prints error messages to stdout.
+    """
+    file_prefix = "jira_metrics_" if report_type == "jira" else "pr_metrics_"
+    identifier_label = "assignee" if report_type == "jira" else "author"
+
+    if len(report_files) == 0:
+        if identifier:
+            print(f"Error: No reports found for {identifier_label} '{identifier}'")
+        else:
+            print("Error: No general reports found")
+        print("\nLooking for files matching pattern:")
+        if identifier:
+            file_id = get_identifier_for_file(identifier, hide_individual_names)
+            print(f"  {reports_dir}/{file_prefix}{file_id}_*.json")
+        else:
+            print(f"  {reports_dir}/{file_prefix}general_*.json")
+        return 1
+
+    if len(report_files) < 2:
+        print(f"Warning: Found only {len(report_files)} report(s), need at least 2 for comparison")
+        print(f"Found: {', '.join(report_files)}")
+        return 1
+
+    return 0
+
+
+def limit_and_display_reports(report_files, max_reports=4):
+    """
+    Limit number of reports and display them.
+
+    Args:
+        report_files: List of report file paths (must be sorted)
+        max_reports: Maximum number of reports to use (default: 4)
+
+    Returns:
+        Limited list of report files
+    """
+    # Use all reports if <= max_reports, otherwise use the most recent ones
+    if len(report_files) > max_reports:
+        print(
+            f"Found {len(report_files)} reports, using the {max_reports} most recent for comparison:"
+        )
+        report_files = sorted(report_files)[-max_reports:]
+    else:
+        report_files = sorted(report_files)
+
+    print(f"Analyzing {len(report_files)} reports:")
+    for i, f in enumerate(report_files, 1):
+        print(f"  Phase {i}: {f}")
+    print()
+
+    return report_files
+
+
+def reconcile_phase_names(phase_names, report_files):
+    """
+    Reconcile phase names from config with actual report files.
+
+    Args:
+        phase_names: List of phase names from config (can be empty)
+        report_files: List of report file paths
+
+    Returns:
+        Tuple of (phase_names, report_files) - both potentially modified
+    """
+    # Use phase names from config, limit report files to match config phases
+    if phase_names and len(report_files) > len(phase_names):
+        print(
+            f"Warning: Found {len(report_files)} reports but config only has {len(phase_names)} phases"
+        )
+        print(f"Using only the {len(phase_names)} most recent reports to match config")
+        report_files = sorted(report_files)[-len(phase_names) :]
+    elif not phase_names:
+        # No config available, use generic names for all found reports
+        phase_names = [f"Phase {i+1}" for i in range(len(report_files))]
+
+    return phase_names, report_files
+
+
+def add_throughput_metric_change(metric_changes, first_report, last_report):
+    """
+    Add Daily Throughput metric change with all variants to metric_changes list.
+
+    This is a shared utility for both Jira and PR reports to avoid code duplication.
+    Groups all throughput variants under a single "Daily Throughput" entry.
+
+    Args:
+        metric_changes: List to append metric change to
+        first_report: First period report data (dict) - must contain daily_throughput fields
+        last_report: Last period report data (dict) - must contain daily_throughput fields
+
+    Note:
+        Both Jira and PR reports now store pre-calculated throughput values in the same structure:
+        - daily_throughput
+        - daily_throughput_skip_leave
+        - daily_throughput_capacity
+        - daily_throughput_both
+    """
+    first_throughput = first_report.get("daily_throughput", 0)
+    last_throughput = last_report.get("daily_throughput", 0)
+
+    # Store all variants for detailed breakdown display
+    throughput_variants = []
+
+    # Basic throughput
+    throughput_variants.append(
+        f"  - Daily Throughput: {first_throughput:.2f}/d → {last_throughput:.2f}/d"
+    )
+
+    # Skip leave days variant
+    first_skip_leave = first_report.get("daily_throughput_skip_leave")
+    last_skip_leave = last_report.get("daily_throughput_skip_leave")
+    if first_skip_leave is not None and last_skip_leave is not None:
+        throughput_variants.append(
+            f"  - Skip leave days: {first_skip_leave:.2f}/d → {last_skip_leave:.2f}/d"
+        )
+
+    # Capacity variant
+    first_capacity = first_report.get("daily_throughput_capacity")
+    last_capacity = last_report.get("daily_throughput_capacity")
+    if first_capacity is not None and last_capacity is not None:
+        throughput_variants.append(
+            f"  - Average per capacity: {first_capacity:.2f}/d → {last_capacity:.2f}/d"
+        )
+
+    # Both (capacity + excl. leave) variant
+    first_both = first_report.get("daily_throughput_both")
+    last_both = last_report.get("daily_throughput_both")
+    if first_both is not None and last_both is not None:
+        throughput_variants.append(
+            f"  - Per capacity, excl. leave: {first_both:.2f}/d → {last_both:.2f}/d"
+        )
+
+    # Add Daily Throughput metric change with variants
+    pct_change = calculate_percentage_change(first_throughput, last_throughput)
+    if pct_change is not None:
+        metric_changes.append(
+            {
+                "name": "Daily Throughput",
+                "before": first_throughput,
+                "after": last_throughput,
+                "change": pct_change,
+                "unit": "/d",
+                "is_absolute": False,
+                "variants": throughput_variants,
+            }
+        )
 
 
 def add_metric_change(metric_changes, name, before, after, unit, is_absolute=False):
