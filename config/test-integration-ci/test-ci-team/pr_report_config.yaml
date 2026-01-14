@@ -34,4 +34,4 @@ log_level: "WARNING"
 # - Opt-in sharing: They can choose to share their ID with their manager
 # - This allows connecting individual work to anonymized reports while preserving privacy
 email_anonymous_id:
-  enabled: true # Set to false to disable
+  enabled: false # Set to false to disable

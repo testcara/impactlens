@@ -366,32 +366,29 @@ jobs:
 
           # Use impactlens full command for single team (generates Jira + PR + sends emails once)
           if [ -z "$REPORT_TYPE" ] || [ "$REPORT_TYPE" = "both" ]; then
-            echo "Running: impactlens full --config \"$CONFIG_DIR\" --hide-individual-names --email-anonymous-id"
+            echo "Running: impactlens full --config \"$CONFIG_DIR\" --hide-individual-names"
             python -m impactlens.cli full \
               --config "$CONFIG_DIR" \
               --hide-individual-names \
-              --email-anonymous-id \
               --incremental
           elif [ "$REPORT_TYPE" = "jira" ]; then
             CONFIG_PATH="$CONFIG_DIR/jira_report_config.yaml"
             if [ -f "$CONFIG_PATH" ]; then
-              echo "Running: impactlens jira full --config \"$CONFIG_PATH\" --hide-individual-names --email-anonymous-id"
+              echo "Running: impactlens jira full --config \"$CONFIG_PATH\" --hide-individual-names"
               python -m impactlens.cli jira full \
                 --config "$CONFIG_PATH" \
-                --hide-individual-names \
-                --email-anonymous-id
+                --hide-individual-names
             else
               echo "Jira config not found at $CONFIG_PATH, skipping"
             fi
           elif [ "$REPORT_TYPE" = "pr" ]; then
             CONFIG_PATH="$CONFIG_DIR/pr_report_config.yaml"
             if [ -f "$CONFIG_PATH" ]; then
-              echo "Running: impactlens pr full --config \"$CONFIG_PATH\" --incremental --hide-individual-names --email-anonymous-id"
+              echo "Running: impactlens pr full --config \"$CONFIG_PATH\" --incremental --hide-individual-names"
               python -m impactlens.cli pr full \
                 --config "$CONFIG_PATH" \
                 --incremental \
-                --hide-individual-names \
-                --email-anonymous-id
+                --hide-individual-names
             else
               echo "PR config not found at $CONFIG_PATH, skipping"
             fi
