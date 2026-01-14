@@ -19,76 +19,16 @@ from impactlens.utils.report_utils import (
     generate_comparison_report,
     get_identifier_for_file,
     build_pr_project_prefix,
+    find_comparison_reports,
+    validate_report_files,
+    limit_and_display_reports,
+    reconcile_phase_names,
 )
 from impactlens.utils.workflow_utils import (
     load_config_file,
     get_project_root,
     load_members_from_yaml,
 )
-
-
-def parse_phase_config(config_path="config/github_phases.conf"):
-    """Parse phase configuration file."""
-    phases = []
-    if not os.path.exists(config_path):
-        return phases
-
-    with open(config_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-
-    in_array = False
-    array_lines = []
-
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            continue
-        if "GITHUB_PHASES=(" in line and not stripped.startswith("#"):
-            in_array = True
-            array_start = line.split("GITHUB_PHASES=(", 1)[1]
-            array_lines.append(array_start)
-            if ")" in array_start:
-                break
-            continue
-        if in_array:
-            array_lines.append(line)
-            if ")" in line:
-                break
-
-    array_content = "".join(array_lines)
-    phase_pattern = r'"([^"]+)"'
-    phase_entries = re.findall(phase_pattern, array_content)
-
-    for entry in phase_entries:
-        parts = entry.split("|")
-        if len(parts) == 3:
-            phases.append((parts[0].strip(), parts[1].strip(), parts[2].strip()))
-
-    return phases
-
-
-def find_reports(author=None, reports_dir="reports/github", hide_individual_names=False):
-    """Find all matching PR report files."""
-    if not os.path.exists(reports_dir):
-        return []
-
-    files = []
-    for filename in os.listdir(reports_dir):
-        if not filename.startswith("pr_metrics_"):
-            continue
-        if not filename.endswith(".json"):
-            continue
-
-        if author:
-            # Get file identifier (normalized and optionally anonymized)
-            identifier = get_identifier_for_file(author, hide_individual_names)
-            if f"pr_metrics_{identifier}_" in filename:
-                files.append(os.path.join(reports_dir, filename))
-        else:
-            if "pr_metrics_general_" in filename:
-                files.append(os.path.join(reports_dir, filename))
-
-    return sorted(files)
 
 
 def main():
@@ -127,56 +67,25 @@ def main():
                         anonymization_identifier = member_info.get("email")
                     break
 
-    # Find matching reports
-    # Use anonymization_identifier for file lookup (must match file naming convention)
-    report_files = find_reports(
-        anonymization_identifier,
+    # Find matching reports using shared utility
+    report_files = find_comparison_reports(
+        report_type="pr",
+        identifier=anonymization_identifier,
         reports_dir=args.reports_dir,
         hide_individual_names=args.hide_individual_names,
     )
 
-    if len(report_files) == 0:
-        if args.author:
-            print(f"Error: No reports found for author '{args.author}'")
-        else:
-            print("Error: No general reports found")
-        print("\nLooking for files matching pattern:")
-        if args.author:
-            identifier = get_identifier_for_file(
-                anonymization_identifier, args.hide_individual_names
-            )
-            print(f"  {args.reports_dir}/pr_metrics_{identifier}_*.json")
-        else:
-            print(f"  {args.reports_dir}/pr_metrics_general_*.json")
+    # Validate we have enough reports
+    if validate_report_files(
+        report_files, args.author, args.reports_dir, "pr", args.hide_individual_names
+    ):
         return 1
 
-    if len(report_files) < 2:
-        print(f"Warning: Found only {len(report_files)} report(s), need at least 2 for comparison")
-        print(f"Found: {', '.join(report_files)}")
-        return 1
+    # Limit to max 4 reports and display
+    report_files = limit_and_display_reports(report_files, max_reports=4)
 
-    # Use all reports if <= 4, otherwise use the most recent 4
-    if len(report_files) > 4:
-        print(f"Found {len(report_files)} reports, using the 4 most recent for comparison:")
-        report_files = sorted(report_files)[-4:]
-    else:
-        report_files = sorted(report_files)
-
-    print(f"Analyzing {len(report_files)} reports:")
-    for i, f in enumerate(report_files, 1):
-        print(f"  Phase {i}: {f}")
-    print()
-
-    # Use phase names from config, limit report files to match config phases
-    if phase_names and len(report_files) > len(phase_names):
-        print(
-            f"Warning: Found {len(report_files)} reports but config only has {len(phase_names)} phases"
-        )
-        print(f"Using only the {len(phase_names)} most recent reports to match config")
-        report_files = sorted(report_files)[-len(phase_names) :]
-    elif not phase_names:
-        # No config available, use generic names for all found reports
-        phase_names = [f"Phase {i+1}" for i in range(len(report_files))]
+    # Reconcile phase names with report files
+    phase_names, report_files = reconcile_phase_names(phase_names, report_files)
 
     # Generate comparison report using shared utility
     report_gen = PRReportGenerator()

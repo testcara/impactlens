@@ -15,6 +15,7 @@ from impactlens.utils.report_utils import (
     calculate_percentage_change,
     format_metric_changes,
     add_metric_change,
+    add_throughput_metric_change,
     get_identifier_for_file,
     get_identifier_for_display,
 )
@@ -209,6 +210,8 @@ class JiraReportGenerator:
         assignee=None,
         velocity_stats=None,
         hide_individual_names=False,
+        leave_days=0,
+        capacity=1.0,
     ):
         """
         Generate JSON output from metrics.
@@ -233,6 +236,11 @@ class JiraReportGenerator:
             get_identifier_for_display(assignee, hide_individual_names) if assignee else None
         )
 
+        # Calculate span_days from start_date and end_date
+        from impactlens.utils.core_utils import calculate_days_between
+
+        span_days = calculate_days_between(start_date, end_date) if start_date and end_date else 0
+
         output_data = {
             "analysis_date": datetime.now().isoformat(),
             "project_key": project_key,
@@ -249,6 +257,19 @@ class JiraReportGenerator:
             "closing_time_stats": {},
             "state_statistics": {},
             "velocity_stats": velocity_stats or {},
+            # Add time range information (needed for comparison reports)
+            "time_range": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "span_days": span_days,
+                "leave_days": leave_days,
+                "capacity": capacity,
+            },
+            # Add throughput data (calculated in get_jira_metrics.py)
+            "daily_throughput": metrics.get("daily_throughput", 0),
+            "daily_throughput_skip_leave": metrics.get("daily_throughput_skip_leave"),
+            "daily_throughput_capacity": metrics.get("daily_throughput_capacity"),
+            "daily_throughput_both": metrics.get("daily_throughput_both"),
         }
 
         # Add closing time stats
@@ -366,133 +387,68 @@ class JiraReportGenerator:
 
     def parse_jira_report(self, filename):
         """
-        Parse a Jira report file and extract key metrics.
+        Parse a Jira JSON report file and extract key metrics.
 
         Args:
-            filename: Path to text report file
+            filename: Path to JSON report file
 
         Returns:
-            Dictionary with extracted metrics
+            Dictionary with extracted metrics (same structure as PR report parsing)
         """
+        with open(filename, "r", encoding="utf-8") as f:
+            json_data = json.load(f)
+
+        # Extract data from JSON (same structure as we write in generate_json_output)
         data = {
             "filename": filename,
-            "assignee": None,
-            "jql_query": None,
-            "time_range": {},
-            "issue_types": {},
-            "total_issues": 0,
+            "assignee": json_data.get("query_parameters", {}).get("assignee"),
+            "jql_query": json_data.get("jql_query"),
+            "total_issues": json_data.get("total_issues_analyzed", 0),
             "closure_stats": {},
             "state_times": {},
             "state_reentry": {},
+            "time_range": {},
+            "issue_types": {},
         }
 
-        with open(filename, "r", encoding="utf-8") as f:
-            content = f.read()
-            lines = content.split("\n")
+        # Extract closure stats
+        closing_stats = json_data.get("closing_time_stats", {})
+        if closing_stats:
+            data["closure_stats"]["avg_days"] = closing_stats.get("average_days", 0)
+            data["closure_stats"]["max_days"] = closing_stats.get("max_days", 0)
 
-        # Extract basic info
-        for line in lines:
-            if line.startswith("Assignee:"):
-                data["assignee"] = line.split(":", 1)[1].strip()
-            elif line.startswith("JQL Query:"):
-                data["jql_query"] = line.split(":", 1)[1].strip()
-            elif line.startswith("Total:"):
-                match = re.search(r"Total:\s*(\d+)", line)
-                if match:
-                    data["total_issues"] = int(match.group(1))
-            elif line.startswith("Average Closure Time:"):
-                match = re.search(r"Average Closure Time:\s*([\d.]+)\s*days", line)
-                if match:
-                    data["closure_stats"]["avg_days"] = float(match.group(1))
-            elif line.startswith("Longest Closure Time:"):
-                match = re.search(r"Longest Closure Time:\s*([\d.]+)\s*days", line)
-                if match:
-                    data["closure_stats"]["max_days"] = float(match.group(1))
-            elif line.startswith("Start:"):
-                data["time_range"]["start_date"] = line.split(":", 1)[1].strip()
-            elif line.startswith("End:"):
-                data["time_range"]["end_date"] = line.split(":", 1)[1].strip()
-            elif line.startswith("Leave Days:"):
-                match = re.search(r"Leave Days:\s*([\d.]+)\s*days?", line)
-                if match:
-                    data["time_range"]["leave_days"] = float(match.group(1))
-            elif line.startswith("Capacity:"):
-                match = re.search(r"Capacity:\s*([\d.]+)", line)
-                if match:
-                    data["time_range"]["capacity"] = float(match.group(1))
-            elif line.startswith("Earliest Resolved:"):
-                data["time_range"]["earliest_resolved"] = line.split(":", 1)[1].strip()
-            elif line.startswith("Latest Resolved:"):
-                data["time_range"]["latest_resolved"] = line.split(":", 1)[1].strip()
-            elif line.startswith("Data Span:"):
-                match = re.search(r"Data Span:\s*(\d+)\s*days", line)
-                if match:
-                    data["time_range"]["span_days"] = int(match.group(1))
+        # Extract state times (convert from state_statistics)
+        state_stats = json_data.get("state_statistics", {})
+        for state, stats in state_stats.items():
+            avg_days = stats.get("average_days", 0)
+            if avg_days > 0:
+                data["state_times"][state] = avg_days
 
-        # Parse issue types
-        in_issue_types = False
-        for line in lines:
-            if line.startswith("--- Issue Type Statistics ---"):
-                in_issue_types = True
-                continue
-            if in_issue_types:
-                if line.startswith("---"):
-                    break
-                match = re.match(
-                    r"\s*(Story|Task|Bug|Epic|Sub-task)\s+(\d+)\s*\(\s*([\d.]+)%\)", line
-                )
-                if match:
-                    issue_type, count, percentage = match.groups()
-                    data["issue_types"][issue_type] = {
-                        "count": int(count),
-                        "percentage": float(percentage),
-                    }
+            # Extract re-entry rates from avg_transitions_per_issue
+            reentry_rate = stats.get("avg_transitions_per_issue", 0)
+            if reentry_rate > 0:
+                data["state_reentry"][state] = reentry_rate
 
-        # Parse state times
-        in_state_analysis = False
-        for line in lines:
-            if "State" in line and "Occurrences" in line and "Avg Duration" in line:
-                in_state_analysis = True
-                continue
-            if in_state_analysis:
-                if line.startswith("---"):
-                    break
-                line_stripped = line.strip()
-                if (
-                    line_stripped
-                    and not line_stripped.startswith("State")
-                    and not line_stripped.startswith("=")
-                ):
-                    match = re.match(
-                        r"^(\S+(?:\s+\S+)?)\s+(\d+)\s+(\d+)\s+([-\d.]+)\s*(days|hours)",
-                        line_stripped,
-                    )
-                    if match:
-                        state_name = match.group(1).strip()
-                        avg_time = float(match.group(4))
-                        time_unit = match.group(5)
-                        avg_days = avg_time / 24.0 if time_unit == "hours" else avg_time
-                        if avg_days > 0:
-                            data["state_times"][state_name] = avg_days
+        # Extract time range from time_range field (new format) or query_parameters (fallback)
+        time_range = json_data.get("time_range", {})
+        if time_range:
+            data["time_range"]["start_date"] = time_range.get("start_date")
+            data["time_range"]["end_date"] = time_range.get("end_date")
+            data["time_range"]["span_days"] = time_range.get("span_days")
+            data["time_range"]["leave_days"] = time_range.get("leave_days", 0)
+            data["time_range"]["capacity"] = time_range.get("capacity", 1.0)
+        else:
+            # Fallback to query_parameters for older JSON files
+            query_params = json_data.get("query_parameters", {})
+            if query_params:
+                data["time_range"]["start_date"] = query_params.get("start_date")
+                data["time_range"]["end_date"] = query_params.get("end_date")
 
-        # Parse re-entry rates
-        current_state = None
-        for line in lines:
-            if line.strip().endswith(":") and not line.startswith("-"):
-                state_candidate = line.strip().rstrip(":")
-                if state_candidate in [
-                    "To Do",
-                    "In Progress",
-                    "Review",
-                    "New",
-                    "Waiting",
-                    "Release Pending",
-                ]:
-                    current_state = state_candidate
-            elif current_state and "Average times per issue entering this state" in line:
-                match = re.search(r"([\d.]+)\s*times", line)
-                if match:
-                    data["state_reentry"][current_state] = float(match.group(1))
+        # Extract throughput data (already calculated and stored in JSON)
+        data["daily_throughput"] = json_data.get("daily_throughput", 0)
+        data["daily_throughput_skip_leave"] = json_data.get("daily_throughput_skip_leave")
+        data["daily_throughput_capacity"] = json_data.get("daily_throughput_capacity")
+        data["daily_throughput_both"] = json_data.get("daily_throughput_both")
 
         return data
 
@@ -682,6 +638,10 @@ class JiraReportGenerator:
 
             # Collect all metric changes using shared utility functions
             metric_changes = []
+
+            # Daily throughput metrics - use shared utility function
+            # (Now both Jira and PR reports have the same throughput data structure)
+            add_throughput_metric_change(metric_changes, first_report, last_report)
 
             # Average closure time
             first_avg = first_report["closure_stats"].get("avg_days", 0)
