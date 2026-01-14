@@ -1,8 +1,8 @@
 name: CI
 
 on:
-  push:
-    branches: [master]
+  # Only run on PRs - merge to master doesn't need to re-run tests
+  # (tests already passed during PR review)
   pull_request:
     branches: [master]
 
