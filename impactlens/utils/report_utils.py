@@ -413,32 +413,44 @@ def add_throughput_metric_change(metric_changes, first_report, last_report):
     throughput_variants = []
 
     # Basic throughput
+    pct_change_basic = calculate_percentage_change(first_throughput, last_throughput)
+    change_str_basic = f" ({pct_change_basic:+.1f}% change)" if pct_change_basic is not None else ""
     throughput_variants.append(
-        f"  - Daily Throughput: {first_throughput:.2f}/d → {last_throughput:.2f}/d"
+        f"  - Daily Throughput: {first_throughput:.2f}/d → {last_throughput:.2f}/d{change_str_basic}"
     )
 
     # Skip leave days variant
     first_skip_leave = first_report.get("daily_throughput_skip_leave")
     last_skip_leave = last_report.get("daily_throughput_skip_leave")
     if first_skip_leave is not None and last_skip_leave is not None:
+        pct_change_skip_leave = calculate_percentage_change(first_skip_leave, last_skip_leave)
+        change_str = (
+            f" ({pct_change_skip_leave:+.1f}% change)" if pct_change_skip_leave is not None else ""
+        )
         throughput_variants.append(
-            f"  - Skip leave days: {first_skip_leave:.2f}/d → {last_skip_leave:.2f}/d"
+            f"  - Skip leave days: {first_skip_leave:.2f}/d → {last_skip_leave:.2f}/d{change_str}"
         )
 
     # Capacity variant
     first_capacity = first_report.get("daily_throughput_capacity")
     last_capacity = last_report.get("daily_throughput_capacity")
     if first_capacity is not None and last_capacity is not None:
+        pct_change_capacity = calculate_percentage_change(first_capacity, last_capacity)
+        change_str = (
+            f" ({pct_change_capacity:+.1f}% change)" if pct_change_capacity is not None else ""
+        )
         throughput_variants.append(
-            f"  - Average per capacity: {first_capacity:.2f}/d → {last_capacity:.2f}/d"
+            f"  - Average per capacity: {first_capacity:.2f}/d → {last_capacity:.2f}/d{change_str}"
         )
 
     # Both (capacity + excl. leave) variant
     first_both = first_report.get("daily_throughput_both")
     last_both = last_report.get("daily_throughput_both")
     if first_both is not None and last_both is not None:
+        pct_change_both = calculate_percentage_change(first_both, last_both)
+        change_str = f" ({pct_change_both:+.1f}% change)" if pct_change_both is not None else ""
         throughput_variants.append(
-            f"  - Per capacity, excl. leave: {first_both:.2f}/d → {last_both:.2f}/d"
+            f"  - Per capacity, excl. leave: {first_both:.2f}/d → {last_both:.2f}/d{change_str}"
         )
 
     # Add Daily Throughput metric change with variants
