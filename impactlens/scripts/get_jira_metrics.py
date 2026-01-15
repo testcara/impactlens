@@ -15,6 +15,7 @@ from impactlens.core.jira_report_generator import JiraReportGenerator
 from impactlens.utils.workflow_utils import get_project_root, load_members_from_yaml
 from impactlens.utils.common_args import add_jira_metrics_args
 from impactlens.utils.core_utils import calculate_days_between, calculate_throughput_variants
+from impactlens.utils.cli_utils import parse_leave_days_capacity, validate_date_range
 
 
 def main():
@@ -38,23 +39,11 @@ def main():
     default_config_path = project_root / "config" / "jira_report_config.yaml"
     config_path = members_file if members_file else default_config_path
 
-    # Get leave_days from command line argument
-    leave_days = 0
-    if args.leave_days is not None:
-        try:
-            leave_days = float(args.leave_days)
-        except ValueError:
-            print(f"Error: --leave-days must be a number, got '{args.leave_days}'")
-            return 1
+    # Validate date format
+    validate_date_range(args.start, args.end)
 
-    # Get capacity from command line argument
-    capacity = 1.0
-    if args.capacity is not None:
-        try:
-            capacity = float(args.capacity)
-        except ValueError:
-            print(f"Error: --capacity must be a number, got '{args.capacity}'")
-            return 1
+    # Parse leave_days and capacity from command line arguments
+    leave_days, capacity = parse_leave_days_capacity(args)
 
     # Initialize calculator and report generator
     calculator = JiraMetricsCalculator(project_key=args.project)

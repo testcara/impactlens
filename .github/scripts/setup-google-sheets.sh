@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup Google Sheets credentials for CI
+# Setup Google Sheets and Drive credentials for CI
 # Usage: ./setup-google-sheets.sh
 
 set -e

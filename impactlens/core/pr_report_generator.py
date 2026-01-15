@@ -15,6 +15,9 @@ from impactlens.utils.report_utils import (
     format_metric_changes,
     get_identifier_for_file,
     get_identifier_for_display,
+    generate_comparison_report_header,
+    save_report_output,
+    METRICS_GUIDE_URL,
 )
 from impactlens.utils.core_utils import calculate_days_between
 
@@ -155,6 +158,8 @@ class PRReportGenerator:
         repo_name,
         author=None,
         hide_individual_names=False,
+        leave_days=0,
+        capacity=1.0,
     ):
         """
         Generate JSON output.
@@ -168,6 +173,8 @@ class PRReportGenerator:
             repo_name: Repository name
             author: Optional author filter
             hide_individual_names: If True, anonymize author names in JSON
+            leave_days: Number of leave days (default: 0)
+            capacity: Work capacity 0.0-1.0 (default: 1.0)
 
         Returns:
             Dictionary suitable for JSON serialization
@@ -194,10 +201,12 @@ class PRReportGenerator:
 
         return {
             "analysis_date": datetime.now().isoformat(),
-            "period": {
+            "time_range": {
                 "start_date": start_date,
                 "end_date": end_date,
                 "span_days": span_days,
+                "leave_days": leave_days,
+                "capacity": capacity,
             },
             "repository": {"owner": repo_owner, "name": repo_name},
             "filter": {"author": display_author},
@@ -228,21 +237,16 @@ class PRReportGenerator:
         Returns:
             Output filename
         """
-        os.makedirs(output_dir, exist_ok=True)
-
-        date_range = f"{start_date}_{end_date}".replace("-", "")
-
-        if author:
-            # Get file identifier (normalized and optionally anonymized)
-            identifier = get_identifier_for_file(author, hide_individual_names)
-            filename = f"{output_dir}/pr_metrics_{identifier}_{date_range}.json"
-        else:
-            filename = f"{output_dir}/pr_metrics_general_{date_range}.json"
-
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(output_data, f, indent=2, ensure_ascii=False)
-
-        return filename
+        return save_report_output(
+            content=json.dumps(output_data, indent=2, ensure_ascii=False),
+            start_date=start_date,
+            end_date=end_date,
+            report_type="pr",
+            output_format="json",
+            identifier=author,
+            output_dir=output_dir,
+            hide_individual_names=hide_individual_names,
+        )
 
     def save_text_report(
         self,
@@ -267,21 +271,16 @@ class PRReportGenerator:
         Returns:
             Output filename
         """
-        os.makedirs(output_dir, exist_ok=True)
-
-        date_range = f"{start_date}_{end_date}".replace("-", "")
-
-        if author:
-            # Get file identifier (normalized and optionally anonymized)
-            identifier = get_identifier_for_file(author, hide_individual_names)
-            filename = f"{output_dir}/pr_report_{identifier}_{date_range}.txt"
-        else:
-            filename = f"{output_dir}/pr_report_general_{date_range}.txt"
-
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write(report_text)
-
-        return filename
+        return save_report_output(
+            content=report_text,
+            start_date=start_date,
+            end_date=end_date,
+            report_type="pr",
+            output_format="txt",
+            identifier=author,
+            output_dir=output_dir,
+            hide_individual_names=hide_individual_names,
+        )
 
     def parse_pr_report(self, filename):
         """
@@ -297,7 +296,7 @@ class PRReportGenerator:
             data = json.load(f)
 
         stats = data.get("statistics", {})
-        period = data.get("period", {})
+        time_range = data.get("time_range", {})
 
         # Extract overall metrics from non_ai_stats if available, otherwise from ai_stats,
         # otherwise calculate from all PRs
@@ -321,14 +320,15 @@ class PRReportGenerator:
 
         return {
             "filename": filename,
-            "period": period,
+            "time_range": time_range,
             "total_prs": stats.get("total_prs", 0),
             "daily_throughput": stats.get("daily_throughput", 0),
             "daily_throughput_skip_leave": stats.get("daily_throughput_skip_leave"),
             "daily_throughput_capacity": stats.get("daily_throughput_capacity"),
             "daily_throughput_both": stats.get("daily_throughput_both"),
-            "leave_days": stats.get("leave_days", 0),
-            "capacity": stats.get("capacity", 1.0),
+            # Read from time_range (new format) or fallback to stats (old format)
+            "leave_days": time_range.get("leave_days", stats.get("leave_days", 0)),
+            "capacity": time_range.get("capacity", stats.get("capacity", 1.0)),
             "ai_adoption_rate": stats.get("ai_adoption_rate", 0),
             "ai_assisted_prs": stats.get("ai_assisted_prs", 0),
             "non_ai_prs": stats.get("non_ai_prs", 0),
@@ -371,33 +371,21 @@ class PRReportGenerator:
         Returns:
             TSV format string
         """
-        lines = []
-
-        # Header
-        if author:
-            lines.append(f"PR AI Impact Analysis Report - {author}")
-        else:
-            lines.append("PR AI Impact Analysis Report - Team Overall")
-        lines.append(f"Report Generated: {datetime.now().strftime('%B %d, %Y')}")
+        # Build project info string
+        project_info = None
         if repo_owner and repo_name:
-            lines.append(f"Repository: {repo_owner}/{repo_name}")
+            project_info = f"{repo_owner}/{repo_name}"
         elif repo_name:
-            lines.append(f"Repository: {repo_name}")
-        lines.append("")
+            project_info = repo_name
 
-        # Add description for multi-phase analysis
-        if len(reports) >= 2:
-            lines.append("This report analyzes PR data across multiple periods to evaluate")
-            lines.append("the impact of AI tools on development efficiency:")
-            lines.append("")
-
-        # Phase info with date ranges
-        for i, (name, report) in enumerate(zip(phase_names, reports), 1):
-            period = report.get("period", {})
-            start_date = period.get("start_date", "N/A")
-            end_date = period.get("end_date", "N/A")
-            lines.append(f"Phase {i}: {name} ({start_date} to {end_date})")
-        lines.append("")
+        # Generate common header using shared utility
+        lines = generate_comparison_report_header(
+            report_type="PR",
+            identifier=author,
+            project_info=project_info,
+            reports=reports,
+            phase_names=phase_names,
+        )
 
         # Metrics table header
         header = "Metric\t" + "\t".join(phase_names)
@@ -406,7 +394,7 @@ class PRReportGenerator:
         # Analysis Period (span_days)
         periods = []
         for r in reports:
-            span_days = r.get("period", {}).get("span_days")
+            span_days = r.get("time_range", {}).get("span_days")
             if span_days is not None:
                 periods.append(f"{span_days}d")
             else:
@@ -673,6 +661,6 @@ class PRReportGenerator:
 
         lines.append("")
         lines.append("For detailed metric explanations, see:")
-        lines.append("https://github.com/testcara/impactlens/blob/master/docs/METRICS_GUIDE.md")
+        lines.append(METRICS_GUIDE_URL)
 
         return "\n".join(lines)

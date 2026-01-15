@@ -23,6 +23,7 @@ from impactlens.utils.logger import logger
 from impactlens.utils.report_utils import get_identifier_for_display
 from impactlens.utils.workflow_utils import load_members_from_yaml
 from impactlens.utils.common_args import add_pr_metrics_args
+from impactlens.utils.cli_utils import parse_leave_days_capacity, validate_date_range
 
 
 def main():
@@ -58,13 +59,8 @@ Examples:
     if hasattr(args, "github_username") and args.github_username:
         args.author = args.github_username
 
-    # Validate dates
-    try:
-        datetime.strptime(args.start, "%Y-%m-%d")
-        datetime.strptime(args.end, "%Y-%m-%d")
-    except ValueError:
-        print("Error: Dates must be in YYYY-MM-DD format")
-        return 1
+    # Validate date format
+    validate_date_range(args.start, args.end)
 
     # For or anonymization consistency: use email for hash matching
     # Email is required in config for cross-platform identification
@@ -215,23 +211,9 @@ Examples:
         print("\n⚠ No merged PRs found for the specified period")
         print("📊 Generating report with empty metrics...")
 
-    # Get leave_days and capacity from command line arguments
+    # Parse leave_days and capacity from command line arguments
     # (Orchestration layer like generate_pr_report.py should aggregate these from config)
-    leave_days = 0
-    if args.leave_days is not None:
-        try:
-            leave_days = float(args.leave_days)
-        except ValueError:
-            print(f"Error: --leave-days must be a number, got '{args.leave_days}'")
-            return 1
-
-    capacity = 1.0
-    if args.capacity is not None:
-        try:
-            capacity = float(args.capacity)
-        except ValueError:
-            print(f"Error: --capacity must be a number, got '{args.capacity}'")
-            return 1
+    leave_days, capacity = parse_leave_days_capacity(args)
 
     print("\n📊 Calculating statistics...")
     calculator = PRMetricsCalculator()
@@ -264,6 +246,8 @@ Examples:
         client.repo_name,
         anonymization_identifier,
         hide_individual_names=args.hide_individual_names,
+        leave_days=leave_days,
+        capacity=capacity,
     )
 
     # Save outputs

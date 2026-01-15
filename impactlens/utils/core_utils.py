@@ -410,3 +410,90 @@ def read_ai_analysis_report(filepath):
             rows.append([plain_line])
 
     return rows
+
+
+def generate_sheet_name_from_report(report_path: str, config_path: str = None) -> str:
+    """
+    Generate Google Sheets tab name from report file path.
+
+    This function replicates the naming logic from upload_to_sheets.py to ensure
+    consistent naming across data sheets and visualization sheets.
+
+    Args:
+        report_path: Path to the report file (e.g., "reports/team/jira/combined_jira_report_20250116.tsv")
+        config_path: Optional config file path for extracting sheet prefix
+
+    Returns:
+        Sheet name with all prefixes applied (e.g., "team - PROJ Jira Report - Combined")
+
+    Examples:
+        >>> generate_sheet_name_from_report("reports/team1/jira/combined_jira_report_20250116.tsv")
+        'Jira Report - Combined'
+        >>> generate_sheet_name_from_report("reports/team1/github/combined_pr_report_20250116.tsv")
+        'PR Report - Combined'
+    """
+    import os
+    from pathlib import Path
+    from impactlens.utils.workflow_utils import extract_sheet_prefix
+
+    filename = Path(report_path).stem
+
+    # Determine base sheet name from filename pattern
+    # Check if it's an aggregated report
+    if filename.startswith("aggregated_jira_report"):
+        sheet_name = "Jira Report - Aggregated"
+    elif filename.startswith("aggregated_pr_report"):
+        sheet_name = "PR Report - Aggregated"
+    # Check if it's an AI analysis report
+    elif filename.startswith("ai_analysis_pr"):
+        sheet_name = "AI Analysis - PR"
+    elif filename.startswith("ai_analysis_jira"):
+        sheet_name = "AI Analysis - Jira"
+    # Check if it's a combined PR report (may have project prefix)
+    elif "combined_pr_report" in filename:
+        sheet_name = "PR Report - Combined"
+    # Check if it's a combined Jira report (may have project prefix)
+    elif "combined_jira_report" in filename:
+        sheet_name = "Jira Report - Combined"
+    # Check if it's a PR comparison report
+    elif filename.startswith("pr_comparison_"):
+        parts = filename.replace("pr_comparison_", "").split("_")
+        if parts[0] == "general":
+            sheet_name = "PR Report - Team"
+        else:
+            normalized = normalize_username(parts[0])
+            sheet_name = f"PR Report - {normalized}"
+    # Check if it's a Jira comparison report
+    elif filename.startswith("jira_comparison_"):
+        parts = filename.replace("jira_comparison_", "").split("_")
+        if parts[0] == "general":
+            sheet_name = "Jira Report - Team"
+        else:
+            normalized = normalize_username(parts[0])
+            sheet_name = f"Jira Report - {normalized}"
+    # Fallback for old comparison_report_* naming (for backwards compatibility)
+    else:
+        parts = filename.replace("comparison_report_", "").split("_")
+        if parts[0] == "general":
+            sheet_name = "Jira Report - Team"
+        else:
+            normalized = normalize_username(parts[0])
+            sheet_name = f"Jira Report - {normalized}"
+
+    # Add project/repo name to sheet name (from environment variables set by config)
+    if "jira" in sheet_name.lower():
+        project_key = os.getenv("JIRA_PROJECT_KEY", "")
+        if project_key:
+            sheet_name = f"{project_key} {sheet_name}"
+    elif "pr" in sheet_name.lower() or "ai analysis" in sheet_name.lower():
+        repo_name = os.getenv("GITHUB_REPO_NAME", "")
+        if repo_name:
+            sheet_name = f"{repo_name} {sheet_name}"
+
+    # Add top-level directory prefix for complex scenarios (if config_path is provided)
+    # Extract prefix from config path (e.g., "cue" from config/cue/cue-konfluxui/)
+    sheet_prefix = extract_sheet_prefix(config_path) if config_path else ""
+    if sheet_prefix:
+        sheet_name = f"{sheet_prefix} - {sheet_name}"
+
+    return sheet_name

@@ -16,6 +16,36 @@ from datetime import datetime
 from impactlens.utils.logger import Colors, set_log_level
 
 
+def apply_project_settings_to_env(project_settings: Dict[str, Any]) -> None:
+    """
+    Apply project settings from config to environment variables.
+
+    This allows config files to override .env settings for project-specific values
+    like jira_project_key, github_repo_name, etc.
+
+    Args:
+        project_settings: Dict with project configuration from YAML config file
+
+    Example:
+        >>> project_settings = {"jira_project_key": "KFLUX", "github_repo_name": "konflux-ui"}
+        >>> apply_project_settings_to_env(project_settings)
+        # Now os.environ["JIRA_PROJECT_KEY"] == "KFLUX"
+    """
+    env_mappings = {
+        "jira_url": "JIRA_URL",
+        "jira_project_key": "JIRA_PROJECT_KEY",
+        "github_url": "GITHUB_URL",
+        "github_repo_owner": "GITHUB_REPO_OWNER",
+        "github_repo_name": "GITHUB_REPO_NAME",
+        "google_spreadsheet_id": "GOOGLE_SPREADSHEET_ID",
+    }
+
+    for config_key, env_var in env_mappings.items():
+        config_value = project_settings.get(config_key)
+        if config_value:  # Config has value, override environment variable
+            os.environ[env_var] = str(config_value)
+
+
 def get_project_root() -> Path:
     """
     Get the project root directory by searching for marker files.
@@ -267,21 +297,8 @@ def load_config_file(
     # Extract project settings (non-sensitive configuration)
     project_settings = config.get("project", {})
 
-    # Apply project settings to environment variables (config overrides env)
-    # This allows config files to override .env settings
-    env_mappings = {
-        "jira_url": "JIRA_URL",
-        "jira_project_key": "JIRA_PROJECT_KEY",
-        "github_url": "GITHUB_URL",
-        "github_repo_owner": "GITHUB_REPO_OWNER",
-        "github_repo_name": "GITHUB_REPO_NAME",
-        "google_spreadsheet_id": "GOOGLE_SPREADSHEET_ID",
-    }
-
-    for config_key, env_var in env_mappings.items():
-        config_value = project_settings.get(config_key)
-        if config_value:  # Config has value, override environment variable
-            os.environ[env_var] = str(config_value)
+    # Apply project settings to environment variables
+    apply_project_settings_to_env(project_settings)
 
     # Apply log_level from config if specified
     log_level = config.get("log_level")
