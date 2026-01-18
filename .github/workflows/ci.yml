@@ -495,3 +495,124 @@ jobs:
             echo ""
           fi
           echo "✅ Multi-team aggregation test completed successfully"
+
+  test-gemini-api:
+    name: Test Gemini API Integration
+    runs-on: ubuntu-latest
+    needs: test
+    # Only run if GOOGLE_API_KEY secret is available
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if GOOGLE_API_KEY is available
+        id: check_secret
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "secret_available=false" >> $GITHUB_OUTPUT
+            echo "⚠️  GOOGLE_API_KEY not configured - skipping Gemini API test"
+          else
+            echo "secret_available=true" >> $GITHUB_OUTPUT
+            echo "✓ GOOGLE_API_KEY is configured"
+          fi
+
+      - name: Set up Python
+        if: steps.check_secret.outputs.secret_available == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        if: steps.check_secret.outputs.secret_available == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install google-genai
+
+      - name: Create test report
+        if: steps.check_secret.outputs.secret_available == 'true'
+        run: |
+          mkdir -p reports/gemini-test
+          cat > reports/gemini-test/test_report.tsv << 'EOF'
+          GitHub PR AI Impact Analysis - Combined Report
+          Generated: 2024-01-01 12:00:00
+          Team: Test Team
+
+          ========================================
+          PHASE SUMMARY
+          ========================================
+
+          Metric	Phase 1	Phase 2	Phase 3
+          Total PRs	10	15	12
+          Avg Cycle Time (days)	5.2	4.8	4.5
+          AI Tool Usage %	60%	75%	80%
+
+          ========================================
+          DETAILED METRICS
+          ========================================
+
+          Developer	PRs	Avg Cycle Time	AI Usage
+          Developer-1	5	4.5	Yes
+          Developer-2	8	5.0	Yes
+          Developer-3	7	4.8	No
+          EOF
+          echo "✓ Test report created"
+
+      - name: Test Gemini API call
+        if: steps.check_secret.outputs.secret_available == 'true'
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          echo "=========================================="
+          echo "Testing Gemini API Integration"
+          echo "=========================================="
+          echo ""
+
+          python -m impactlens.scripts.analyze_with_claude_code \
+            --reports-dir reports/gemini-test/test_report.tsv \
+            --gemini-api-mode \
+            --output-dir reports/gemini-test \
+            --timeout 60
+
+          echo ""
+          echo "✓ Gemini API test completed successfully"
+
+          # Check if analysis was generated
+          if [ -f reports/gemini-test/ai_analysis_*.txt ]; then
+            echo "✓ Analysis file generated"
+            echo ""
+            echo "Analysis preview:"
+            head -30 reports/gemini-test/ai_analysis_*.txt
+          else
+            echo "✗ Analysis file not found"
+            exit 1
+          fi
+
+      - name: Upload Gemini test results
+        if: steps.check_secret.outputs.secret_available == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-api-test-results
+          path: reports/gemini-test/
+          retention-days: 7
+
+      - name: Skip test (no API key)
+        if: steps.check_secret.outputs.secret_available == 'false'
+        run: |
+          echo "=========================================="
+          echo "Gemini API Test Skipped"
+          echo "=========================================="
+          echo ""
+          echo "⚠️  GOOGLE_API_KEY secret not configured"
+          echo ""
+          echo "To enable Gemini API testing:"
+          echo "  1. Go to: https://aistudio.google.com/apikey"
+          echo "  2. Create an API key"
+          echo "  3. Add it as GOOGLE_API_KEY secret in GitHub repository settings"
+          echo ""
+          exit 0
