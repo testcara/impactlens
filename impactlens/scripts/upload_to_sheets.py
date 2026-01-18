@@ -49,7 +49,12 @@ from clients.sheets_client import (
     format_sheet,
     get_service_account_email,
 )
-from utils.core_utils import read_tsv_report, normalize_username, read_ai_analysis_report
+from utils.core_utils import (
+    read_tsv_report,
+    normalize_username,
+    read_ai_analysis_report,
+    generate_sheet_name_from_report,
+)
 from utils.workflow_utils import extract_sheet_prefix
 from impactlens.utils.common_args import add_upload_to_sheets_args
 
@@ -113,70 +118,8 @@ Note:
 
     # Derive sheet name from filename if not provided
     if not args.sheet_name:
-        filename = Path(args.report).stem
-
-        # Remove timestamp from filename for cleaner name
-        # e.g., "comparison_report_wlin_20251022_111614" -> "Jira Report - wlin"
-        # e.g., "pr_comparison_wlin_20251022_111614" -> "PR Report - wlin"
-        # e.g., "combined_pr_report_20251022_111614" -> "PR Report - Combined"
-        # e.g., "combined_jira_report_20251022_111614" -> "Jira Report - Combined"
-
-        # Check if it's an aggregated report
-        if filename.startswith("aggregated_jira_report"):
-            args.sheet_name = "Jira Report - Aggregated"
-        elif filename.startswith("aggregated_pr_report"):
-            args.sheet_name = "PR Report - Aggregated"
-        # Check if it's an AI analysis report
-        elif filename.startswith("ai_analysis_pr"):
-            args.sheet_name = "AI Analysis - PR"
-        elif filename.startswith("ai_analysis_jira"):
-            args.sheet_name = "AI Analysis - Jira"
-        # Check if it's a combined PR report (may have project prefix)
-        elif "combined_pr_report" in filename:
-            args.sheet_name = "PR Report - Combined"
-        # Check if it's a combined Jira report (may have project prefix)
-        elif "combined_jira_report" in filename:
-            args.sheet_name = "Jira Report - Combined"
-        # Check if it's a PR comparison report
-        elif filename.startswith("pr_comparison_"):
-            parts = filename.replace("pr_comparison_", "").split("_")
-            if parts[0] == "general":
-                args.sheet_name = "PR Report - Team"
-            else:
-                normalized = normalize_username(parts[0])
-                args.sheet_name = f"PR Report - {normalized}"
-        # Check if it's a Jira comparison report
-        elif filename.startswith("jira_comparison_"):
-            parts = filename.replace("jira_comparison_", "").split("_")
-            if parts[0] == "general":
-                args.sheet_name = "Jira Report - Team"
-            else:
-                normalized = normalize_username(parts[0])
-                args.sheet_name = f"Jira Report - {normalized}"
-        # Fallback for old comparison_report_* naming (for backwards compatibility)
-        else:
-            parts = filename.replace("comparison_report_", "").split("_")
-            if parts[0] == "general":
-                args.sheet_name = "Jira Report - Team"
-            else:
-                normalized = normalize_username(parts[0])
-                args.sheet_name = f"Jira Report - {normalized}"
-
-    # Add project/repo name to sheet name (if available)
-    if "jira" in args.sheet_name.lower():
-        project_key = os.getenv("JIRA_PROJECT_KEY", "")
-        if project_key:
-            args.sheet_name = f"{project_key} {args.sheet_name}"
-    elif "pr" in args.sheet_name.lower() or "ai analysis" in args.sheet_name.lower():
-        repo_name = os.getenv("GITHUB_REPO_NAME", "")
-        if repo_name:
-            args.sheet_name = f"{repo_name} {args.sheet_name}"
-
-    # Add top-level directory prefix for complex scenarios (if --config is provided)
-    # Extract prefix from config path (e.g., "cue" from config/cue/cue-konfluxui/)
-    sheet_prefix = extract_sheet_prefix(args.config) if args.config else ""
-    if sheet_prefix:
-        args.sheet_name = f"{sheet_prefix} - {args.sheet_name}"
+        # Use shared utility function for consistent naming
+        args.sheet_name = generate_sheet_name_from_report(args.report, args.config)
 
     print("\n📊 Uploading report to Google Sheets...")
     print(f"Report: {args.report}")

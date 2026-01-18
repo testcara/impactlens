@@ -18,6 +18,9 @@ from impactlens.utils.report_utils import (
     add_throughput_metric_change,
     get_identifier_for_file,
     get_identifier_for_display,
+    generate_comparison_report_header,
+    save_report_output,
+    METRICS_GUIDE_URL,
 )
 from impactlens.utils.core_utils import calculate_days_between, calculate_throughput_variants
 
@@ -332,26 +335,16 @@ class JiraReportGenerator:
         Returns:
             Output filename
         """
-        os.makedirs(output_dir, exist_ok=True)
-
-        start_formatted = start_date.replace("-", "")
-        end_formatted = end_date.replace("-", "")
-
-        if assignee:
-            # Get file identifier (normalized and optionally anonymized)
-            identifier = get_identifier_for_file(assignee, hide_individual_names)
-            filename = os.path.join(
-                output_dir, f"jira_report_{identifier}_{start_formatted}_{end_formatted}.txt"
-            )
-        else:
-            filename = os.path.join(
-                output_dir, f"jira_report_general_{start_formatted}_{end_formatted}.txt"
-            )
-
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write(report_text)
-
-        return filename
+        return save_report_output(
+            content=report_text,
+            start_date=start_date,
+            end_date=end_date,
+            report_type="jira",
+            output_format="txt",
+            identifier=assignee,
+            output_dir=output_dir,
+            hide_individual_names=hide_individual_names,
+        )
 
     def save_json_output(
         self,
@@ -376,25 +369,16 @@ class JiraReportGenerator:
         Returns:
             Output filename
         """
-        os.makedirs(output_dir, exist_ok=True)
-
-        start_formatted = start_date.replace("-", "")
-        end_formatted = end_date.replace("-", "")
-
-        if assignee:
-            # Get file identifier (normalized and optionally anonymized)
-            identifier = get_identifier_for_file(assignee, hide_individual_names)
-        else:
-            identifier = "general"
-
-        filename = os.path.join(
-            output_dir, f"jira_metrics_{identifier}_{start_formatted}_{end_formatted}.json"
+        return save_report_output(
+            content=json.dumps(output_data, indent=2, ensure_ascii=False),
+            start_date=start_date,
+            end_date=end_date,
+            report_type="jira",
+            output_format="json",
+            identifier=assignee,
+            output_dir=output_dir,
+            hide_individual_names=hide_individual_names,
         )
-
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(output_data, f, indent=2, ensure_ascii=False)
-
-        return filename
 
     def parse_jira_report(self, filename):
         """
@@ -486,32 +470,14 @@ class JiraReportGenerator:
         Returns:
             TSV format string
         """
-        lines = []
-
-        # Header
-        if assignee:
-            lines.append(f"AI Impact Analysis Report - {assignee}")
-        else:
-            lines.append("AI Impact Analysis Report - Team Overall")
-        lines.append(f"Report Generated: {datetime.now().strftime('%B %d, %Y')}")
-        if project_key:
-            lines.append(f"Project: {project_key}")
-        lines.append("")
-
-        # Add description for multi-phase analysis
-        if len(reports) >= 2:
-            lines.append(
-                "This report analyzes development data across multiple periods to evaluate"
-            )
-            lines.append("the impact of AI tools on team efficiency:")
-            lines.append("")
-
-        # Phase info with date ranges
-        for i, (name, report) in enumerate(zip(phase_names, reports), 1):
-            start_date = report["time_range"].get("start_date", "N/A")
-            end_date = report["time_range"].get("end_date", "N/A")
-            lines.append(f"Phase {i}: {name} ({start_date} to {end_date})")
-        lines.append("")
+        # Generate common header using shared utility
+        lines = generate_comparison_report_header(
+            report_type="JIRA",
+            identifier=assignee,
+            project_info=project_key,
+            reports=reports,
+            phase_names=phase_names,
+        )
 
         # Metrics table header
         header = "Metric\t" + "\t".join(phase_names)
@@ -687,6 +653,6 @@ class JiraReportGenerator:
 
         lines.append("")
         lines.append("For detailed metric explanations, see:")
-        lines.append("https://github.com/testcara/impactlens/blob/master/docs/METRICS_GUIDE.md")
+        lines.append(METRICS_GUIDE_URL)
 
         return "\n".join(lines)

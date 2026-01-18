@@ -346,6 +346,21 @@ def get_service_account_email(credentials_file=None):
         return None
 
 
+def get_sheets_service(credentials_file=None, timeout=60):
+    """
+    Get Google Sheets API service (convenience wrapper).
+
+    Args:
+        credentials_file: Path to credentials file (optional, uses env var if not provided)
+        timeout: Timeout in seconds for API requests (default: 60)
+
+    Returns:
+        Google Sheets API service object
+    """
+    credentials = get_credentials(credentials_file)
+    return build_service(credentials, timeout)
+
+
 def build_service(credentials, timeout=60):
     """
     Build Google Sheets API service with timeout configuration.

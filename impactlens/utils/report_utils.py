@@ -15,6 +15,123 @@ from typing import List, Optional, Any, Tuple, Dict
 from impactlens.utils.anonymization import anonymize_name
 
 
+# Documentation URL constant
+METRICS_GUIDE_URL = "https://github.com/testcara/impactlens/blob/master/docs/METRICS_GUIDE.md"
+
+
+def save_report_output(
+    content: str,
+    start_date: str,
+    end_date: str,
+    report_type: str,
+    output_format: str,
+    identifier: Optional[str] = None,
+    output_dir: str = "reports",
+    hide_individual_names: bool = False,
+) -> str:
+    """
+    Save report output to file (unified function for both Jira and PR reports).
+
+    Args:
+        content: Report content (text or JSON string)
+        start_date: Start date (YYYY-MM-DD)
+        end_date: End date (YYYY-MM-DD)
+        report_type: "jira" or "pr"
+        output_format: "txt" or "json"
+        identifier: Optional assignee/author (for filename)
+        output_dir: Output directory
+        hide_individual_names: If True, anonymize the filename
+
+    Returns:
+        Output filename path
+
+    Examples:
+        >>> save_report_output(text, "2024-01-01", "2024-03-31", "jira", "txt", "wlin")
+        'reports/jira/jira_report_wlin_20240101_20240331.txt'
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Format dates for filename
+    date_range = f"{start_date}_{end_date}".replace("-", "")
+
+    # Determine file prefix based on type and format
+    if output_format == "txt":
+        prefix = f"{report_type}_report_"
+    else:  # json
+        prefix = f"{report_type}_metrics_"
+
+    # Build filename
+    if identifier:
+        # Get file identifier (normalized and optionally anonymized)
+        file_id = get_identifier_for_file(identifier, hide_individual_names)
+        filename = os.path.join(output_dir, f"{prefix}{file_id}_{date_range}.{output_format}")
+    else:
+        filename = os.path.join(output_dir, f"{prefix}general_{date_range}.{output_format}")
+
+    # Write file
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    return filename
+
+
+def generate_comparison_report_header(
+    report_type: str,
+    identifier: Optional[str],
+    project_info: Optional[str],
+    reports: List[Dict],
+    phase_names: List[str],
+) -> List[str]:
+    """
+    Generate common header section for comparison reports (Jira/PR).
+
+    Args:
+        report_type: "JIRA" or "PR"
+        identifier: Optional assignee/author name
+        project_info: Optional project key or repository name
+        reports: List of parsed report dictionaries
+        phase_names: List of phase names
+
+    Returns:
+        List of formatted header lines
+
+    Examples:
+        >>> generate_comparison_report_header("JIRA", "wlin", "KONFLUX", reports, ["Phase 1", "Phase 2"])
+        ['JIRA AI Impact Analysis Report - wlin', 'Report Generated: January 15, 2026', ...]
+    """
+    lines = []
+
+    # Title
+    if identifier:
+        lines.append(f"{report_type} AI Impact Analysis Report - {identifier}")
+    else:
+        lines.append(f"{report_type} AI Impact Analysis Report - Team Overall")
+
+    lines.append(f"Report Generated: {datetime.now().strftime('%B %d, %Y')}")
+
+    if project_info:
+        label = "Project" if report_type == "JIRA" else "Repository"
+        lines.append(f"{label}: {project_info}")
+
+    lines.append("")
+
+    # Add description for multi-phase analysis
+    if len(reports) >= 2:
+        lines.append("This report compares team metrics across multiple phases.")
+        lines.append("")
+
+    # Phase info with date ranges
+    for i, (name, report) in enumerate(zip(phase_names, reports), 1):
+        time_range = report.get("time_range", {})
+        start_date = time_range.get("start_date", "N/A")
+        end_date = time_range.get("end_date", "N/A")
+        lines.append(f"Phase {i}: {name} ({start_date} to {end_date})")
+
+    lines.append("")
+
+    return lines
+
+
 def build_jira_project_prefix(project_settings: Optional[Dict]) -> Optional[str]:
     """
     Build project prefix for Jira reports from project settings.
@@ -647,6 +764,7 @@ def combine_comparison_reports(
     title: Optional[str] = None,
     project_prefix: Optional[str] = None,
     hide_individual_names: bool = False,
+    visualization_link: Optional[str] = None,
 ) -> str:
     """
     Combine all individual member comparison reports into a single report grouped by metric.
@@ -660,6 +778,7 @@ def combine_comparison_reports(
         title: Optional title for the combined report
         project_prefix: Optional prefix for filename (e.g., project_key for Jira, repo_name for PR)
         hide_individual_names: Whether to anonymize individual names and hide sensitive fields
+        visualization_link: Github png link
 
     Returns:
         Path to generated combined report file
@@ -774,10 +893,18 @@ def combine_comparison_reports(
         lines.append(f"Project: {project_prefix}")
     lines.append("")
     lines.append(
-        f"This report compares {report_type.upper()} metrics across different time periods"
+        "This report provides grouped tabular metrics data for team and individual comparison across multiple phases."
     )
-    lines.append("to evaluate the impact of AI tools on development workflow.")
+    if visualization_link:
+        lines.append(
+            "For visual analysis of individual performance distributions, see the visualization report link below."
+        )
     lines.append("")
+
+    # Add visualization link if available
+    if visualization_link:
+        lines.append(f"Visualization Report: {visualization_link}")
+        lines.append("")
 
     # Add phase info (extract from phase names)
     for i, phase_name in enumerate(phase_names, 1):

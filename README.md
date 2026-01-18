@@ -24,10 +24,11 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 - **Track AI Productivity Impact**: Compare development efficiency before and after AI tool adoption
 - **Performance Reviews**: Objective metrics for evaluating team and individual performance
 - **Data-Driven Insights**: Track closure time, merge time, throughput, and more to help making informed decisions
+- **Visual Distribution Analysis**: Auto-generated box plot charts showing team performance distribution for key metrics, stored in GitHub repository and embedded in Google Sheets for easy stakeholder review
 - **Privacy Protection**: Automatic anonymization in CI for sharing reports while protecting individual privacy. Optional email notifications send members their anonymous ID to find personal metrics
 - **CI-Driven Automation**: Submit config via PR → Reports auto-generated and posted as PR comments
 - **Multi-Repo Aggregation**: Combine reports from multiple repositories/projects into unified team-wide views
-- **Easy Sharing**: Auto-upload to Google Sheets for stakeholder visibility
+- **Easy Sharing**: Auto-upload to Google Sheets with embedded chart visualizations for stakeholder visibility
 - **Flexible Deployment**: GitHub Actions CI (zero config) or local CLI for full data access
 
 **Use Cases:**
@@ -44,42 +45,47 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         CLI Interface                            │
-│                         (impactlens)                             │
+│                         CLI Interface                           │
+│                         (impactlens)                            │
 └──────────────┬──────────────────────────────┬───────────────────┘
                │                              │
        ┌───────▼────────┐            ┌────────▼──────────┐
        │  Jira Workflow │            │   PR Workflow     │
        └───────┬────────┘            └────────┬──────────┘
                │                              │
-       ┌───────▼────────┐            ┌────────▼──────────┐
-       │  Jira Client   │            │ GitHub/GitLab     │
-       │  (REST/GraphQL)│            │ Client (GraphQL)  │
-       └───────┬────────┘            └────────┬──────────┘
+  ┌────────────▼──────────────┐  ┌────────────▼───────────────────┐
+  │ Jira Client(REST/GraphQL) │  │ GitHub/GitLab Client (GraphQL) │
+  └────────────┬──────────────┘  └────────────┬───────────────────┘
                │                              │
-               └──────────┬───────────────────┘
-                          │
-                 ┌────────▼───────────┐
-                 │  Metrics           │
-                 │  Calculators       │
-                 └────────┬───────────┘
-                          │
-                 ┌────────▼───────────┐
-                 │  Report            │
-                 │  Generators        │
-                 └────────┬───────────┘
-                          │
-                 ┌────────▼───────────┐
-                 │  Report            │
-                 │  Aggregators       │
-                 └────────┬───────────┘
-                          │
-          ┌───────────────┼───────────────┐
-          │               │               │
-  ┌───────▼────────┐ ┌───▼────┐ ┌────────▼──────────┐
-  │ Google Sheets  │ │  TSV   │ │  Claude Analysis  │
-  │    Upload      │ │ Files  │ │  (Optional)       │
-  └────────────────┘ └────────┘ └───────────────────┘
+               └───────────────┬──────────────┘
+                               │
+                  ┌────────────▼───────────┐
+                  │   Metrics Calculators  │
+                  └────────────┬───────────┘
+                               │
+                  ┌────────────▼───────────┐
+                  │   Report Generators    │
+                  └────────────┬───────────┘
+                               │
+               ┌───────────────▼───────────────┐
+               │  Visualization Generators     │
+               └───────────────┬───────────────┘
+                               │
+                  ┌────────────▼───────────┐
+                  │   Report Aggregators   │
+                  └────────────┬───────────┘
+                               │
+           ┌───────────────────┼─────────────────────────┐
+           │                   │                         │
+     ┌─────▼─────┐ ┌───────────▼──────────┐ ┌────────────▼──────────────┐
+     │ TSV Fiels │ │ PNG Charts(Optional) │ │ Claude Analysis(Optional) │
+     └─────┬─────┘ └───────────┬──────────┘ └────────────┬──────────────┘
+           │                   │                         │
+           └───────────────────┼─────────────────────────┘
+                               │
+         ┌─────────────────────▼─────────────────────┐
+         │ Google Sheets Reports with embeded Charts │
+         └───────────────────────────────────────────┘
 ```
 
 **Key Components:**
@@ -87,7 +93,8 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 - **CLI Interface**: Unified command-line interface (`cli.py`)
 - **Clients**: API integrations (Jira REST/GraphQL, GitHub/GitLab GraphQL, Google Sheets)
 - **Core Logic**: Metrics calculators and report generators
-- **Output**: TSV reports, Google Sheets upload, AI-powered insights
+- **Visualization**: Box plot chart generation, GitHub image storage, Google Sheets embedding
+- **Output**: TSV reports, visual charts, Google Sheets dashboards, AI-powered insights
 
 ### Directory Structure
 
@@ -113,6 +120,7 @@ impactlens/
 │   │   ├── get_pr_metrics.py
 │   │   ├── generate_*_report.py
 │   │   ├── generate_*_comparison_report.py
+│   │   ├── generate_charts.py    # Chart generation CLI
 │   │   ├── send_email_notifications.py
 │   │   ├── upload_to_sheets.py
 │   │   └── verify_setup.py
@@ -121,7 +129,10 @@ impactlens/
 │       ├── email_notifier.py     # Email notification utilities
 │       ├── smtp_config.py        # SMTP configuration & email helpers
 │       ├── workflow_utils.py     # Config loading & workflow helpers
-│       └── report_utils.py       # Report generation utilities
+│       ├── report_utils.py       # Report generation utilities
+│       ├── visualization.py      # Box plot chart generation
+│       ├── github_charts_uploader.py  # Upload charts to GitHub repo
+│       └── sheets_visualization.py    # Google Sheets chart embedding
 ├── .github/workflows/            # GitHub Actions CI
 │   ├── ci.yml                    # Test & lint workflow
 │   └── generate-reports.yml      # Automated report generation
