@@ -24,3 +24,5 @@ output_dir: "reports/test-ci-team2/github"
 
 # Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
 log_level: "WARNING"
+
+replace_existing_reports: true
