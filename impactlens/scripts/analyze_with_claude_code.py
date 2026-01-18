@@ -295,6 +295,143 @@ def call_anthropic_api(prompt: str, api_key: str = None, timeout: int = 300) -> 
         raise RuntimeError(f"Anthropic API call failed: {e}")
 
 
+def call_gemini_api(prompt: str, api_key: str = None, timeout: int = 300) -> str:
+    """
+    Call Google Gemini API to analyze the prompt.
+
+    Args:
+        prompt: The analysis prompt to send to Gemini
+        api_key: Gemini API key (if None, reads from GEMINI_API_KEY env var)
+        timeout: Timeout in seconds (default: 300 = 5 minutes)
+
+    Returns:
+        Analysis text from Gemini API
+
+    Raises:
+        RuntimeError: If API call fails
+        ValueError: If API key not provided
+    """
+    logger.info("🤖 Calling Gemini API for analysis...")
+    logger.info(f"   Timeout: {timeout}s")
+
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError:
+        raise ImportError(
+            "google-genai library not installed. Install with:\n"
+            "  pip install google-genai>=0.1.0"
+        )
+
+    # Get API key (Google uses GOOGLE_API_KEY for Gemini)
+    if not api_key:
+        api_key = os.environ.get("GOOGLE_API_KEY")
+
+    if not api_key:
+        raise ValueError(
+            "Google API key not found. Either:\n"
+            "  1. Set GOOGLE_API_KEY environment variable, or\n"
+            "  2. Pass --gemini-api-key parameter"
+        )
+
+    try:
+        # Check for proxy settings from environment
+        import httpx
+
+        # Get proxy settings from environment variables
+        http_proxy = os.environ.get("http_proxy") or os.environ.get("HTTP_PROXY")
+        https_proxy = os.environ.get("https_proxy") or os.environ.get("HTTPS_PROXY")
+
+        # Create httpx client with proxy support
+        httpx_client = None
+        if https_proxy or http_proxy:
+            logger.info(f"   Using proxy: {https_proxy or http_proxy}")
+            httpx_client = httpx.Client(
+                proxy=https_proxy or http_proxy,
+                timeout=timeout,
+            )
+
+        # Initialize client
+        client = genai.Client(api_key=api_key)
+
+        # Use Gemini 2.0 Flash model (fast and cost-effective)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-exp",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                max_output_tokens=4096,
+                temperature=0.7,
+                httpOptions=(
+                    types.HttpOptions(
+                        timeout=timeout,
+                        httpxClient=httpx_client,
+                    )
+                    if httpx_client
+                    else types.HttpOptions(
+                        timeout=timeout,
+                    )
+                ),
+            ),
+        )
+
+        analysis = response.text.strip()
+
+        if not analysis:
+            raise RuntimeError("Gemini API returned empty response")
+
+        logger.info("   ✓ Analysis completed successfully")
+        logger.info(f"   Model: gemini-2.0-flash-exp")
+        if hasattr(response, "usage_metadata"):
+            logger.info(
+                f"   Tokens: {response.usage_metadata.prompt_token_count} in, "
+                f"{response.usage_metadata.candidates_token_count} out"
+            )
+
+        return analysis
+
+    except Exception as e:
+        error_msg = str(e)
+
+        # Provide helpful error messages for common issues
+        if (
+            "ssl" in error_msg.lower()
+            or "handshake" in error_msg.lower()
+            or "timed out" in error_msg.lower()
+        ):
+            raise RuntimeError(
+                f"Gemini API call failed: {e}\n\n"
+                "⚠️  SSL/Network connection error - This usually means:\n"
+                "   1. Gemini API is not accessible in your region (China, some EU countries)\n"
+                "   2. Network firewall is blocking the connection\n"
+                "   3. You may need to use a VPN or proxy to access the API\n\n"
+                "💡 Recommended alternatives:\n"
+                "   • Use Claude API which has better global availability:\n"
+                "     export ANTHROPIC_API_KEY='your-key'\n"
+                "     python -m impactlens.scripts.analyze_with_claude_code \\\n"
+                "       --reports-dir 'your-report.tsv' \\\n"
+                "       --claude-api-mode\n\n"
+                "   • Or use prompt preview mode to copy-paste into any AI:\n"
+                "     python -m impactlens.scripts.analyze_with_claude_code \\\n"
+                "       --reports-dir 'your-report.tsv' \\\n"
+                "       --prompt-only"
+            )
+        elif "location" in error_msg.lower() or "not supported" in error_msg.lower():
+            raise RuntimeError(
+                f"Gemini API call failed: {e}\n\n"
+                "⚠️  This error usually means:\n"
+                "   1. Gemini API is not available in your region (China, some EU countries)\n"
+                "   2. You may need to use a VPN or proxy to access the API\n"
+                "   3. Consider using Claude API instead with --claude-api-mode\n\n"
+                "💡 Alternative: Use Claude API which has better global availability:\n"
+                "   export ANTHROPIC_API_KEY='your-key'\n"
+                "   python -m impactlens.scripts.analyze_with_claude_code \\\n"
+                "     --reports-dir 'your-report.tsv' \\\n"
+                "     --claude-api-mode"
+            )
+        else:
+            raise RuntimeError(f"Gemini API call failed: {e}")
+
+
 def call_claude_code(prompt: str, timeout: int = 300) -> str:
     """
     Call Claude Code CLI in non-interactive mode to analyze the prompt.
@@ -508,24 +645,37 @@ Examples:
         logger.info("")
         return 0
 
-    # Automatic mode: call Claude API or Claude Code
+    # Validation: ensure only one API mode is selected
+    if sum([args.claude_api_mode, args.gemini_api_mode]) > 1:
+        logger.error("❌ Error: Only one API mode can be selected at a time")
+        logger.error("   Choose either --claude-api-mode OR --gemini-api-mode (not both)")
+        return 1
+
+    # Automatic mode: call AI API or Claude Code
     logger.info("")
     logger.info("=" * 80)
     if args.claude_api_mode:
         logger.info("🚀 AUTOMATIC ANALYSIS MODE (Anthropic API)")
+    elif args.gemini_api_mode:
+        logger.info("🚀 AUTOMATIC ANALYSIS MODE (Gemini API)")
     else:
         logger.info("🚀 AUTOMATIC ANALYSIS MODE (Claude Code CLI)")
     logger.info("=" * 80)
     logger.info("")
 
     try:
-        # Call Claude API or Claude Code based on mode
+        # Call AI API or Claude Code based on mode
         if args.claude_api_mode:
             analysis = call_anthropic_api(
                 prompt, api_key=args.anthropic_api_key, timeout=args.timeout
             )
+            analysis_tool = "Anthropic API (Claude Sonnet)"
+        elif args.gemini_api_mode:
+            analysis = call_gemini_api(prompt, api_key=args.gemini_api_key, timeout=args.timeout)
+            analysis_tool = "Google Gemini API (Gemini 2.0 Flash)"
         else:
             analysis = call_claude_code(prompt, timeout=args.timeout)
+            analysis_tool = "Claude Code CLI"
 
         logger.info("")
         logger.info("=" * 80)
@@ -537,9 +687,6 @@ Examples:
 
         # Save analysis automatically
         logger.info("💾 Saving analysis to file...")
-        analysis_tool = (
-            "Anthropic API (Claude Sonnet)" if args.claude_api_mode else "Claude Code CLI"
-        )
         output_file = save_analysis(analysis, report_path, args.output_dir, analysis_tool)
         logger.info(f"   ✓ Saved to: {output_file}")
         logger.info("")

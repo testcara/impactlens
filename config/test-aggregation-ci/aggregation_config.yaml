@@ -1,11 +1,9 @@
 aggregation:
   # Name for the aggregated report
   name: "Test CI Team"
-
-  # Output directory for aggregated reports
-  output_dir: "reports/test-ci-aggregated"
-
   projects:
     - "test-ci-team1"
     - "test-ci-team2"
 
+# Required for multiple scenario
+output_dir: "reports/test-ci-aggregated"

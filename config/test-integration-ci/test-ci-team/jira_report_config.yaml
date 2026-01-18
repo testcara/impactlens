@@ -21,16 +21,9 @@ members:
 
 # Use test output directory to avoid polluting main reports
 output_dir: "reports/test-ci-team/jira"
-
-# Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
-log_level: "WARNING"
-
-# Email anonymous IDs to team members (optional)
-# When enabled, each team member receives ONLY THEIR OWN anonymous ID (e.g., Developer-A3F2)
-# - Privacy protected: Members cannot see others' IDs
-# - Opt-in sharing: They can choose to share their ID with their manager
-# - This allows connecting individual work to anonymized reports while preserving privacy
-email_anonymous_id:
-  enabled: false # Set to false to disable
-
+# Send Hashed members name to individuals.
+# Required by CI for first-time run.
+# Disabled it if you do not want to be mailed every run.
+email_anonymous_id: true
+# Remove old reports when we rerun ci jobs
 replace_existing_reports: true

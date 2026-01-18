@@ -156,11 +156,13 @@ def should_send_email_notification(
         from impactlens.utils.workflow_utils import load_config_file
 
         _, root_configs = load_config_file(config_file_path)
-        email_enabled = root_configs.get("visualization", True)
+        email_enabled = root_configs.get("email_anonymous_id", False)
         if email_enabled:
             console.print("[bold green]✓[/bold green] Email notifications enabled in config")
         else:
-            console.print("[dim]Email notifications disabled in config (enabled: false)[/dim]")
+            console.print(
+                "[dim]Email notifications disabled in config (email_anonymous_id: false)[/dim]"
+            )
 
         return email_enabled
     except Exception as e:

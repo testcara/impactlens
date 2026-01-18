@@ -1,5 +1,6 @@
 # Test configuration for CI integration testing
 # This config uses a small date range and minimal team members for fast testing
+# This config just includes the nessary config for first time setup.
 
 project:
   jira_url: "https://issues.redhat.com"
@@ -21,15 +22,11 @@ members:
   - email: kkanova@redhat.com
     capacity: 0.5
 
-# Use test output directory to avoid polluting main reports
+# required for multiple scenario
 output_dir: "reports/test-ci-team1/jira"
-
-# Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
-log_level: "WARNING"
-
-# Email anonymous IDs to team members
-# Each member receives ONLY their own ID (privacy protected)
-email_anonymous_id:
-  enabled: true
-
+# Send Hashed members name to individuals.
+# Required by CI for first-time run.
+# Disabled it if you do not want to be mailed every run.
+email_anonymous_id: true
+# Remove old reports when we rerun ci jobs
 replace_existing_reports: true

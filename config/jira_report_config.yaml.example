@@ -53,13 +53,21 @@ members:
   - email: mmarcin@redhat.com
 
 
-# Output directory for reports
-# SIMPLE SCENARIO (single project): Optional, defaults to "reports/jira"
-# COMPLEX SCENARIO (multi-project aggregation): REQUIRED! Must be "reports/{project-name}/jira"
-#   where {project-name} matches the subdirectory name in aggregation config
-#
-# Example for aggregation:
-# output_dir: "reports/internal-services/jira"  # For config/my-team/internal-services/jira_report_config.yaml
-# output_dir: "reports/frontend/jira"           # For config/my-team/frontend/jira_report_config.yaml
-#
-# output_dir: "reports/jira"  # Simple scenario (optional)
+# Send Hashed Develop ID to individuals.
+# Required by CI for first-time run.
+# Disabled it if you do not want to be mailed every run.
+email_anonymous_id: true
+
+# Simple scenario (optional)
+output_dir: "reports/jira"
+# Multiple scenario (required):
+# output_dir: "reports/internal-services/jira"  # For config/my-team/internal-services/pr_report_config.yaml
+# output_dir: "reports/frontend/jira"           # For config/my-team/frontend/pr_report_config.yaml
+
+# delete old sheets with same name but different timestamp(Recommend)
+# replace_existing_reports: true
+
+# Google Sheets settings (optional)
+# google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
+# If you do not set in Config PR, reports would be uploaded to the default google-sheet by CI.
+# IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com

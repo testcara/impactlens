@@ -280,7 +280,7 @@ def add_capacity_args(parser: argparse.ArgumentParser) -> None:
 
 
 def add_claude_analysis_args(parser: argparse.ArgumentParser) -> None:
-    """Add arguments for Claude-based analysis (analyze_with_claude_code.py)."""
+    """Add arguments for AI-based analysis (analyze_with_claude_code.py)."""
     parser.add_argument(
         "--reports-dir",
         type=str,
@@ -302,18 +302,18 @@ def add_claude_analysis_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--save-analysis",
         type=str,
-        help="Analysis text to save directly (optional, skips Claude Code call)",
+        help="Analysis text to save directly (optional, skips AI API call)",
     )
     parser.add_argument(
         "--timeout",
         type=int,
         default=300,
-        help="Timeout for Claude Code analysis in seconds (default: 300)",
+        help="Timeout for AI analysis in seconds (default: 300)",
     )
     parser.add_argument(
         "--prompt-only",
         action="store_true",
-        help="Prompt preview mode: only generate and display prompt without calling Claude",
+        help="Prompt preview mode: only generate and display prompt without calling AI",
     )
     parser.add_argument(
         "--no-upload",
@@ -329,6 +329,16 @@ def add_claude_analysis_args(parser: argparse.ArgumentParser) -> None:
         "--anthropic-api-key",
         type=str,
         help="Anthropic API key (if not provided, reads from ANTHROPIC_API_KEY env var)",
+    )
+    parser.add_argument(
+        "--gemini-api-mode",
+        action="store_true",
+        help="Use Google Gemini API instead of Claude Code CLI (requires GOOGLE_API_KEY)",
+    )
+    parser.add_argument(
+        "--gemini-api-key",
+        type=str,
+        help="Google API key for Gemini (if not provided, reads from GOOGLE_API_KEY env var)",
     )
 
 
