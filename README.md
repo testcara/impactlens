@@ -78,7 +78,7 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
            ┌───────────────────┼─────────────────────────┐
            │                   │                         │
      ┌─────▼─────┐ ┌───────────▼──────────┐ ┌────────────▼──────────────┐
-     │ TSV Fiels │ │ PNG Charts(Optional) │ │ Claude Analysis(Optional) │
+     │ TSV Files │ │ PNG Charts(Optional) │ │ Claude Analysis(Optional) │
      └─────┬─────┘ └───────────┬──────────┘ └────────────┬──────────────┘
            │                   │                         │
            └───────────────────┼─────────────────────────┘

@@ -481,14 +481,18 @@ def generate_sheet_name_from_report(report_path: str, config_path: str = None) -
             sheet_name = f"Jira Report - {normalized}"
 
     # Add project/repo name to sheet name (from environment variables set by config)
-    if "jira" in sheet_name.lower():
-        project_key = os.getenv("JIRA_PROJECT_KEY", "")
-        if project_key:
-            sheet_name = f"{project_key} {sheet_name}"
-    elif "pr" in sheet_name.lower() or "ai analysis" in sheet_name.lower():
-        repo_name = os.getenv("GITHUB_REPO_NAME", "")
-        if repo_name:
-            sheet_name = f"{repo_name} {sheet_name}"
+    # BUT: Skip for aggregated reports since they combine multiple projects
+    is_aggregated = "aggregated" in sheet_name.lower()
+
+    if not is_aggregated:
+        if "jira" in sheet_name.lower():
+            project_key = os.getenv("JIRA_PROJECT_KEY", "")
+            if project_key:
+                sheet_name = f"{project_key} {sheet_name}"
+        elif "pr" in sheet_name.lower() or "ai analysis" in sheet_name.lower():
+            repo_name = os.getenv("GITHUB_REPO_NAME", "")
+            if repo_name:
+                sheet_name = f"{repo_name} {sheet_name}"
 
     # Add top-level directory prefix for complex scenarios (if config_path is provided)
     # Extract prefix from config path (e.g., "cue" from config/cue/cue-konfluxui/)

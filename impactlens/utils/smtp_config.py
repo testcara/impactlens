@@ -126,19 +126,35 @@ def send_email_notifications_cli(
     try:
         from impactlens.utils.email_notifier import notify_members
         from impactlens.utils.anonymization import _global_anonymizer
-        from impactlens.utils.workflow_utils import load_members_from_yaml
+        from impactlens.scripts.send_email_notifications import collect_all_members
         import os
 
-        # Load team members from config
+        # Load team members from configs with email_anonymous_id enabled
         if config_file_path:
-            # Convert to Path if string (load_members_from_yaml expects Path object)
+            # Convert to Path if string
             if isinstance(config_file_path, str):
                 config_file_path = Path(config_file_path)
 
-            # Load detailed team member info (returns dict)
-            members_dict = load_members_from_yaml(config_file_path)
-            # Convert dict to list of dicts for notify_members
-            members = list(members_dict.values()) if members_dict else []
+            # Get config directory from the config file path
+            config_dir = config_file_path.parent
+
+            # Collect members from all configs with email_anonymous_id enabled
+            # This handles both Jira and PR configs, merging them if both are enabled
+            members, email_enabled = collect_all_members(config_dir)
+
+            if not email_enabled:
+                if console:
+                    console.print(
+                        "[dim]No configs have email_anonymous_id enabled - skipping[/dim]"
+                    )
+                return
+
+            if not members:
+                if console:
+                    console.print(
+                        "[dim]No members found in configs with email_anonymous_id enabled[/dim]"
+                    )
+                return
 
             # Pre-populate anonymizer with all team member identifiers
             # This ensures everyone gets a consistent anonymous ID
