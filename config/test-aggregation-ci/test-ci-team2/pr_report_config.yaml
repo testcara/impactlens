@@ -21,8 +21,9 @@ members:
 
 # Use test output directory to avoid polluting main reports
 output_dir: "reports/test-ci-team2/github"
-
-# Logging level: DEBUG, INFO, WARNING, ERROR (default: WARNING to avoid leaking sensitive info)
-log_level: "WARNING"
-
+# Send Hashed members name to individuals.
+# Required by CI for first-time run.
+# Disabled it if you do not want to be mailed every run.
+email_anonymous_id: true
+# Remove old reports when we rerun ci jobs
 replace_existing_reports: true

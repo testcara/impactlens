@@ -42,35 +42,6 @@ def collect_members_from_config(config_path: Path) -> List[Dict]:
         return []
 
 
-def load_email_config(config_path: Path) -> Dict:
-    """
-    Load email notification configuration from a config file.
-
-    Args:
-        config_path: Path to config file
-
-    Returns:
-        Dict with email notification settings (enabled flag only)
-    """
-    if not config_path.exists():
-        return None
-
-    try:
-        with open(config_path, "r") as f:
-            config = yaml.safe_load(f)
-        # Support multiple config names for backward compatibility
-        email_config = (
-            config.get("email_anonymous_id")
-            or config.get("share_anonymous_id")
-            or config.get("email_notifications_for_identifier")
-            or config.get("email_notifications", {})
-        )
-        return email_config
-    except Exception as e:
-        print(f"Warning: Failed to load email config from {config_path}: {e}")
-        return {}
-
-
 def _add_members_to_dict(members: List[Dict], all_members_by_email: Dict[str, Dict]) -> None:
     """
     Helper function to deduplicate and add members to the collection dict.
@@ -88,9 +59,15 @@ def _add_members_to_dict(members: List[Dict], all_members_by_email: Dict[str, Di
                 all_members_by_email[email] = member
 
 
-def collect_all_members(config_dir: Path) -> tuple[List[Dict], Dict]:
+def collect_all_members(config_dir: Path) -> tuple[List[Dict], bool]:
     """
-    Collect all unique team members and email config from config directory.
+    Collect all unique team members from configs with email_anonymous_id enabled.
+
+    Logic:
+    - If Jira config has email_anonymous_id: true, collect Jira members
+    - If PR config has email_anonymous_id: true, collect PR members
+    - If both are true, collect and merge (deduplicate) all members
+    - Returns True if any config has email enabled, False otherwise
 
     Supports both single-team and aggregation modes:
     - Single team: Loads from jira_report_config.yaml and/or pr_report_config.yaml in config_dir
@@ -100,10 +77,10 @@ def collect_all_members(config_dir: Path) -> tuple[List[Dict], Dict]:
         config_dir: Path to config directory
 
     Returns:
-        Tuple of (members list, email_config dict)
+        Tuple of (members list, email_enabled boolean)
     """
     all_members_by_email: Dict[str, Dict] = {}  # email -> member info
-    email_config = {}  # Will use first valid email config found
+    any_email_enabled = False  # Track if any config has email enabled
 
     # Check if this is aggregation mode
     aggregation_config = config_dir / "aggregation_config.yaml"
@@ -125,17 +102,26 @@ def collect_all_members(config_dir: Path) -> tuple[List[Dict], Dict]:
                 # Try both jira and pr config files
                 for config_name in ["jira_report_config.yaml", "pr_report_config.yaml"]:
                     config_path = project_dir / config_name
-                    members = collect_members_from_config(config_path)
 
-                    # Load email config from first available config
-                    if not email_config:
-                        email_config = load_email_config(config_path) or {}
+                    if not config_path.exists():
+                        continue
 
-                    _add_members_to_dict(members, all_members_by_email)
+                    # Check if email_anonymous_id is enabled in this config
+                    from impactlens.utils.workflow_utils import get_email_anonymous_id_enabled
+
+                    if get_email_anonymous_id_enabled(config_path):
+                        any_email_enabled = True
+                        members = collect_members_from_config(config_path)
+                        _add_members_to_dict(members, all_members_by_email)
+                        print(
+                            f"  ✓ {project}/{config_name}: email_anonymous_id enabled, collected {len(members)} members"
+                        )
+                    else:
+                        print(f"  ✗ {project}/{config_name}: email_anonymous_id disabled")
 
         except Exception as e:
             print(f"Error loading aggregation config: {e}")
-            return []
+            return [], False
 
     else:
         # Single team mode: load from config_dir directly
@@ -143,15 +129,24 @@ def collect_all_members(config_dir: Path) -> tuple[List[Dict], Dict]:
 
         for config_name in ["jira_report_config.yaml", "pr_report_config.yaml"]:
             config_path = config_dir / config_name
-            members = collect_members_from_config(config_path)
 
-            # Load email config from first available config
-            if not email_config:
-                email_config = load_email_config(config_path) or {}
+            if not config_path.exists():
+                continue
 
-            _add_members_to_dict(members, all_members_by_email)
+            # Check if email_anonymous_id is enabled in this config
+            from impactlens.utils.workflow_utils import get_email_anonymous_id_enabled
 
-    return list(all_members_by_email.values()), email_config
+            if get_email_anonymous_id_enabled(config_path):
+                any_email_enabled = True
+                members = collect_members_from_config(config_path)
+                _add_members_to_dict(members, all_members_by_email)
+                print(
+                    f"  ✓ {config_name}: email_anonymous_id enabled, collected {len(members)} members"
+                )
+            else:
+                print(f"  ✗ {config_name}: email_anonymous_id disabled")
+
+    return list(all_members_by_email.values()), any_email_enabled
 
 
 def main():
@@ -189,23 +184,20 @@ def main():
     print("=" * 60)
     print(f"Config directory: {config_dir}\n")
 
-    # Collect all team members and email config (deduplicated)
-    members, email_config = collect_all_members(config_dir)
+    # Collect all team members from configs with email_anonymous_id enabled (deduplicated)
+    members, email_enabled = collect_all_members(config_dir)
+
+    if not email_enabled:
+        print("ℹ️  Email notifications are disabled in all configs (email_anonymous_id: false)")
+        print("=" * 60)
+        sys.exit(0)
 
     if not members:
-        print("No team members found in config files")
+        print("No team members found in configs with email_anonymous_id enabled")
         print("=" * 60)
         sys.exit(0)
 
     print(f"Found {len(members)} unique team members\n")
-
-    # Check if email notifications are enabled
-    if not email_config.get("enabled", True):
-        print(
-            "ℹ️  Email notifications are disabled in config (email_notifications.enabled = false)"
-        )
-        print("=" * 60)
-        sys.exit(0)
 
     # Mail save file mode
     if args.mail_save_file:
