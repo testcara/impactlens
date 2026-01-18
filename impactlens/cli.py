@@ -156,11 +156,13 @@ def should_send_email_notification(
         from impactlens.utils.workflow_utils import load_config_file
 
         _, root_configs = load_config_file(config_file_path)
-        email_enabled = root_configs.get("visualization", True)
+        email_enabled = root_configs.get("email_anonymous_id", False)
         if email_enabled:
             console.print("[bold green]✓[/bold green] Email notifications enabled in config")
         else:
-            console.print("[dim]Email notifications disabled in config (enabled: false)[/dim]")
+            console.print(
+                "[dim]Email notifications disabled in config (email_anonymous_id: false)[/dim]"
+            )
 
         return email_enabled
     except Exception as e:
@@ -1044,6 +1046,215 @@ def pr_full(
 # ============================================================================
 
 
+def _process_single_project(
+    project_config_dir: Path,
+    project_name: str,
+    no_upload: bool,
+    upload_members: bool,
+    hide_individual_names: bool,
+    email_anonymous_id: bool,
+    mail_save_file: Optional[str],
+    with_claude_insights: bool,
+    claude_api_mode: bool,
+    no_visualization: bool,
+    incremental: bool,
+    skip_email: bool = False,
+) -> list:
+    """
+    Process a single project's Jira and PR workflows.
+
+    Returns:
+        List of failed workflow names
+    """
+    failed_workflows = []
+
+    # Resolve config paths for this project
+    jira_config_path, pr_config_path = resolve_config_paths_for_full(str(project_config_dir))
+
+    # Jira workflow
+    if jira_config_path and jira_config_path.exists():
+        console.print(
+            f"\n[bold cyan]JIRA WORKFLOW{f' - {project_name}' if project_name else ''}[/bold cyan]"
+        )
+        jira_exit_code = _jira_full_impl(
+            config=str(jira_config_path),
+            no_upload=no_upload,
+            upload_members=upload_members,
+            hide_individual_names=hide_individual_names,
+            email_anonymous_id=email_anonymous_id,
+            mail_save_file=mail_save_file,
+            with_claude_insights=with_claude_insights,
+            claude_api_mode=claude_api_mode,
+            no_visualization=no_visualization,
+            skip_email=skip_email,
+        )
+        if jira_exit_code != 0:
+            failed_workflows.append(f"{project_name + ' ' if project_name else ''}Jira workflow")
+
+    # PR workflow
+    if pr_config_path and pr_config_path.exists():
+        console.print(
+            f"\n[bold magenta]PR WORKFLOW{f' - {project_name}' if project_name else ''}[/bold magenta]"
+        )
+        pr_exit_code = _pr_full_impl(
+            config=str(pr_config_path),
+            incremental=incremental,
+            no_upload=no_upload,
+            upload_members=upload_members,
+            hide_individual_names=hide_individual_names,
+            email_anonymous_id=email_anonymous_id,
+            mail_save_file=mail_save_file,
+            with_claude_insights=with_claude_insights,
+            claude_api_mode=claude_api_mode,
+            no_visualization=no_visualization,
+            skip_email=skip_email,
+        )
+        if pr_exit_code != 0:
+            failed_workflows.append(f"{project_name + ' ' if project_name else ''}PR workflow")
+
+    return failed_workflows
+
+
+def _run_aggregation(aggregation_config_path: Path, no_upload: bool) -> list:
+    """
+    Run aggregation for Jira and PR reports.
+
+    Returns:
+        List of failed aggregations
+    """
+    failed_workflows = []
+
+    console.print("\n" + "=" * 60)
+    console.print("[bold cyan]AGGREGATING REPORTS[/bold cyan]")
+    console.print("=" * 60)
+
+    try:
+        aggregator = ReportAggregator(str(aggregation_config_path))
+
+        # Aggregate Jira reports
+        console.print("[cyan]Aggregating Jira reports...[/cyan]")
+        jira_output = aggregator.aggregate_jira_reports()
+        if jira_output:
+            console.print(f"[green]✓ Jira aggregation completed: {jira_output.name}[/green]")
+            upload_to_google_sheets(
+                jira_output, skip_upload=no_upload, config_path=aggregation_config_path
+            )
+        else:
+            console.print("[yellow]⚠ No Jira reports found for aggregation[/yellow]")
+
+        # Aggregate PR reports
+        console.print("[cyan]Aggregating PR reports...[/cyan]")
+        pr_output = aggregator.aggregate_pr_reports()
+        if pr_output:
+            console.print(f"[green]✓ PR aggregation completed: {pr_output.name}[/green]")
+            upload_to_google_sheets(
+                pr_output, skip_upload=no_upload, config_path=aggregation_config_path
+            )
+        else:
+            console.print("[yellow]⚠ No PR reports found for aggregation[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]Error during aggregation: {e}[/red]")
+        failed_workflows.append("Aggregation")
+
+    return failed_workflows
+
+
+def _send_email_notifications(
+    config_path: Path,
+    email_anonymous_id: bool,
+    hide_individual_names: bool,
+    mail_save_file: Optional[str],
+    is_multi_team: bool = False,
+) -> None:
+    """
+    Send email notifications with proper deduplication.
+    """
+    # Determine config file to check for email settings
+    if is_multi_team:
+        # For multi-team, check if email should be sent
+        from impactlens.scripts.send_email_notifications import collect_all_members
+
+        members, email_enabled = collect_all_members(config_path)
+
+        if not email_enabled and not email_anonymous_id:
+            return
+
+        if not hide_individual_names:
+            console.print(
+                "\n[bold yellow]⚠️  --email-anonymous-id requires --hide-individual-names[/bold yellow]"
+            )
+            console.print("[yellow]   Email notifications skipped.[/yellow]")
+            return
+
+        console.print("\n" + "=" * 60)
+        console.print("[bold]EMAIL NOTIFICATIONS (MULTI-TEAM)[/bold]")
+        console.print("=" * 60)
+        console.print("[dim]Deduplicating and sending notifications across all teams...[/dim]\n")
+
+        if members:
+            # Use a dummy config file path (any config in the directory will work
+            # since send_email_notifications_cli uses collect_all_members from the parent dir)
+            # Find first config file in any subdirectory
+            config_file = None
+            for subdir in config_path.iterdir():
+                if subdir.is_dir():
+                    for config_name in ["jira_report_config.yaml", "pr_report_config.yaml"]:
+                        candidate = subdir / config_name
+                        if candidate.exists():
+                            config_file = candidate
+                            break
+                if config_file:
+                    break
+
+            if config_file:
+                send_email_notifications_cli(
+                    config_file_path=config_file,
+                    report_context="Multi-Team Aggregated Report Generated",
+                    console=console,
+                    mail_save_file=mail_save_file,
+                )
+            else:
+                console.print("[yellow]No config file found for email notifications[/yellow]")
+        else:
+            console.print("[yellow]No email notifications to send[/yellow]")
+    else:
+        # Single team - find first config file
+        config_file = None
+        if config_path.is_file():
+            config_file = config_path
+        else:
+            for name in ["jira_report_config.yaml", "pr_report_config.yaml"]:
+                candidate = config_path / name
+                if candidate.exists():
+                    config_file = candidate
+                    break
+
+        if not config_file:
+            return
+
+        if not should_send_email_notification(email_anonymous_id, config_file):
+            return
+
+        if not hide_individual_names:
+            console.print(
+                "\n[bold yellow]⚠️  --email-anonymous-id requires --hide-individual-names[/bold yellow]"
+            )
+            console.print("[yellow]   Email notifications skipped.[/yellow]")
+            return
+
+        console.print("\n" + "=" * 60)
+        console.print("[bold]EMAIL NOTIFICATIONS[/bold]")
+        console.print("=" * 60)
+
+        send_email_notifications_cli(
+            config_file_path=config_file,
+            report_context="Full Report Generated (Jira + PR)",
+            console=console,
+            mail_save_file=mail_save_file,
+        )
+
+
 @app.command(name="full")
 def full_workflow(
     config: Optional[str] = typer.Option(
@@ -1101,6 +1312,12 @@ def full_workflow(
     Config parameter:
     - Directory: config/team-a (auto-finds both jira_report_config.yaml and pr_report_config.yaml)
     - Specific file: Uses for both workflows
+
+    Auto-detection of aggregation mode:
+    - If aggregation_config.yaml exists in the config directory, runs in multi-team mode
+    - Processes all projects listed in aggregation_config.yaml
+    - Aggregates reports after all projects complete
+    - Sends deduplicated email notifications once at the end
     """
     # Set log level early
     set_log_level(log_level)
@@ -1113,126 +1330,136 @@ def full_workflow(
         )
     )
 
-    # Resolve config paths (directory or specific files)
-    jira_config_path, pr_config_path = resolve_config_paths_for_full(config)
+    # Check for aggregation mode first
+    config_path = Path(config) if config else Path("config")
+    aggregation_config_path = config_path / "aggregation_config.yaml"
 
-    failed_workflows = []
+    is_aggregation_mode = aggregation_config_path.exists()
 
-    # Jira Full Workflow
-    console.print("\n" + "=" * 60)
-    console.print("[bold cyan]JIRA WORKFLOW[/bold cyan]")
-    console.print("=" * 60)
+    if is_aggregation_mode:
+        console.print("\n" + "=" * 60)
+        console.print("[bold cyan]MULTI-TEAM AGGREGATION MODE DETECTED[/bold cyan]")
+        console.print("=" * 60)
+        console.print(f"[dim]Aggregation config: {aggregation_config_path}[/dim]\n")
 
-    jira_exit_code = _jira_full_impl(
-        config=str(jira_config_path) if jira_config_path else None,
-        no_upload=no_upload,
-        upload_members=upload_members,
-        hide_individual_names=hide_individual_names,
-        email_anonymous_id=email_anonymous_id,
-        mail_save_file=mail_save_file,
-        with_claude_insights=with_claude_insights,
-        claude_api_mode=claude_api_mode,
-        no_visualization=no_visualization,
-        skip_email=True,  # Skip email in individual workflows, send once at end
-    )
+        # Load aggregation config to get projects list
+        try:
+            with open(aggregation_config_path, "r") as f:
+                agg_config = yaml.safe_load(f)
 
-    if jira_exit_code != 0:
-        failed_workflows.append("Jira workflow")
+            projects = agg_config.get("aggregation", {}).get("projects", [])
 
-    # PR Full Workflow
-    console.print("\n" + "=" * 60)
-    console.print("[bold magenta]PR WORKFLOW[/bold magenta]")
-    console.print("=" * 60)
+            if not projects:
+                console.print("[red]Error: No projects found in aggregation_config.yaml[/red]")
+                raise typer.Exit(1)
 
-    pr_exit_code = _pr_full_impl(
-        config=str(pr_config_path) if pr_config_path else None,
-        incremental=incremental,
-        no_upload=no_upload,
-        upload_members=upload_members,
-        hide_individual_names=hide_individual_names,
-        email_anonymous_id=email_anonymous_id,
-        mail_save_file=mail_save_file,
-        with_claude_insights=with_claude_insights,
-        claude_api_mode=claude_api_mode,
-        no_visualization=no_visualization,
-        skip_email=True,  # Skip email in individual workflows, send once at end
-    )
+            console.print(f"[cyan]Found {len(projects)} project(s): {', '.join(projects)}[/cyan]\n")
 
-    if pr_exit_code != 0:
-        failed_workflows.append("PR workflow")
+            failed_workflows = []
 
-    # Check if aggregation config exists and run aggregation
-    # Look for aggregation_config.yaml in two places:
-    # 1. Same directory as the config files (for single team)
-    # 2. Parent directory (for multi-team with aggregation at parent level)
-    config_dir = None
-    if jira_config_path:
-        config_dir = jira_config_path.parent
-    elif pr_config_path:
-        config_dir = pr_config_path.parent
+            # Process each project
+            for idx, project in enumerate(projects, 1):
+                console.print("\n" + "=" * 60)
+                console.print(f"[bold white]PROJECT {idx}/{len(projects)}: {project}[/bold white]")
+                console.print("=" * 60)
 
-    aggregation_config = None
-    if config_dir:
-        # Try current directory first
-        aggregation_config = config_dir / "aggregation_config.yaml"
-        if not aggregation_config.exists():
-            # Try parent directory
-            aggregation_config = config_dir.parent / "aggregation_config.yaml"
+                project_config_dir = config_path / project
 
-        if aggregation_config.exists():
-            console.print("\n" + "=" * 60)
-            console.print("[bold cyan]AGGREGATION[/bold cyan]")
-            console.print("=" * 60)
-            console.print(f"[dim]Found aggregation config: {aggregation_config}[/dim]\n")
-
-            try:
-                aggregator = ReportAggregator(str(aggregation_config))
-
-                # Aggregate Jira reports
-                console.print("[cyan]Aggregating Jira reports...[/cyan]")
-                jira_output = aggregator.aggregate_jira_reports()
-                if jira_output:
+                if not project_config_dir.exists():
                     console.print(
-                        f"[green]✓ Jira aggregation completed: {jira_output.name}[/green]"
+                        f"[yellow]⚠ Project directory not found: {project_config_dir}[/yellow]"
                     )
-                    # Upload aggregated Jira report
-                    upload_to_google_sheets(jira_output, skip_upload=no_upload)
-                else:
-                    console.print("[yellow]⚠ No Jira reports found for aggregation[/yellow]")
+                    failed_workflows.append(f"{project} (directory not found)")
+                    continue
 
-                # Aggregate PR reports
-                console.print("[cyan]Aggregating PR reports...[/cyan]")
-                pr_output = aggregator.aggregate_pr_reports()
-                if pr_output:
-                    console.print(f"[green]✓ PR aggregation completed: {pr_output.name}[/green]")
-                    # Upload aggregated PR report
-                    upload_to_google_sheets(pr_output, skip_upload=no_upload)
-                else:
-                    console.print("[yellow]⚠ No PR reports found for aggregation[/yellow]")
+                # Process this project's workflows
+                project_failures = _process_single_project(
+                    project_config_dir=project_config_dir,
+                    project_name=project,
+                    no_upload=no_upload,
+                    upload_members=upload_members,
+                    hide_individual_names=hide_individual_names,
+                    email_anonymous_id=email_anonymous_id,
+                    mail_save_file=mail_save_file,
+                    with_claude_insights=with_claude_insights,
+                    claude_api_mode=claude_api_mode,
+                    no_visualization=no_visualization,
+                    incremental=incremental,
+                    skip_email=True,  # Skip email in multi-team mode, send once at end
+                )
+                failed_workflows.extend(project_failures)
 
-            except Exception as e:
-                console.print(f"[red]Error during aggregation: {e}[/red]")
-                failed_workflows.append("Aggregation")
+                console.print(f"\n[green]✓ Project {project} completed[/green]")
 
-    # Email Notifications (opt-in, only with anonymization, sent once at the end)
-    config_to_use = jira_config_path or pr_config_path
-    if should_send_email_notification(email_anonymous_id, config_to_use):
-        if not hide_individual_names:
-            console.print(
-                "\n[bold yellow]⚠️  --email-anonymous-id requires --hide-individual-names[/bold yellow]"
+            # Run aggregation
+            agg_failures = _run_aggregation(aggregation_config_path, no_upload)
+            failed_workflows.extend(agg_failures)
+
+            # Send deduplicated email notifications for all teams
+            _send_email_notifications(
+                config_path=config_path,
+                email_anonymous_id=email_anonymous_id,
+                hide_individual_names=hide_individual_names,
+                mail_save_file=mail_save_file,
+                is_multi_team=True,
             )
-            console.print("[yellow]   Email notifications skipped.[/yellow]")
-        else:
+
+            # Final summary
             console.print("\n" + "=" * 60)
-            console.print("[bold]EMAIL NOTIFICATIONS[/bold]")
+            if failed_workflows:
+                console.print(
+                    f"[yellow]⚠ Some workflows failed: {', '.join(failed_workflows)}[/yellow]"
+                )
+            else:
+                console.print(
+                    "[bold green]✅ Multi-team aggregation completed successfully![/bold green]"
+                )
             console.print("=" * 60)
 
-            send_email_notifications_cli(
-                config_file_path=config_to_use,
-                report_context="Full Report Generated (Jira + PR)",
-                console=console,
-                mail_save_file=mail_save_file,
-            )
+            if failed_workflows:
+                raise typer.Exit(1)
+
+            return
+
+        except Exception as e:
+            console.print(f"[red]Error in multi-team aggregation mode: {e}[/red]")
+            raise typer.Exit(1)
+
+    # Single-team mode
+    # Process single project workflows
+    failed_workflows = _process_single_project(
+        project_config_dir=config_path,
+        project_name="",
+        no_upload=no_upload,
+        upload_members=upload_members,
+        hide_individual_names=hide_individual_names,
+        email_anonymous_id=email_anonymous_id,
+        mail_save_file=mail_save_file,
+        with_claude_insights=with_claude_insights,
+        claude_api_mode=claude_api_mode,
+        no_visualization=no_visualization,
+        incremental=incremental,
+        skip_email=True,  # Skip email, send once at end
+    )
+
+    # Check if aggregation config exists and run aggregation (optional)
+    # Look for aggregation_config.yaml in current or parent directory
+    aggregation_config = config_path / "aggregation_config.yaml"
+    if not aggregation_config.exists():
+        aggregation_config = config_path.parent / "aggregation_config.yaml"
+
+    if aggregation_config.exists():
+        agg_failures = _run_aggregation(aggregation_config, no_upload)
+        failed_workflows.extend(agg_failures)
+
+    # Send email notifications
+    _send_email_notifications(
+        config_path=config_path,
+        email_anonymous_id=email_anonymous_id,
+        hide_individual_names=hide_individual_names,
+        mail_save_file=mail_save_file,
+        is_multi_team=False,
+    )
 
     # Final Summary
     console.print("\n" + "=" * 60)

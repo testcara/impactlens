@@ -28,7 +28,11 @@ class ReportAggregator:
         self.config = self._load_config()
         self.agg_settings = self.config.get("aggregation", {})
         self.name = self.agg_settings.get("name", "Aggregated Report")
-        self.output_dir = Path(self.agg_settings.get("output_dir", "reports/aggregated"))
+        # Try to read output_dir from root level first, then from aggregation block
+        self.output_dir = Path(
+            self.config.get("output_dir")
+            or self.agg_settings.get("output_dir", "reports/aggregated")
+        )
 
     def _load_config(self) -> Dict[str, Any]:
         """Load aggregation config from YAML file."""

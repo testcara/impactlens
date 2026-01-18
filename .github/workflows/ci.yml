@@ -320,7 +320,7 @@ jobs:
           rm -rf .cache/github/
           echo "✓ Cache cleared"
 
-      - name: Run integration test - Multi-team aggregation (Team 1)
+      - name: Run integration test - Multi-team aggregation (using full command)
         if: steps.docs_check.outputs.code_changed == 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
@@ -328,93 +328,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
+          SMTP_USER: ${{ secrets.MAIL_APP_USER }}
+          SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
         run: |
           echo "=========================================="
-          echo "Multi-Team Aggregation Test - Team 1"
+          echo "Multi-Team Aggregation Test"
           echo "=========================================="
-
-          # Get upload args using shared script
-          UPLOAD_ARGS=$(.github/scripts/get-upload-args.sh)
-
-          # Generate Jira reports for Team 1
-          if [ -n "$JIRA_API_TOKEN" ]; then
-            echo "Generating Jira reports for Team 1..."
-            python -m impactlens.cli jira full \
-              --config config/test-aggregation-ci/test-ci-team1/jira_report_config.yaml \
-              $UPLOAD_ARGS \
-              --hide-individual-names || echo "⚠️  Team 1 Jira generation failed (continuing)"
-          fi
-
-          # Generate PR reports for Team 1 (without --incremental since cache is cleared)
-          echo "Generating PR reports for Team 1..."
-          python -m impactlens.cli pr full \
-            --config config/test-aggregation-ci/test-ci-team1/pr_report_config.yaml \
-            $UPLOAD_ARGS \
-            --hide-individual-names || echo "⚠️  Team 1 PR generation failed (continuing)"
-
-          echo "✓ Team 1 reports completed"
-          ls -lh reports/test-ci-team1/ || true
-
-      - name: Run integration test - Multi-team aggregation (Team 2)
-        if: steps.docs_check.outputs.code_changed == 'true'
-        env:
-          JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
-          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
-          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
-        run: |
-          echo "=========================================="
-          echo "Multi-Team Aggregation Test - Team 2"
-          echo "=========================================="
-
-          # Get upload args using shared script
-          UPLOAD_ARGS=$(.github/scripts/get-upload-args.sh)
-
-          # Generate Jira reports for Team 2
-          if [ -n "$JIRA_API_TOKEN" ]; then
-            echo "Generating Jira reports for Team 2..."
-            python -m impactlens.cli jira full \
-              --config config/test-aggregation-ci/test-ci-team2/jira_report_config.yaml \
-              $UPLOAD_ARGS \
-              --hide-individual-names || echo "⚠️  Team 2 Jira generation failed (continuing)"
-          fi
-
-          # Generate PR reports for Team 2 (without --incremental since cache is cleared)
-          echo "Generating PR reports for Team 2..."
-          python -m impactlens.cli pr full \
-            --config config/test-aggregation-ci/test-ci-team2/pr_report_config.yaml \
-            $UPLOAD_ARGS \
-            --hide-individual-names || echo "⚠️  Team 2 PR generation failed (continuing)"
-
-          echo "✓ Team 2 reports completed"
-          ls -lh reports/test-ci-team2/ || true
-
-      - name: Run integration test - Report aggregation
-        if: steps.docs_check.outputs.code_changed == 'true'
-        env:
-          CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
-          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
-        run: |
-          echo "=========================================="
-          echo "Multi-Team Aggregation Test - Aggregating Reports"
-          echo "=========================================="
-
-          # Check if at least one team report exists
-          if [ ! -d "reports/test-ci-team1" ] && [ ! -d "reports/test-ci-team2" ]; then
-            echo "⚠️  No team reports found, skipping aggregation test"
-            exit 0
-          fi
-
-          # Use the prepared aggregation config (no .example suffix in test-aggregation-ci)
-          AGGREGATION_CONFIG="config/test-aggregation-ci/aggregation_config.yaml"
-
-          echo "Aggregation config:"
-          cat "$AGGREGATION_CONFIG"
-          echo ""
-
-          echo "Available reports:"
-          ls -R reports/test-ci-team*/*/combined_*.tsv 2>/dev/null || echo "No combined reports found yet"
+          echo "Using impactlens full command with auto-detection"
           echo ""
 
           # Get upload args using shared script
@@ -423,41 +343,27 @@ jobs:
           if [ -n "$UPLOAD_ARGS" ]; then
             echo "⚠️  Google Sheets not configured, skipping upload"
           else
-            echo "✓ Google Sheets configured, will upload aggregated reports"
+            echo "✓ Google Sheets configured, will upload reports"
           fi
 
-          echo "Command: python -m impactlens.cli aggregate --config $AGGREGATION_CONFIG $UPLOAD_ARGS"
-          echo ""
-
-          python -m impactlens.cli aggregate \
-            --config "$AGGREGATION_CONFIG" \
-            $UPLOAD_ARGS
-
-          echo ""
-          echo "✓ Aggregation integration test completed"
-          echo "Generated aggregated reports:"
-          ls -lh reports/test-ci-aggregated/ || echo "No aggregated reports generated"
-
-      - name: Run integration test - Multi-team email notifications
-        if: steps.docs_check.outputs.code_changed == 'true'
-        env:
-          SMTP_USER: ${{ secrets.MAIL_APP_USER }}
-          SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
-        run: |
-          echo "=========================================="
-          echo "Multi-Team Aggregation Test - Email Notifications"
-          echo "=========================================="
-          echo "Testing email deduplication across multiple teams"
-          echo ""
-
-          # Send emails using the aggregation config (auto-deduplicates by email)
-          python -m impactlens.scripts.send_email_notifications \
-            --config-dir config/test-aggregation-ci \
+          # The 'full' command will:
+          # 1. Detect aggregation_config.yaml in config/test-aggregation-ci/
+          # 2. Process test-ci-team1 and test-ci-team2 (skip individual emails)
+          # 3. Aggregate reports
+          # 4. Send deduplicated email notifications once at the end
+          echo "Running: impactlens full --config config/test-aggregation-ci"
+          python -m impactlens.cli full \
+            --config config/test-aggregation-ci \
+            $UPLOAD_ARGS \
+            --hide-individual-names \
             --mail-save-file reports/test-ci-aggregated/emails
 
           echo ""
-          echo "✓ Multi-team email notification test completed"
-          echo "  (Emails deduplicated across all teams and sent once per person)"
+          echo "✓ Multi-team aggregation test completed"
+          echo "Generated reports:"
+          ls -lh reports/test-ci-team1/ 2>/dev/null || echo "  No team1 reports"
+          ls -lh reports/test-ci-team2/ 2>/dev/null || echo "  No team2 reports"
+          ls -lh reports/test-ci-aggregated/ 2>/dev/null || echo "  No aggregated reports"
 
       - name: Test analysis prompt generation
         if: steps.docs_check.outputs.code_changed == 'true'

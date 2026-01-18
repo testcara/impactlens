@@ -16,7 +16,9 @@ from datetime import datetime
 from impactlens.utils.logger import Colors, set_log_level
 
 
-def apply_project_settings_to_env(project_settings: Dict[str, Any]) -> None:
+def apply_project_settings_to_env(
+    project_settings: Dict[str, Any], root_config: Optional[Dict[str, Any]] = None
+) -> None:
     """
     Apply project settings from config to environment variables.
 
@@ -25,11 +27,14 @@ def apply_project_settings_to_env(project_settings: Dict[str, Any]) -> None:
 
     Args:
         project_settings: Dict with project configuration from YAML config file
+        root_config: Optional dict with root-level config (for google_spreadsheet_id)
 
     Example:
         >>> project_settings = {"jira_project_key": "KFLUX", "github_repo_name": "konflux-ui"}
-        >>> apply_project_settings_to_env(project_settings)
+        >>> root_config = {"google_spreadsheet_id": "1ABC..."}
+        >>> apply_project_settings_to_env(project_settings, root_config)
         # Now os.environ["JIRA_PROJECT_KEY"] == "KFLUX"
+        # Now os.environ["GOOGLE_SPREADSHEET_ID"] == "1ABC..."
     """
     env_mappings = {
         "jira_url": "JIRA_URL",
@@ -37,13 +42,38 @@ def apply_project_settings_to_env(project_settings: Dict[str, Any]) -> None:
         "github_url": "GITHUB_URL",
         "github_repo_owner": "GITHUB_REPO_OWNER",
         "github_repo_name": "GITHUB_REPO_NAME",
-        "google_spreadsheet_id": "GOOGLE_SPREADSHEET_ID",
     }
 
     for config_key, env_var in env_mappings.items():
         config_value = project_settings.get(config_key)
         if config_value:  # Config has value, override environment variable
             os.environ[env_var] = str(config_value)
+
+    # Handle root-level google_spreadsheet_id
+    if root_config:
+        google_spreadsheet_id = root_config.get("google_spreadsheet_id")
+        if google_spreadsheet_id:
+            os.environ["GOOGLE_SPREADSHEET_ID"] = str(google_spreadsheet_id)
+
+
+def get_email_anonymous_id_enabled(config_path: Path) -> bool:
+    """
+    Check if email_anonymous_id is enabled in a config file.
+
+    Args:
+        config_path: Path to config file (jira_report_config.yaml, pr_report_config.yaml, etc.)
+
+    Returns:
+        True if email_anonymous_id is enabled, False otherwise
+    """
+    if not config_path.exists():
+        return False
+
+    try:
+        _, root_configs = load_config_file(config_path)
+        return root_configs.get("email_anonymous_id", False)
+    except Exception:
+        return False
 
 
 def get_project_root() -> Path:
@@ -287,8 +317,8 @@ def load_config_file(
     # Extract project settings (non-sensitive configuration)
     project_settings = config.get("project", {})
 
-    # Apply project settings to environment variables
-    apply_project_settings_to_env(project_settings)
+    # Apply project settings and root-level configs to environment variables
+    apply_project_settings_to_env(project_settings, config)
 
     # Build root_configs with all root-level configuration
     root_configs = {}
@@ -624,8 +654,14 @@ def upload_to_google_sheets(
 
             # Check if replace_existing_reports is enabled in config
             try:
-                _, root_configs = load_config_file(config_path)
-                replace_existing = root_configs.get("replace_existing_reports", False)
+                with open(config_path, "r") as f:
+                    config = yaml.safe_load(f)
+
+                # Read replace_existing_reports from root level (consistent across all config types)
+                replace_existing = (
+                    config.get("replace_existing_reports", False) if config else False
+                )
+
                 if replace_existing:
                     cmd.append("--replace-existing")
             except Exception:
