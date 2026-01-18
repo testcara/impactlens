@@ -368,14 +368,12 @@ Tips:
 
 
 def _create_sheet_tab(service, spreadsheet_id: str, sheet_name: str) -> int:
-    """Create a new sheet tab in the spreadsheet."""
-    request = {
-        "addSheet": {
-            "properties": {
-                "title": sheet_name,
-            }
-        }
-    }
+    """Create a new sheet tab in the spreadsheet with auto-assigned color based on team name."""
+    from impactlens.clients.sheets_client import get_sheet_properties_with_color
+
+    # Get sheet properties with auto-assigned color
+    properties = get_sheet_properties_with_color(sheet_name)
+    request = {"addSheet": {"properties": properties}}
 
     response = (
         service.spreadsheets()

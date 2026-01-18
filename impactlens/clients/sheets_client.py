@@ -292,19 +292,151 @@ def cleanup_old_sheets(service, spreadsheet_id, new_sheet_name, reason="cleanup 
         return []
 
 
+def extract_team_name_from_sheet(sheet_name):
+    """
+    Extract team name (prefix) from sheet name.
+
+    Examples:
+        "test-integration-ci - Konflux UI Jira Report - Combined - 2026-01-18 06:16"
+        → "test-integration-ci"
+
+        "konfluxui - PR Report - Combined - 2026-01-18 10:00"
+        → "konfluxui"
+
+        "(Visual) test-integration-ci - Jira Report - Combined - 2026-01-18 10:00"
+        → "test-integration-ci"
+
+    Args:
+        sheet_name: Full sheet name with team prefix
+
+    Returns:
+        Team name (first part before " - ") or None if no prefix found
+    """
+    import re
+
+    # Remove any prefix in parentheses like "(Visual)" at the beginning
+    cleaned_name = re.sub(r"^\([^)]+\)\s*", "", sheet_name)
+
+    parts = cleaned_name.split(" - ")
+    if len(parts) >= 2:
+        # First part is typically the team name
+        team_name = parts[0].strip()
+        return team_name if team_name else None
+    return None
+
+
+def get_tab_color_for_team(team_name):
+    """
+    Generate a consistent color for a team based on team name.
+    Uses hash function and HSL color space to dynamically generate distinct colors.
+
+    Args:
+        team_name: Team name/prefix
+
+    Returns:
+        dict: RGB color object for Google Sheets API
+
+    Color generation:
+        - Uses HSL color space for better color distribution
+        - Hue: derived from team name hash (0-360 degrees)
+        - Saturation: 65% (vibrant but not oversaturated)
+        - Lightness: 55% (medium darkness for good visibility)
+    """
+    if not team_name:
+        return None
+
+    import hashlib
+
+    # Generate hash from team name
+    hash_value = int(hashlib.md5(team_name.encode()).hexdigest(), 16)
+
+    # Use hash to determine hue (0-360 degrees)
+    # This gives us unlimited distinct colors
+    hue = (hash_value % 360) / 360.0
+
+    # Fixed saturation and lightness for consistent appearance
+    saturation = 0.65  # 65% - vibrant colors
+    lightness = 0.55  # 55% - medium darkness (darker than pastel)
+
+    # Convert HSL to RGB
+    def hsl_to_rgb(hue_val, sat_val, light_val):
+        """Convert HSL color to RGB."""
+        if sat_val == 0:
+            r = g = b = light_val
+        else:
+
+            def hue_to_rgb(p, q, t):
+                if t < 0:
+                    t += 1
+                if t > 1:
+                    t -= 1
+                if t < 1 / 6:
+                    return p + (q - p) * 6 * t
+                if t < 1 / 2:
+                    return q
+                if t < 2 / 3:
+                    return p + (q - p) * (2 / 3 - t) * 6
+                return p
+
+            q = (
+                light_val * (1 + sat_val)
+                if light_val < 0.5
+                else light_val + sat_val - light_val * sat_val
+            )
+            p = 2 * light_val - q
+            r = hue_to_rgb(p, q, hue_val + 1 / 3)
+            g = hue_to_rgb(p, q, hue_val)
+            b = hue_to_rgb(p, q, hue_val - 1 / 3)
+
+        return r, g, b
+
+    r, g, b = hsl_to_rgb(hue, saturation, lightness)
+
+    return {"red": r, "green": g, "blue": b}
+
+
+def get_sheet_properties_with_color(sheet_name):
+    """
+    Build sheet properties dict with auto-assigned tab color based on team name.
+
+    This is a utility function that can be reused across different sheet creation functions
+    to ensure consistent color assignment.
+
+    Args:
+        sheet_name: Name for the sheet tab (e.g., "team-a - Jira Report - 2026-01-18")
+
+    Returns:
+        dict: Sheet properties with title and optionally tabColor
+    """
+    # Auto-assign color based on team name
+    team_name = extract_team_name_from_sheet(sheet_name)
+    tab_color = get_tab_color_for_team(team_name) if team_name else None
+
+    # Build sheet properties
+    properties = {"title": sheet_name}
+    if tab_color:
+        properties["tabColor"] = tab_color
+
+    return properties
+
+
 def create_new_sheet_tab(service, spreadsheet_id, sheet_name):
     """
-    Create a new sheet tab in the spreadsheet.
+    Create a new sheet tab in the spreadsheet with auto-assigned color based on team name.
+
+    The tab color is automatically determined by extracting the team name from the sheet name
+    and using a hash function to consistently assign the same color to all tabs from the same team.
 
     Args:
         service: Google Sheets API service
         spreadsheet_id: ID of the spreadsheet
-        sheet_name: Name for the new sheet tab
+        sheet_name: Name for the new sheet tab (e.g., "team-a - Jira Report - 2026-01-18")
 
     Returns:
         Sheet ID of the newly created tab
     """
-    request_body = {"requests": [{"addSheet": {"properties": {"title": sheet_name}}}]}
+    properties = get_sheet_properties_with_color(sheet_name)
+    request_body = {"requests": [{"addSheet": {"properties": properties}}]}
 
     response = (
         service.spreadsheets()
