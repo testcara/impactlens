@@ -183,6 +183,115 @@ def get_existing_sheets(service, spreadsheet_id):
             raise
 
 
+def cleanup_old_sheets(service, spreadsheet_id, new_sheet_name, reason="cleanup requested"):
+    """
+    Unified utility to delete old sheets with same prefix but different timestamp.
+
+    This function provides consistent logging and error handling for sheet cleanup operations.
+
+    Args:
+        service: Google Sheets API service
+        spreadsheet_id: ID of the spreadsheet
+        new_sheet_name: The newly created sheet name (with timestamp)
+                       Example: "team - PR Report - Combined - 2026-01-18 10:43"
+        reason: Human-readable reason for cleanup (for logging)
+
+    Returns:
+        List of deleted sheet names
+
+    Example:
+        If new_sheet_name is "team - PR Report - Combined - 2026-01-18 10:43"
+        Will delete "team - PR Report - Combined - 2026-01-07 10:43" etc.
+    """
+    import re
+
+    print(f"   🧹 Sheet cleanup started ({reason})")
+    print(f"      New sheet: '{new_sheet_name}'")
+
+    # Extract prefix by removing timestamp pattern (YYYY-MM-DD HH:MM at end)
+    # Pattern: " - YYYY-MM-DD HH:MM" at the end
+    timestamp_pattern = r" - \d{4}-\d{2}-\d{2} \d{2}:\d{2}$"
+    prefix = re.sub(timestamp_pattern, "", new_sheet_name)
+
+    if prefix == new_sheet_name:
+        # No timestamp found in new sheet name, nothing to delete
+        print(f"      ℹ️  Sheet name has no timestamp pattern, skipping cleanup")
+        print(f"      Expected format: 'Name - YYYY-MM-DD HH:MM'")
+        return []
+
+    print(f"      Extracted prefix: '{prefix}'")
+    print(f"      🔍 Scanning spreadsheet for matching sheets...")
+
+    # Get all sheets
+    try:
+        spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        sheets = spreadsheet.get("sheets", [])
+        print(f"      Found {len(sheets)} total sheet(s) in spreadsheet")
+    except HttpError as e:
+        print(f"      ⚠️  Failed to get sheets for cleanup: {e}")
+        return []
+
+    # Find sheets with same prefix but different timestamp
+    sheets_to_delete = []
+    all_matching_sheets = []
+
+    for sheet in sheets:
+        sheet_title = sheet["properties"]["title"]
+        sheet_id = sheet["properties"]["sheetId"]
+
+        # Track all sheets with same prefix for debugging
+        if sheet_title.startswith(prefix):
+            all_matching_sheets.append(sheet_title)
+
+        # Check if this sheet has the same prefix
+        if sheet_title.startswith(prefix + " - ") and sheet_title != new_sheet_name:
+            # Verify it matches the pattern (has timestamp)
+            if re.search(timestamp_pattern, sheet_title):
+                sheets_to_delete.append({"title": sheet_title, "id": sheet_id})
+                print(f"      ➜ Will delete: '{sheet_title}'")
+
+    # Debug: show all sheets with matching prefix
+    if all_matching_sheets:
+        print(f"      All sheets with prefix '{prefix}': {len(all_matching_sheets)}")
+        for sheet_title in all_matching_sheets:
+            if sheet_title == new_sheet_name:
+                print(f"         • '{sheet_title}' (current - keep)")
+            elif sheet_title in [s["title"] for s in sheets_to_delete]:
+                print(f"         • '{sheet_title}' (old - delete)")
+            else:
+                print(f"         • '{sheet_title}' (other - keep)")
+
+    if not sheets_to_delete:
+        print(f"      ✓ No old sheets to delete")
+        if len(all_matching_sheets) == 1:
+            print(f"      This is the first upload with this prefix")
+        return []
+
+    print(f"      🗑️  Deleting {len(sheets_to_delete)} old sheet(s)...")
+
+    # Delete old sheets
+    deleted_sheets = []
+    requests = []
+    for sheet in sheets_to_delete:
+        requests.append({"deleteSheet": {"sheetId": sheet["id"]}})
+        deleted_sheets.append(sheet["title"])
+
+    try:
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id, body={"requests": requests}
+        ).execute()
+
+        print(f"      ✅ Successfully deleted {len(deleted_sheets)} sheet(s):")
+        for sheet_name in deleted_sheets:
+            print(f"         🗑️  {sheet_name}")
+
+        return deleted_sheets
+    except HttpError as e:
+        print(f"      ⚠️  Failed to delete old sheets: {e}")
+        print(f"      Attempted to delete: {deleted_sheets}")
+        return []
+
+
 def create_new_sheet_tab(service, spreadsheet_id, sheet_name):
     """
     Create a new sheet tab in the spreadsheet.
@@ -208,7 +317,9 @@ def create_new_sheet_tab(service, spreadsheet_id, sheet_name):
     return sheet_id
 
 
-def upload_data_to_sheet(service, spreadsheet_id, data, sheet_name="Sheet1", create_new_tab=True):
+def upload_data_to_sheet(
+    service, spreadsheet_id, data, sheet_name="Sheet1", create_new_tab=True, replace_existing=False
+):
     """
     Upload data to a Google Sheet.
 
@@ -218,6 +329,7 @@ def upload_data_to_sheet(service, spreadsheet_id, data, sheet_name="Sheet1", cre
         data: List of lists (rows)
         sheet_name: Base name of the sheet tab
         create_new_tab: If True, always create a new tab with timestamp
+        replace_existing: If True, delete old sheets with same name but different timestamp
 
     Returns:
         tuple: (final_sheet_name, sheet_id)
@@ -271,6 +383,15 @@ def upload_data_to_sheet(service, spreadsheet_id, data, sheet_name="Sheet1", cre
     ).execute()
 
     print(f"✓ Uploaded {len(data)} rows to sheet '{final_sheet_name}'")
+
+    # Delete old sheets with same prefix if replace_existing is True
+    if replace_existing and create_new_tab:
+        cleanup_old_sheets(
+            service=service,
+            spreadsheet_id=spreadsheet_id,
+            new_sheet_name=final_sheet_name,
+            reason="replace_existing=True",
+        )
 
     return final_sheet_name, sheet_id
 

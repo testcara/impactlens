@@ -17,7 +17,6 @@ from datetime import datetime, timedelta
 
 from impactlens.clients.github_client import GitHubClient
 
-
 # Skip all tests if GitHub credentials not available
 pytestmark = pytest.mark.skipif(
     not os.getenv("GITHUB_TOKEN")

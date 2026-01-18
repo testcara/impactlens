@@ -17,6 +17,10 @@ project:
   # If you do not set, would upload to the default google-sheet.
   # IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com
 
+  # replace_existing_reports: false  # If true, delete old sheets with same name but different timestamp
+  # When enabled, uploading a new report will automatically delete previous versions for this team
+  # Example: New "Team - PR Report - Combined - 2026-01-18 10:43" will delete "Team - PR Report - Combined - 2026-01-07 10:43"
+
 phases:
   - name: "No AI Period"
     start: "2024-10-24"

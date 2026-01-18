@@ -133,6 +133,12 @@ Note:
         )
         print(f"Target: Existing spreadsheet{env_source}")
 
+    # Print replace_existing status
+    if args.replace_existing:
+        print("🧹 Old reports cleanup: Enabled (will delete previous versions)")
+    else:
+        print("ℹ️  Old reports cleanup: Disabled (previous versions will be kept)")
+
     # Get credentials
     try:
         creds = get_credentials(args.credentials)
@@ -181,7 +187,12 @@ Note:
         # Upload data (create new tab if updating existing spreadsheet)
         create_new_tab = bool(args.spreadsheet_id)
         final_sheet_name, sheet_id = upload_data_to_sheet(
-            service, spreadsheet_id, data, args.sheet_name, create_new_tab
+            service,
+            spreadsheet_id,
+            data,
+            args.sheet_name,
+            create_new_tab,
+            replace_existing=args.replace_existing,
         )
 
         # Format sheet

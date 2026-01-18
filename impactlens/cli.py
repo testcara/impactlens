@@ -153,24 +153,16 @@ def should_send_email_notification(
         return False
 
     try:
-        with open(config_file_path, "r") as f:
-            config = yaml.safe_load(f)
-        # Support multiple config names for backward compatibility
-        email_config = (
-            config.get("email_anonymous_id")
-            or config.get("share_anonymous_id")
-            or config.get("email_notifications_for_identifier")
-            or config.get("email_notifications", {})
-        )
+        from impactlens.utils.workflow_utils import load_config_file
 
-        is_enabled = email_config.get("enabled", False) if email_config else False
-
-        if is_enabled:
+        _, root_configs = load_config_file(config_file_path)
+        email_enabled = root_configs.get("visualization", True)
+        if email_enabled:
             console.print("[bold green]✓[/bold green] Email notifications enabled in config")
         else:
             console.print("[dim]Email notifications disabled in config (enabled: false)[/dim]")
 
-        return is_enabled
+        return email_enabled
     except Exception as e:
         console.print(f"[dim]Failed to read email config: {e} - notifications disabled[/dim]")
         return False
@@ -238,23 +230,29 @@ def generate_visualization_for_report(
             )
 
             # Load config to get project settings (jira_project_key, github_repo_name, etc.)
-            _, _, _, project_settings = load_config_file(config_file_path)
+            project_settings, root_configs = load_config_file(config_file_path)
 
-            # Apply project settings to environment variables
-            apply_project_settings_to_env(project_settings)
+            # Apply project settings to environment variables (already done in load_config_file)
+            # apply_project_settings_to_env(project_settings)
+
+            # Get replace_existing setting from config
+            replace_existing = root_configs.get("replace_existing_reports", False)
         except Exception as e:
             print(f"⚠️  Warning: Failed to load config for visualization: {e}")
+            replace_existing = False
+
+    # Initialize replace_existing if not set
+    if "replace_existing" not in locals():
+        replace_existing = False
 
     # Check if visualization should be enabled
     should_generate_visualization = not no_visualization
 
     # Check config file for visualization.enabled setting (CLI param takes priority)
-    if not no_visualization and config_file_path:
+    if not no_visualization and config_file_path and "root_configs" in locals():
         try:
-            with open(config_file_path, "r") as f:
-                config_data = yaml.safe_load(f)
-            visualization_config = config_data.get("visualization", {})
-            config_enabled = visualization_config.get("enabled", True)  # Default to True
+            # Use root_configs from earlier load_config_file call
+            config_enabled = root_configs.get("visualization", True)  # Default to True
             should_generate_visualization = config_enabled
         except Exception:
             pass  # If config read fails, keep CLI behavior
@@ -289,6 +287,7 @@ def generate_visualization_for_report(
                     create_sheets_visualization=has_sheets,  # Create Google Sheets visualization
                     spreadsheet_id=os.environ.get("GOOGLE_SPREADSHEET_ID"),
                     config_path=str(config_file_path) if config_file_path else None,
+                    replace_existing=replace_existing,  # Delete old sheets if enabled in config
                 )
 
                 if generated_charts:

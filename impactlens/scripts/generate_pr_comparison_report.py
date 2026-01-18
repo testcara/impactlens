@@ -45,7 +45,8 @@ def main():
     custom_config_file = Path(args.config) if args.config else None
 
     try:
-        phases, _, _, project_settings = load_config_file(default_config_file, custom_config_file)
+        project_settings, root_configs = load_config_file(default_config_file, custom_config_file)
+        phases = root_configs["phases"]
         phase_names = [phase[0] for phase in phases]  # Extract phase names
     except Exception as e:
         print(f"Warning: Could not load phase names from config: {e}")
