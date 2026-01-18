@@ -17,6 +17,7 @@ def create_visualization_sheet(
     spreadsheet_id: Optional[str] = None,
     sheet_name: Optional[str] = None,
     config_path: Optional[str] = None,
+    replace_existing: bool = False,
 ) -> Dict[str, str]:
     """
     Create a Google Sheet with embedded PNG charts for visualization.
@@ -29,6 +30,7 @@ def create_visualization_sheet(
         spreadsheet_id: Existing spreadsheet ID (creates new if None)
         sheet_name: Name for the sheet tab (auto-generated if None)
         config_path: Config file path for extracting sheet prefix (optional)
+        replace_existing: If True, delete old visualization sheets with same name but different timestamp
 
     Returns:
         Dict with:
@@ -39,6 +41,7 @@ def create_visualization_sheet(
     from impactlens.clients.sheets_client import (
         create_spreadsheet,
         get_existing_sheets,
+        cleanup_old_sheets,
     )
 
     # Read report metadata
@@ -347,6 +350,15 @@ Tips:
     print(f"✅ Created visualization sheet: {sheet_name}")
     print(f"   📊 {len(chart_github_links)} charts embedded")
     print(f"   🔗 {spreadsheet_url}")
+
+    # Delete old visualization sheets with same prefix if replace_existing is True
+    if replace_existing:
+        cleanup_old_sheets(
+            service=service,
+            spreadsheet_id=spreadsheet_id,
+            new_sheet_name=sheet_name,
+            reason="visualization replace_existing=True",
+        )
 
     return {
         "spreadsheet_id": spreadsheet_id,

@@ -14,7 +14,6 @@ from typing import List, Optional, Any, Tuple, Dict
 
 from impactlens.utils.anonymization import anonymize_name
 
-
 # Documentation URL constant
 METRICS_GUIDE_URL = "https://github.com/testcara/impactlens/blob/master/docs/METRICS_GUIDE.md"
 

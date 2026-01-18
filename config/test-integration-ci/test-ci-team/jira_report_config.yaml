@@ -32,3 +32,5 @@ log_level: "WARNING"
 # - This allows connecting individual work to anonymized reports while preserving privacy
 email_anonymous_id:
   enabled: false # Set to false to disable
+
+replace_existing_reports: true

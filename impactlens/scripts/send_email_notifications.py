@@ -201,7 +201,9 @@ def main():
 
     # Check if email notifications are enabled
     if not email_config.get("enabled", True):
-        print("ℹ️  Email notifications are disabled in config (email_notifications.enabled = false)")
+        print(
+            "ℹ️  Email notifications are disabled in config (email_notifications.enabled = false)"
+        )
         print("=" * 60)
         sys.exit(0)
 

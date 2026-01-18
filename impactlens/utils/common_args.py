@@ -7,7 +7,6 @@ Arguments are organized into logical groups based on functionality.
 
 import argparse
 
-
 # ============================================================================
 # Core Arguments - Used by most scripts
 # ============================================================================
@@ -461,5 +460,10 @@ def add_upload_to_sheets_args(parser: argparse.ArgumentParser) -> None:
         "--no-format",
         action="store_true",
         help="Skip formatting (frozen header, bold, etc)",
+    )
+    parser.add_argument(
+        "--replace-existing",
+        action="store_true",
+        help="Delete old sheets with same name but different timestamp after upload",
     )
     add_config_arg(parser)  # For extracting sheet prefix

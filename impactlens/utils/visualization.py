@@ -504,6 +504,7 @@ def generate_charts_from_combined_report(
     github_repo: str = "testcara/impactlens-charts",
     team_name: Optional[str] = None,
     config_path: Optional[str] = None,
+    replace_existing: bool = False,
 ) -> tuple[List[str], Optional[Dict]]:
     """
     Generate charts for all key metrics in a combined report.
@@ -519,6 +520,7 @@ def generate_charts_from_combined_report(
         github_repo: GitHub repository in format "owner/repo" (default: testcara/impactlens-charts)
         team_name: Team name for organizing charts in GitHub (auto-detected from report path if None)
         config_path: Config file path for extracting sheet prefix (optional)
+        replace_existing: If True, delete old sheets with same name but different timestamp
 
     Returns:
         Tuple of:
@@ -694,6 +696,7 @@ def generate_charts_from_combined_report(
                 chart_github_links=chart_links,
                 spreadsheet_id=spreadsheet_id,
                 config_path=config_path,
+                replace_existing=replace_existing,
             )
         except Exception as e:
             print(f"⚠️  Failed to create Sheets visualization: {e}")

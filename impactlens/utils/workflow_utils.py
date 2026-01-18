@@ -177,33 +177,35 @@ def load_and_resolve_config(
     try:
         if custom_config_path:
             # Merge custom config with default
-            phases, default_assignee_or_author, output_dir, project_settings = load_config_file(
+            project_settings, root_configs = load_config_file(
                 default_config_path, custom_config_path
             )
         else:
             # Use default config only
-            phases, default_assignee_or_author, output_dir, project_settings = load_config_file(
-                default_config_path
-            )
+            project_settings, root_configs = load_config_file(default_config_path)
     except (FileNotFoundError, ValueError) as e:
         print(f"{Colors.RED}Error loading config: {e}{Colors.NC}")
         return None
 
     # Step 3: Resolve output directory
+    output_dir = root_configs.get("output_dir")
     if output_dir:
         reports_dir = Path(output_dir)
         print(f"{Colors.BLUE}Using custom output directory: {reports_dir}{Colors.NC}")
     else:
         reports_dir = default_reports_dir
 
+    phases = root_configs["phases"]
+    default_assignee_or_author = root_configs["default_assignee"]
+
     return phases, default_assignee_or_author, reports_dir, project_settings
 
 
 def load_config_file(
     config_path: Path, custom_config_path: Optional[Path] = None
-) -> Tuple[List[Tuple[str, str, str]], str, Optional[str], Dict[str, Any]]:
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Load phase configuration from a YAML config file with optional custom config override.
+    Load configuration from a YAML config file with optional custom config override.
 
     Design:
     1. If custom config exists AND default config exists → merge (custom overrides default)
@@ -215,11 +217,18 @@ def load_config_file(
         custom_config_path: Optional path to custom YAML config that overrides defaults
 
     Returns:
-        Tuple of (phases, default_assignee, output_dir, project_settings)
-        phases: List of (phase_name, start_date, end_date) tuples
-        default_assignee: Default assignee/author (empty string for team)
-        output_dir: Optional custom output directory for team isolation
+        Tuple of (project_settings, root_configs)
         project_settings: Dict with project configuration (jira_url, github_repo_owner, etc.)
+        root_configs: Dict with root-level runtime configuration including:
+            - phases: List of (phase_name, start_date, end_date) tuples
+            - default_assignee: Default assignee/author (empty string for team)
+            - output_dir: Optional custom output directory for team isolation
+            - visualization: Whether visualization is enabled
+            - replace_existing_reports: Whether to replace existing reports
+            - email_anonymous_id: Email anonymous ID
+            - log_level: Logging level
+            - members: List of team member configurations
+            - (any other root-level config values)
 
     Raises:
         FileNotFoundError: If required config file doesn't exist
@@ -275,7 +284,16 @@ def load_config_file(
 
         print(f"[INFO] Using default config: {config_path}")
 
-    # Extract phases
+    # Extract project settings (non-sensitive configuration)
+    project_settings = config.get("project", {})
+
+    # Apply project settings to environment variables
+    apply_project_settings_to_env(project_settings)
+
+    # Build root_configs with all root-level configuration
+    root_configs = {}
+
+    # Extract and parse phases
     phases = []
     if "phases" in config and config["phases"]:
         for phase in config["phases"]:
@@ -288,25 +306,21 @@ def load_config_file(
     if not phases:
         raise ValueError(f"No valid phases found in {config_path}")
 
-    # Extract default assignee/author
-    default_assignee = config.get("default_assignee", "")
-
-    # Extract custom output directory (for team isolation)
-    output_dir = config.get("output_dir", None)
-
-    # Extract project settings (non-sensitive configuration)
-    project_settings = config.get("project", {})
-
-    # Apply project settings to environment variables
-    apply_project_settings_to_env(project_settings)
+    root_configs["phases"] = phases
+    root_configs["default_assignee"] = config.get("default_assignee", "")
+    root_configs["output_dir"] = config.get("output_dir", None)
+    root_configs["visualization"] = config.get("visualization", True)
+    root_configs["replace_existing_reports"] = config.get("replace_existing_reports", False)
+    root_configs["email_anonymous_id"] = config.get("email_anonymous_id", None)
+    root_configs["log_level"] = config.get("log_level", None)
+    root_configs["members"] = config.get("members", [])
 
     # Apply log_level from config if specified
-    log_level = config.get("log_level")
-    if log_level:
-        set_log_level(log_level)
-        print(f"[INFO] Log level set to: {log_level}")
+    if root_configs["log_level"]:
+        set_log_level(root_configs["log_level"])
+        print(f"[INFO] Log level set to: {root_configs['log_level']}")
 
-    return phases, default_assignee, output_dir, project_settings
+    return project_settings, root_configs
 
 
 def aggregate_member_values_for_phases(
@@ -607,6 +621,15 @@ def upload_to_google_sheets(
         # Add --config parameter if config_path is provided
         if config_path:
             cmd.extend(["--config", str(config_path)])
+
+            # Check if replace_existing_reports is enabled in config
+            try:
+                _, root_configs = load_config_file(config_path)
+                replace_existing = root_configs.get("replace_existing_reports", False)
+                if replace_existing:
+                    cmd.append("--replace-existing")
+            except Exception:
+                pass  # If config load fails, skip replace-existing flag
 
         try:
             result = subprocess.run(

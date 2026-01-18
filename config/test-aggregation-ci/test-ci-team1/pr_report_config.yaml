@@ -34,3 +34,5 @@ log_level: "WARNING"
 # Each member receives ONLY their own ID (privacy protected)
 email_anonymous_id:
   enabled: true
+
+replace_existing_reports: true
