@@ -4,6 +4,7 @@ Thank you for your interest in contributing to AI Impact Analysis! This guide wi
 
 ## Table of Contents
 
+- [Project Structure](#project-structure)
 - [Development Setup](#development-setup)
 - [Code Contribution Workflow](#code-contribution-workflow)
 - [Commit Guidelines](#commit-guidelines)
@@ -11,6 +12,109 @@ Thank you for your interest in contributing to AI Impact Analysis! This guide wi
 - [Code Quality](#code-quality)
 - [Documentation](#documentation)
 - [Getting Help](#getting-help)
+
+## Project Structure
+
+Understanding the project structure helps you navigate the codebase and know where to make changes.
+
+```
+impactlens/
+├── impactlens/           # Core library
+│   ├── cli.py                    # CLI entry point
+│   ├── clients/                  # API clients
+│   │   ├── jira_client.py        # Jira REST/GraphQL API
+│   │   ├── github_client_graphql.py  # GitHub GraphQL
+│   │   ├── github_client.py      # GitHub REST API (legacy)
+│   │   └── sheets_client.py      # Google Sheets API
+│   ├── core/                     # Business logic
+│   │   ├── jira_metrics_calculator.py
+│   │   ├── pr_metrics_calculator.py
+│   │   ├── jira_report_generator.py
+│   │   ├── pr_report_generator.py
+│   │   ├── report_aggregator.py  # Multi-team aggregation
+│   │   └── report_orchestrator.py
+│   ├── models/                   # Data models & config
+│   │   └── config.py             # Configuration models
+│   ├── scripts/                  # Script modules
+│   │   ├── generate_analysis_prompt.py  # Generate AI analysis prompts
+│   │   ├── analyze_with_gemini.py       # Gemini API analysis
+│   │   ├── get_jira_metrics.py
+│   │   ├── get_pr_metrics.py
+│   │   ├── generate_jira_report.py
+│   │   ├── generate_pr_report.py
+│   │   ├── generate_jira_comparison_report.py
+│   │   ├── generate_pr_comparison_report.py
+│   │   ├── aggregate_reports.py  # Multi-team report aggregation
+│   │   ├── generate_charts.py    # Chart generation CLI
+│   │   ├── send_email_notifications.py
+│   │   ├── upload_to_sheets.py
+│   │   ├── clear_google_sheets.py  # Utility to clean up old sheets
+│   │   └── verify_setup.py
+│   └── utils/                    # Shared utilities
+│       ├── anonymization.py      # Privacy & anonymization utilities
+│       ├── cli_utils.py          # CLI helper functions
+│       ├── common_args.py        # Shared CLI argument definitions
+│       ├── core_utils.py         # Core utility functions
+│       ├── email_notifier.py     # Email notification utilities
+│       ├── github_charts_uploader.py  # Upload charts to GitHub repo
+│       ├── logger.py             # Logging configuration
+│       ├── pr_utils.py           # PR-specific utilities
+│       ├── report_preprocessor.py # Report data preprocessing
+│       ├── report_utils.py       # Report generation utilities
+│       ├── sheets_visualization.py # Google Sheets chart embedding
+│       ├── smtp_config.py        # SMTP configuration & email helpers
+│       ├── visualization.py      # Box plot chart generation
+│       └── workflow_utils.py     # Config loading & workflow helpers
+├── .github/workflows/            # GitHub Actions CI
+│   ├── ci.yml                    # Test & lint workflow
+│   ├── config-validation.yml     # Config-only PR validation
+│   ├── gemini-analysis.yml       # AI analysis workflow
+│   └── generate-reports.yml      # Automated report generation
+├── config/                       # Configuration files
+│   ├── jira_report_config.yaml.example  # Jira config template
+│   ├── pr_report_config.yaml.example    # PR config template
+│   ├── aggregation_config.yaml.example  # Multi-repo aggregation config
+│   ├── analysis_prompt_template.yaml    # Single report AI analysis template
+│   ├── combined_analysis_prompt_template.yaml  # Combined Jira+PR analysis template
+│   ├── test-simple-team/         # CI basic test configs
+│   │   ├── jira_report_config.yaml
+│   │   └── pr_report_config.yaml
+│   └── test-aggregation-ci/      # CI aggregation test configs
+│       ├── aggregation_config.yaml
+│       ├── test-ci-team1/
+│       │   ├── jira_report_config.yaml
+│       │   └── pr_report_config.yaml
+│       └── test-ci-team2/
+│           ├── jira_report_config.yaml
+│           └── pr_report_config.yaml
+├── docs/                         # Documentation
+│   ├── CONFIGURATION.md          # Detailed configuration guide
+│   ├── LOCAL_DEVELOPMENT.md      # Local development guide
+│   ├── METRICS_GUIDE.md          # Metrics explanations & formulas
+│   └── CONTRIBUTING.md           # Contribution guidelines
+├── tests/                        # Test suite
+│   ├── test_jira_client.py
+│   ├── test_github_client.py
+│   ├── test_jira_integration.py
+│   ├── test_github_integration.py
+│   └── test_utils.py
+├── .env.example                  # Environment variables template
+├── requirements.txt              # Python dependencies
+├── docker-compose.yml            # Docker Compose setup
+├── Dockerfile                    # Docker build configuration
+├── pyproject.toml                # Project metadata & CLI config
+└── tox.ini                       # Test configuration
+```
+
+**Key directories for contributors:**
+
+- `impactlens/core/` - Add new metrics calculators or report generators here
+- `impactlens/clients/` - API client implementations (Jira, GitHub, GitLab, Google Sheets)
+- `impactlens/utils/` - Shared utilities and helper functions
+- `impactlens/scripts/` - Standalone scripts for specific tasks
+- `tests/` - Unit and integration tests
+- `docs/` - User and developer documentation
+- `.github/workflows/` - CI/CD workflows
 
 ## Development Setup
 
