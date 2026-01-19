@@ -67,6 +67,12 @@ output_dir: "reports/jira"
 # delete old sheets with same name but different timestamp(Recommend)
 # replace_existing_reports: true
 
+# AI Analysis (optional)
+# AI-powered analysis is enabled by default. Set to true to disable.
+# When enabled: Generates analysis prompts and AI insights (if GOOGLE_API_KEY is configured)
+# When disabled: Skips prompt and analysis generation (faster processing, no API costs)
+# no_ai_analysis: true
+
 # Google Sheets settings (optional)
 # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
 # If you do not set in Config PR, reports would be uploaded to the default google-sheet by CI.

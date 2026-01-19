@@ -23,7 +23,7 @@ members:
     github_username: sahil143
 
 # Use test output directory to avoid polluting main reports
-output_dir: "reports/test-ci-team/github"
+output_dir: "reports/test-simple-team/github"
 # Send Hashed members name to individuals.
 # Required by CI for first-time run.
 # Disabled it if you do not want to be mailed every run.

@@ -1,0 +1,123 @@
+name: 'AI Report Analysis'
+description: 'Generate AI-powered analysis for reports using Gemini'
+inputs:
+  reports_dir:
+    description: 'Directory containing combined reports (supports glob patterns)'
+    required: true
+    default: 'reports'
+  gemini_api_key:
+    description: 'Gemini API key (required for analyze mode)'
+    required: false
+  output_mode:
+    description: 'Output mode: prompt-only (generate prompts) or analyze (run AI analysis)'
+    required: false
+    default: 'prompt-only'
+
+outputs:
+  prompts_generated:
+    description: 'Number of prompts generated'
+    value: ${{ steps.analysis.outputs.prompts_generated }}
+  analyses_completed:
+    description: 'Number of analyses completed'
+    value: ${{ steps.analysis.outputs.analyses_completed }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Generate AI Analysis Prompts
+      id: analysis
+      shell: bash
+      env:
+        GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
+      run: |
+        echo "=========================================="
+        echo "AI Report Analysis (Gemini)"
+        echo "=========================================="
+        echo "Reports directory: ${{ inputs.reports_dir }}"
+        echo "Output mode: ${{ inputs.output_mode }}"
+        echo ""
+
+        # Enable recursive globbing
+        shopt -s globstar nullglob
+
+        PROMPT_COUNT=0
+        ANALYSIS_COUNT=0
+        FAILED_COUNT=0
+
+        # Find all team/project directories with reports
+        shopt -s nullglob
+        for team_dir in ${{ inputs.reports_dir }}/*/; do
+          if [ ! -d "$team_dir" ]; then
+            continue
+          fi
+
+          team_name=$(basename "$team_dir")
+          echo "=========================================="
+          echo "Processing: $team_name"
+          echo "=========================================="
+
+          # Determine output directory
+          output_dir="${team_dir}prompts"
+          mkdir -p "$output_dir"
+
+          # Step 1: Generate prompt (automatically detects combined vs single)
+          echo "Generating analysis prompt..."
+          if python -m impactlens.scripts.generate_analysis_prompt \
+            --reports-dir "$team_dir" \
+            --prompt-only \
+            --output-dir "$output_dir" 2>&1; then
+            echo "  ✓ Prompt generated"
+            PROMPT_COUNT=$((PROMPT_COUNT + 1))
+          else
+            echo "  ✗ Failed to generate prompt"
+            FAILED_COUNT=$((FAILED_COUNT + 1))
+            continue
+          fi
+
+          # Step 2: Run Gemini analysis if in analyze mode
+          if [ "${{ inputs.output_mode }}" = "analyze" ]; then
+            # Find the most recent prompt file
+            prompt_file=$(ls -t "$output_dir"/*.txt 2>/dev/null | head -1)
+
+            if [ -z "$prompt_file" ]; then
+              echo "  ✗ Prompt file not found in $output_dir"
+              FAILED_COUNT=$((FAILED_COUNT + 1))
+              continue
+            fi
+
+            echo "  Running Gemini analysis on: $(basename "$prompt_file")"
+            # For combined analysis, we don't need --report-path
+            if python -m impactlens.scripts.analyze_with_gemini \
+              --prompt-file "$prompt_file" \
+              --output-dir "$output_dir" 2>&1; then
+              echo "  ✓ Gemini analysis completed"
+              ANALYSIS_COUNT=$((ANALYSIS_COUNT + 1))
+            else
+              echo "  ✗ Gemini analysis failed (continuing...)"
+              FAILED_COUNT=$((FAILED_COUNT + 1))
+            fi
+          fi
+
+          echo ""
+        done
+
+        echo "=========================================="
+        echo "AI Analysis Summary"
+        echo "=========================================="
+        echo "Prompts generated: $PROMPT_COUNT"
+        echo "Analyses completed: $ANALYSIS_COUNT"
+        echo "Failed: $FAILED_COUNT"
+        echo ""
+
+        # Set outputs
+        echo "prompts_generated=$PROMPT_COUNT" >> $GITHUB_OUTPUT
+        echo "analyses_completed=$ANALYSIS_COUNT" >> $GITHUB_OUTPUT
+
+        if [ $PROMPT_COUNT -eq 0 ]; then
+          echo "⚠️  No combined reports found"
+          echo "   This is expected if report generation was skipped"
+        elif [ $FAILED_COUNT -gt 0 ]; then
+          echo "⚠️  Some operations failed (non-critical)"
+        else
+          echo "✓ All operations completed successfully"
+        fi

@@ -1,0 +1,93 @@
+name: Gemini AI Analysis
+
+# Manual trigger workflow for running Gemini analysis on existing reports
+# Use this to analyze reports that have already been generated
+
+on:
+  workflow_dispatch:
+    inputs:
+      reports_dir:
+        description: "Reports directory (default: reports)"
+        required: false
+        default: "reports"
+      analysis_mode:
+        description: "Mode: prompt-only (generate prompts) or analyze (run Gemini)"
+        required: true
+        type: choice
+        options:
+          - prompt-only
+          - analyze
+        default: "analyze"
+
+jobs:
+  gemini-analysis:
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          # Install Gemini API library (already in requirements.txt via google-genai)
+          echo "✓ Gemini SDK installed via requirements.txt"
+
+      - name: Check reports directory
+        id: check_reports
+        run: |
+          if [ ! -d "${{ github.event.inputs.reports_dir }}" ]; then
+            echo "⚠️  Reports directory not found: ${{ github.event.inputs.reports_dir }}"
+            echo "Please generate reports first using 'Generate AI Impact Reports' workflow"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "✓ Reports directory found"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Gemini Analysis
+        if: steps.check_reports.outputs.skip != 'true'
+        uses: ./.github/actions/ai-analysis
+        with:
+          reports_dir: ${{ github.event.inputs.reports_dir }}
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          output_mode: ${{ github.event.inputs.analysis_mode }}
+
+      - name: Upload Analysis Results
+        if: steps.check_reports.outputs.skip != 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-analysis-results
+          path: |
+            reports/**/prompts/*.txt
+          retention-days: 30
+
+      - name: Summary
+        if: steps.check_reports.outputs.skip != 'true' && always()
+        run: |
+          echo "=========================================="
+          echo "Gemini Analysis Summary"
+          echo "=========================================="
+          echo "Reports directory: ${{ github.event.inputs.reports_dir }}"
+          echo "Analysis mode: ${{ github.event.inputs.analysis_mode }}"
+          echo ""
+
+          if [ "${{ github.event.inputs.analysis_mode }}" = "analyze" ]; then
+            echo "📊 Generated analysis files:"
+            find ${{ github.event.inputs.reports_dir }} -name "gemini_analysis_*.txt" 2>/dev/null || echo "  (none)"
+          fi
+
+          echo ""
+          echo "📝 Generated prompt files:"
+          find ${{ github.event.inputs.reports_dir }} -name "analysis_prompt_*.txt" 2>/dev/null || echo "  (none)"
+
+          echo ""
+          echo "✓ Gemini analysis workflow completed"

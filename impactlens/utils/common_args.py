@@ -279,13 +279,13 @@ def add_capacity_args(parser: argparse.ArgumentParser) -> None:
 # ============================================================================
 
 
-def add_claude_analysis_args(parser: argparse.ArgumentParser) -> None:
-    """Add arguments for Claude-based analysis (analyze_with_claude_code.py)."""
+def add_prompt_generation_args(parser: argparse.ArgumentParser) -> None:
+    """Add arguments for AI analysis prompt generation (generate_analysis_prompt.py)."""
     parser.add_argument(
         "--reports-dir",
         type=str,
         required=True,
-        help="Path to TSV report (supports wildcards for latest)",
+        help="Path to TSV report file or directory (supports wildcards for files)",
     )
     parser.add_argument(
         "--prompt-template",
@@ -296,39 +296,13 @@ def add_claude_analysis_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="reports",
-        help="Output directory for analysis",
-    )
-    parser.add_argument(
-        "--save-analysis",
-        type=str,
-        help="Analysis text to save directly (optional, skips Claude Code call)",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=300,
-        help="Timeout for Claude Code analysis in seconds (default: 300)",
+        default="reports/prompts",
+        help="Output directory for generated prompts (default: reports/prompts)",
     )
     parser.add_argument(
         "--prompt-only",
         action="store_true",
-        help="Prompt preview mode: only generate and display prompt without calling Claude",
-    )
-    parser.add_argument(
-        "--no-upload",
-        action="store_true",
-        help="Skip uploading analysis to Google Sheets (default: auto-upload)",
-    )
-    parser.add_argument(
-        "--claude-api-mode",
-        action="store_true",
-        help="Use Anthropic API instead of Claude Code CLI (requires ANTHROPIC_API_KEY)",
-    )
-    parser.add_argument(
-        "--anthropic-api-key",
-        type=str,
-        help="Anthropic API key (if not provided, reads from ANTHROPIC_API_KEY env var)",
+        help="Prompt preview mode: generate and display prompt (saves to file)",
     )
 
 

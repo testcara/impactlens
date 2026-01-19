@@ -158,7 +158,9 @@ Note:
     try:
         # Detect if this is an AI analysis report (plain text) or TSV report
         filename = Path(args.report).stem
-        is_ai_analysis = filename.startswith("ai_analysis_")
+        is_ai_analysis = filename.startswith("ai_analysis_") or filename.startswith(
+            "gemini_analysis_"
+        )
 
         if is_ai_analysis:
             # Read as plain text, convert Markdown to plain text
@@ -197,7 +199,7 @@ Note:
 
         # Format sheet
         if not args.no_format:
-            format_sheet(service, spreadsheet_id, sheet_id)
+            format_sheet(service, spreadsheet_id, sheet_id, is_ai_analysis=is_ai_analysis)
 
         # Print success with URL
         url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"

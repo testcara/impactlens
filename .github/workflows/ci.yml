@@ -111,6 +111,10 @@ jobs:
     if: |
       github.event_name == 'push' ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -124,7 +128,7 @@ jobs:
             FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
 
             # Check for test config changes
-            TEST_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/test-integration-ci/.*\.(yaml|yml)$' || true)
+            TEST_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/test-simple-team/.*\.(yaml|yml)$' || true)
 
             # Check for code/non-doc changes
             CODE_CHANGED=$(echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore|config/[^/]+/.*\.(yaml|yml)$)' && echo "true" || echo "false")
@@ -171,9 +175,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/github
-          key: integration-test-basic-pr-cache-${{ hashFiles('config/test-integration-ci/test-ci-team/pr_report_config.yaml') }}-${{ github.run_id }}
+          key: integration-test-basic-pr-cache-${{ hashFiles('config/test-simple-team/pr_report_config.yaml') }}-${{ github.run_id }}
           restore-keys: |
-            integration-test-basic-pr-cache-${{ hashFiles('config/test-integration-ci/test-ci-team/pr_report_config.yaml') }}-
+            integration-test-basic-pr-cache-${{ hashFiles('config/test-simple-team/pr_report_config.yaml') }}-
             integration-test-basic-pr-cache-
 
       - name: Run integration test - Full workflow (Jira + PR + Email)
@@ -184,6 +188,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           SMTP_USER: ${{ secrets.MAIL_APP_USER }}
           SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
           GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
@@ -205,21 +210,17 @@ jobs:
 
           # Run full workflow with mail-save-file mode (emails saved to files)
           python -m impactlens.cli full \
-            --config config/test-integration-ci/test-ci-team \
+            --config config/test-simple-team \
             $UPLOAD_ARGS \
             --incremental \
             --hide-individual-names \
-            --mail-save-file reports/test-ci-team/emails
+            --mail-save-file reports/test-simple-team/emails
 
           echo ""
-          echo "✓ Basic integration test completed (Jira + PR + Email)"
+          echo "✓ Basic integration test completed (Jira + PR + Email + AI Analysis)"
           echo "Reports:"
-          ls -lh reports/test-ci-team/jira/ 2>/dev/null || echo "  No Jira reports"
-          ls -lh reports/test-ci-team/github/ 2>/dev/null || echo "  No PR reports"
-
-      - name: Test analysis prompt generation
-        if: steps.docs_check.outputs.code_changed == 'true'
-        run: .github/scripts/test-prompt-generation.sh "reports/test-ci-team"
+          ls -lh reports/test-simple-team/jira/ 2>/dev/null || echo "  No Jira reports"
+          ls -lh reports/test-simple-team/github/ 2>/dev/null || echo "  No PR reports"
 
       - name: Upload test reports as artifacts
         if: steps.docs_check.outputs.code_changed == 'true' && always()
@@ -227,14 +228,14 @@ jobs:
         with:
           name: integration-test-basic-reports
           path: |
-            reports/test-ci-team/
+            reports/test-simple-team/
           retention-days: 7
 
       - name: Report Statistics and PR Comment
         if: steps.docs_check.outputs.code_changed == 'true' && always()
         uses: ./.github/actions/report-comment
         with:
-          reports_dir: "reports/test-ci-team"
+          reports_dir: "reports/test-simple-team"
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Integration test summary
@@ -245,8 +246,8 @@ jobs:
           echo "=========================================="
           echo ""
           echo "Test Scenario:"
-          echo "  - Config: config/test-integration-ci/test-ci-team/"
-          echo "  - Reports: reports/test-ci-team/"
+          echo "  - Config: config/test-simple-team/"
+          echo "  - Reports: reports/test-simple-team/"
           echo ""
           echo "✅ Basic integration test completed successfully"
 
@@ -258,6 +259,10 @@ jobs:
     if: |
       github.event_name == 'push' ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -328,6 +333,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           SMTP_USER: ${{ secrets.MAIL_APP_USER }}
           SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
         run: |
@@ -364,10 +370,6 @@ jobs:
           ls -lh reports/test-ci-team1/ 2>/dev/null || echo "  No team1 reports"
           ls -lh reports/test-ci-team2/ 2>/dev/null || echo "  No team2 reports"
           ls -lh reports/test-ci-aggregated/ 2>/dev/null || echo "  No aggregated reports"
-
-      - name: Test analysis prompt generation
-        if: steps.docs_check.outputs.code_changed == 'true'
-        run: .github/scripts/test-prompt-generation.sh "reports/test-ci-team*"
 
       - name: Upload test reports as artifacts
         if: steps.docs_check.outputs.code_changed == 'true' && always()

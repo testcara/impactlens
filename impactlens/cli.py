@@ -491,40 +491,58 @@ def jira_combine(
     sys.exit(return_code)
 
 
-def _jira_full_impl(
+def _generic_full_impl(
+    report_type: str,  # "jira" or "pr"
     config: Optional[str],
     no_upload: bool,
     upload_members: bool,
     hide_individual_names: bool,
     email_anonymous_id: bool,
     mail_save_file: Optional[str],
-    with_claude_insights: bool,
-    claude_api_mode: bool,
     no_visualization: bool,
+    skip_ai_analysis: bool = False,
     skip_email: bool = False,
+    incremental: bool = False,  # For PR only
 ) -> int:
     """
-    Internal implementation of Jira full workflow.
+    Generic implementation for Jira/PR full workflow.
 
     Args:
+        report_type: "jira" or "pr"
         skip_email: If True, skip sending email notifications (used in full_workflow)
+        skip_ai_analysis: If True, skip AI analysis (used in full_workflow)
+        incremental: Only for PR - fetch only new/updated PRs
 
     Returns:
         Exit code (0 for success, 1 for failure)
     """
-    workflow_steps = "Team → Members → Combine → Upload"
-    if with_claude_insights:
-        workflow_steps = "Team → Members → Combine → Claude Insights → Upload"
+    # Configuration based on report type
+    if report_type == "jira":
+        config_filename = "jira_report_config.yaml"
+        script_name = "impactlens.scripts.generate_jira_report"
+        reports_glob = "reports/jira/combined_jira_report_*.tsv"
+        color = "cyan"
+        label = "JIRA"
+    else:  # pr
+        config_filename = "pr_report_config.yaml"
+        script_name = "impactlens.scripts.generate_pr_report"
+        reports_glob = "reports/github/combined_pr_report_*.tsv"
+        color = "magenta"
+        label = "PR"
+
+    workflow_steps = "Team → Members → Combine → Visualization → AI Analysis → Upload"
+    if skip_ai_analysis:
+        workflow_steps = "Team → Members → Combine → Visualization → Upload"
 
     console.print(
         Panel.fit(
-            "[bold cyan]Full Jira Workflow[/bold cyan]\n" f"[dim]{workflow_steps}[/dim]",
-            border_style="cyan",
+            f"[bold {color}]Full {label} Workflow[/bold {color}]\n" f"[dim]{workflow_steps}[/dim]",
+            border_style=color,
         )
     )
 
     # Resolve config path (directory or specific file)
-    config_file_path = resolve_config_path(config, "jira_report_config.yaml", "cyan")
+    config_file_path = resolve_config_path(config, config_filename, color)
 
     failed_steps = []
 
@@ -533,6 +551,8 @@ def _jira_full_impl(
     args = ["--all-members"]
     if config_file_path:
         args.extend(["--config", str(config_file_path)])
+    if incremental and report_type == "pr":
+        args.append("--incremental")
     if no_upload:
         args.append("--no-upload")
     if upload_members:
@@ -540,8 +560,8 @@ def _jira_full_impl(
     if hide_individual_names:
         args.append("--hide-individual-names")
 
-    if run_script("impactlens.scripts.generate_jira_report", args, "Jira all reports") != 0:
-        failed_steps.append("Jira all reports")
+    if run_script(script_name, args, f"{label} all reports") != 0:
+        failed_steps.append(f"{label} all reports")
 
     # Step 2: Combine reports
     console.print("\n[bold]Step 2/3:[/bold] Combining reports...")
@@ -553,8 +573,8 @@ def _jira_full_impl(
     if hide_individual_names:
         args.append("--hide-individual-names")
 
-    if run_script("impactlens.scripts.generate_jira_report", args, "Jira combine") != 0:
-        failed_steps.append("Jira combine")
+    if run_script(script_name, args, f"{label} combine") != 0:
+        failed_steps.append(f"{label} combine")
 
     # Step 2.5: Email Notifications (opt-in, only with anonymization)
     if not skip_email and should_send_email_notification(email_anonymous_id, config_file_path):
@@ -568,7 +588,7 @@ def _jira_full_impl(
 
             send_email_notifications_cli(
                 config_file_path=config_file_path,
-                report_context="Jira Report Generated",
+                report_context=f"{label} Report Generated",
                 console=console,
                 mail_save_file=mail_save_file,
             )
@@ -578,36 +598,32 @@ def _jira_full_impl(
         config_file_path=config_file_path,
         no_visualization=no_visualization,
         no_upload=no_upload,
-        report_type="jira",
+        report_type=report_type,
         failed_steps=failed_steps,
     )
 
-    # Step 3: Claude Insights (opt-in)
-    if with_claude_insights:
-        console.print("\n[bold]Step 3/3:[/bold] Generating Claude insights...")
-        jira_reports = list(Path("reports/jira").glob("combined_jira_report_*.tsv"))
-        if jira_reports:
-            latest_jira = max(jira_reports, key=lambda p: p.stat().st_mtime)
+    # Step 3: AI Analysis (default enabled, unless skip_ai_analysis)
+    if not skip_ai_analysis:
+        console.print("\n[bold]Step 3/3:[/bold] Generating AI analysis...")
+        reports = list(Path(reports_glob.split("/")[0]).glob("/".join(reports_glob.split("/")[1:])))
+        if reports:
+            latest_report = max(reports, key=lambda p: p.stat().st_mtime)
 
-            # Build args for analyze script
-            analyze_args = ["--report", str(latest_jira)]
-            if no_upload:
-                analyze_args.append("--no-upload")
-            if claude_api_mode:
-                analyze_args.append("--claude-api-mode")
+            # Build args for prompt generation
+            analyze_args = ["--reports-dir", str(latest_report)]
 
             if (
                 run_script(
-                    "impactlens.scripts.analyze_with_claude_code",
+                    "impactlens.scripts.generate_analysis_prompt",
                     analyze_args,
-                    f"Claude insights: {latest_jira.name}",
+                    f"AI analysis: {latest_report.name}",
                 )
                 != 0
             ):
-                failed_steps.append("Jira Claude insights")
+                failed_steps.append(f"{label} AI analysis")
     else:
         console.print(
-            "\n[bold yellow]ℹ️  Claude insights skipped[/bold yellow] (use --with-claude-insights to enable)"
+            "\n[bold yellow]ℹ️  AI analysis skipped[/bold yellow] (deferred to full workflow)"
         )
 
     # Summary
@@ -620,8 +636,19 @@ def _jira_full_impl(
             console.print(f"  [red]✗[/red] {step}")
         return 1
     else:
-        console.print("[bold green]✓ Jira full workflow completed successfully![/bold green]")
+        console.print(f"[bold green]✓ {label} full workflow completed successfully![/bold green]")
         return 0
+
+
+def _jira_full_impl(**kwargs) -> int:
+    """Wrapper for JIRA full workflow."""
+    kwargs.pop("incremental", None)  # Remove PR-only param if present
+    return _generic_full_impl(report_type="jira", **kwargs)
+
+
+def _pr_full_impl(**kwargs) -> int:
+    """Wrapper for PR full workflow."""
+    return _generic_full_impl(report_type="pr", **kwargs)
 
 
 @jira_app.command(name="full")
@@ -652,24 +679,21 @@ def jira_full(
         "--mail-save-file",
         help="Save emails to files instead of sending them (specify directory path)",
     ),
-    with_claude_insights: bool = typer.Option(
-        False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
-    ),
-    claude_api_mode: bool = typer.Option(
-        False,
-        "--claude-api-mode",
-        help="Use Anthropic API instead of Claude Code CLI (requires ANTHROPIC_API_KEY)",
-    ),
     no_visualization: bool = typer.Option(
         False,
         "--no-visualization",
         help="Skip generating charts and HTML visualization report",
     ),
+    no_ai_analysis: bool = typer.Option(
+        False,
+        "--no-ai-analysis",
+        help="Skip AI analysis (prompt generation and Gemini analysis)",
+    ),
 ):
     """
     Complete Jira workflow: generate all reports and combine.
 
-    Workflow: Team → Members → Combine → Upload (Claude insights optional with --with-claude-insights)
+    Workflow: Team → Members → Combine → Visualization → AI Analysis (default, auto with Gemini API key) → Upload
 
     Config parameter:
     - Directory: config/team-a (auto-finds jira_report_config.yaml)
@@ -682,9 +706,8 @@ def jira_full(
         hide_individual_names=hide_individual_names,
         email_anonymous_id=email_anonymous_id,
         mail_save_file=mail_save_file,
-        with_claude_insights=with_claude_insights,
-        claude_api_mode=claude_api_mode,
         no_visualization=no_visualization,
+        skip_ai_analysis=no_ai_analysis,
     )
     sys.exit(exit_code)
 
@@ -838,142 +861,6 @@ def pr_combine(
     sys.exit(return_code)
 
 
-def _pr_full_impl(
-    config: Optional[str],
-    incremental: bool,
-    no_upload: bool,
-    upload_members: bool,
-    hide_individual_names: bool,
-    email_anonymous_id: bool,
-    mail_save_file: Optional[str],
-    with_claude_insights: bool,
-    claude_api_mode: bool,
-    no_visualization: bool,
-    skip_email: bool = False,
-) -> int:
-    """
-    Internal implementation of PR full workflow.
-
-    Args:
-        skip_email: If True, skip sending email notifications (used in full_workflow)
-
-    Returns:
-        Exit code (0 for success, 1 for failure)
-    """
-    workflow_steps = "Team → Members → Combine → Upload"
-    if with_claude_insights:
-        workflow_steps = "Team → Members → Combine → Claude Insights → Upload"
-
-    console.print(
-        Panel.fit(
-            "[bold magenta]Full PR Workflow[/bold magenta]\n" f"[dim]{workflow_steps}[/dim]",
-            border_style="magenta",
-        )
-    )
-
-    # Resolve config path (directory or specific file)
-    config_file_path = resolve_config_path(config, "pr_report_config.yaml", "magenta")
-
-    failed_steps = []
-
-    # Step 1: Generate team + all members
-    console.print("\n[bold]Step 1/3:[/bold] Generating team + members reports...")
-    args = ["--all-members"]
-    if config_file_path:
-        args.extend(["--config", str(config_file_path)])
-    if incremental:
-        args.append("--incremental")
-    if no_upload:
-        args.append("--no-upload")
-    if upload_members:
-        args.append("--upload-members")
-    if hide_individual_names:
-        args.append("--hide-individual-names")
-
-    if run_script("impactlens.scripts.generate_pr_report", args, "PR all reports") != 0:
-        failed_steps.append("PR all reports")
-
-    # Step 2: Combine reports
-    console.print("\n[bold]Step 2/3:[/bold] Combining reports...")
-    args = ["--combine-only"]
-    if config_file_path:
-        args.extend(["--config", str(config_file_path)])
-    if no_upload:
-        args.append("--no-upload")
-    if hide_individual_names:
-        args.append("--hide-individual-names")
-
-    if run_script("impactlens.scripts.generate_pr_report", args, "PR combine") != 0:
-        failed_steps.append("PR combine")
-
-    # Step 2.5: Email Notifications (opt-in, only with anonymization)
-    if not skip_email and should_send_email_notification(email_anonymous_id, config_file_path):
-        if not hide_individual_names:
-            console.print(
-                "\n[bold yellow]⚠️  --email-anonymous-id requires --hide-individual-names[/bold yellow]"
-            )
-            console.print("[yellow]   Email notifications skipped.[/yellow]")
-        else:
-            console.print("\n[bold]Step 2.5/3:[/bold] Sending email notifications...")
-
-            send_email_notifications_cli(
-                config_file_path=config_file_path,
-                report_context="PR Report Generated",
-                console=console,
-                mail_save_file=mail_save_file,
-            )
-
-    # Step 2.8: Generate Visualizations
-    generate_visualization_for_report(
-        config_file_path=config_file_path,
-        no_visualization=no_visualization,
-        no_upload=no_upload,
-        report_type="pr",
-        failed_steps=failed_steps,
-    )
-
-    # Step 3: Claude Insights (opt-in)
-    if with_claude_insights:
-        console.print("\n[bold]Step 3/3:[/bold] Generating Claude insights...")
-        pr_reports = list(Path("reports/github").glob("combined_pr_report_*.tsv"))
-        if pr_reports:
-            latest_pr = max(pr_reports, key=lambda p: p.stat().st_mtime)
-
-            # Build args for analyze script
-            analyze_args = ["--report", str(latest_pr)]
-            if no_upload:
-                analyze_args.append("--no-upload")
-            if claude_api_mode:
-                analyze_args.append("--claude-api-mode")
-
-            if (
-                run_script(
-                    "impactlens.scripts.analyze_with_claude_code",
-                    analyze_args,
-                    f"Claude insights: {latest_pr.name}",
-                )
-                != 0
-            ):
-                failed_steps.append("PR Claude insights")
-    else:
-        console.print(
-            "\n[bold yellow]ℹ️  Claude insights skipped[/bold yellow] (use --with-claude-insights to enable)"
-        )
-
-    # Summary
-    console.print("\n" + "=" * 60)
-    if failed_steps:
-        console.print(
-            f"[bold yellow]⚠ Workflow completed with {len(failed_steps)} failures:[/bold yellow]"
-        )
-        for step in failed_steps:
-            console.print(f"  [red]✗[/red] {step}")
-        return 1
-    else:
-        console.print("[bold green]✓ PR full workflow completed successfully![/bold green]")
-        return 0
-
-
 @pr_app.command(name="full")
 def pr_full(
     config: Optional[str] = typer.Option(
@@ -1003,24 +890,21 @@ def pr_full(
         "--mail-save-file",
         help="Save emails to files instead of sending them (specify directory path)",
     ),
-    with_claude_insights: bool = typer.Option(
-        False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
-    ),
-    claude_api_mode: bool = typer.Option(
-        False,
-        "--claude-api-mode",
-        help="Use Anthropic API instead of Claude Code CLI (requires ANTHROPIC_API_KEY)",
-    ),
     no_visualization: bool = typer.Option(
         False,
         "--no-visualization",
         help="Skip generating charts and HTML visualization report",
     ),
+    no_ai_analysis: bool = typer.Option(
+        False,
+        "--no-ai-analysis",
+        help="Skip AI analysis (prompt generation and Gemini analysis)",
+    ),
 ):
     """
     Complete PR workflow: generate all reports and combine.
 
-    Workflow: Team → Members → Combine → Upload (Claude insights optional with --with-claude-insights)
+    Workflow: Team → Members → Combine → Visualization → AI Analysis (default, auto with Gemini API key) → Upload
 
     Config parameter:
     - Directory: config/team-a (auto-finds pr_report_config.yaml)
@@ -1034,9 +918,8 @@ def pr_full(
         hide_individual_names=hide_individual_names,
         email_anonymous_id=email_anonymous_id,
         mail_save_file=mail_save_file,
-        with_claude_insights=with_claude_insights,
-        claude_api_mode=claude_api_mode,
         no_visualization=no_visualization,
+        skip_ai_analysis=no_ai_analysis,
     )
     sys.exit(exit_code)
 
@@ -1054,11 +937,10 @@ def _process_single_project(
     hide_individual_names: bool,
     email_anonymous_id: bool,
     mail_save_file: Optional[str],
-    with_claude_insights: bool,
-    claude_api_mode: bool,
     no_visualization: bool,
     incremental: bool,
     skip_email: bool = False,
+    skip_ai_analysis: bool = True,  # Default: skip AI in nested calls
 ) -> list:
     """
     Process a single project's Jira and PR workflows.
@@ -1083,9 +965,8 @@ def _process_single_project(
             hide_individual_names=hide_individual_names,
             email_anonymous_id=email_anonymous_id,
             mail_save_file=mail_save_file,
-            with_claude_insights=with_claude_insights,
-            claude_api_mode=claude_api_mode,
             no_visualization=no_visualization,
+            skip_ai_analysis=skip_ai_analysis,
             skip_email=skip_email,
         )
         if jira_exit_code != 0:
@@ -1104,15 +985,95 @@ def _process_single_project(
             hide_individual_names=hide_individual_names,
             email_anonymous_id=email_anonymous_id,
             mail_save_file=mail_save_file,
-            with_claude_insights=with_claude_insights,
-            claude_api_mode=claude_api_mode,
             no_visualization=no_visualization,
+            skip_ai_analysis=skip_ai_analysis,
             skip_email=skip_email,
         )
         if pr_exit_code != 0:
             failed_workflows.append(f"{project_name + ' ' if project_name else ''}PR workflow")
 
     return failed_workflows
+
+
+def _run_ai_analysis(
+    no_ai_analysis: bool,
+    failed_workflows: list,
+    config_path: Path = None,
+    no_upload: bool = False,
+) -> None:
+    """
+    Run AI analysis on reports (auto-detects single vs combined).
+
+    Workflow:
+    1. Generate analysis prompt from reports → saves to reports/prompts/
+    2. Run Gemini analysis on generated prompt → saves result and uploads to Google Sheets
+
+    Args:
+        no_ai_analysis: If True, skip AI analysis
+        failed_workflows: List to append failures to
+        config_path: Path to config directory (to determine reports location)
+        no_upload: If True, skip uploading analysis results to Google Sheets
+    """
+    if not no_ai_analysis:
+        console.print("\n" + "=" * 60)
+        console.print("[bold green]AI ANALYSIS[/bold green]")
+        console.print("=" * 60)
+        console.print("[dim]Generating analysis prompts and running Gemini...[/dim]\n")
+
+        # Determine reports_dir and output_dir from config
+        reports_dir = "reports"  # Default
+        output_dir = "reports/prompts"  # Default
+
+        if config_path:
+            jira_cfg, pr_cfg = resolve_config_paths_for_full(str(config_path))
+            # Try to extract reports_dir from config output_dir
+            for cfg_path in [jira_cfg, pr_cfg]:
+                if cfg_path and cfg_path.exists():
+                    try:
+                        from impactlens.utils.workflow_utils import load_config_file
+
+                        _, root_configs = load_config_file(cfg_path)
+                        config_output_dir = root_configs.get("output_dir", "")
+                        if config_output_dir:
+                            # Extract parent dir: "reports/test-ci-team/jira" -> "reports/test-ci-team"
+                            reports_dir = str(Path(config_output_dir).parent)
+                            output_dir = f"{reports_dir}/prompts"
+                            break
+                    except Exception:
+                        pass
+
+        # Step 1: Generate analysis prompt
+        if (
+            run_script(
+                "impactlens.scripts.generate_analysis_prompt",
+                ["--reports-dir", reports_dir, "--output-dir", output_dir, "--prompt-only"],
+                "Generate analysis prompt",
+            )
+            != 0
+        ):
+            failed_workflows.append("AI analysis (prompt generation)")
+            return
+
+        # Step 2: Run Gemini analysis
+        analyze_args = ["--output-dir", output_dir]
+        if no_upload:
+            analyze_args.append("--no-upload")
+        if config_path:
+            analyze_args.extend(["--config", str(config_path)])
+
+        if (
+            run_script(
+                "impactlens.scripts.analyze_with_gemini",
+                analyze_args,
+                "Run Gemini analysis",
+            )
+            != 0
+        ):
+            failed_workflows.append("AI analysis (Gemini)")
+    else:
+        console.print(
+            "\n[bold yellow]ℹ️  AI analysis skipped[/bold yellow] (disabled via --no-ai-analysis)\n"
+        )
 
 
 def _run_aggregation(aggregation_config_path: Path, no_upload: bool) -> list:
@@ -1283,19 +1244,16 @@ def full_workflow(
         "--mail-save-file",
         help="Save emails to files instead of sending them (specify directory path)",
     ),
-    with_claude_insights: bool = typer.Option(
-        False, "--with-claude-insights", help="Generate insights using Claude Code (requires setup)"
-    ),
     incremental: bool = typer.Option(False, "--incremental", help="Only fetch new/updated PRs"),
-    claude_api_mode: bool = typer.Option(
-        False,
-        "--claude-api-mode",
-        help="Use Anthropic API instead of Claude Code CLI (requires ANTHROPIC_API_KEY)",
-    ),
     no_visualization: bool = typer.Option(
         False,
         "--no-visualization",
         help="Skip generating charts and HTML visualization report",
+    ),
+    no_ai_analysis: bool = typer.Option(
+        False,
+        "--no-ai-analysis",
+        help="Skip AI analysis (prompt generation and Gemini analysis)",
     ),
     log_level: str = typer.Option(
         "WARNING",
@@ -1307,7 +1265,7 @@ def full_workflow(
     Complete workflow: Execute both Jira full + PR full workflows.
 
     Workflow: Jira (Team → Members → Combine) + PR (Team → Members → Combine) → Upload
-    (Claude insights optional with --with-claude-insights)
+    (Claude insights optional with --with-gemini-insights)
 
     Config parameter:
     - Directory: config/team-a (auto-finds both jira_report_config.yaml and pr_report_config.yaml)
@@ -1381,11 +1339,10 @@ def full_workflow(
                     hide_individual_names=hide_individual_names,
                     email_anonymous_id=email_anonymous_id,
                     mail_save_file=mail_save_file,
-                    with_claude_insights=with_claude_insights,
-                    claude_api_mode=claude_api_mode,
                     no_visualization=no_visualization,
                     incremental=incremental,
                     skip_email=True,  # Skip email in multi-team mode, send once at end
+                    skip_ai_analysis=True,  # Skip AI in nested calls, do combined analysis later
                 )
                 failed_workflows.extend(project_failures)
 
@@ -1394,6 +1351,15 @@ def full_workflow(
             # Run aggregation
             agg_failures = _run_aggregation(aggregation_config_path, no_upload)
             failed_workflows.extend(agg_failures)
+
+            # AI Analysis (auto-detects combined JIRA + PR analysis)
+            # For aggregation mode, pass aggregation_config_path for proper sheet naming
+            _run_ai_analysis(
+                no_ai_analysis,
+                failed_workflows,
+                config_path=aggregation_config_path,
+                no_upload=no_upload,
+            )
 
             # Send deduplicated email notifications for all teams
             _send_email_notifications(
@@ -1435,11 +1401,10 @@ def full_workflow(
         hide_individual_names=hide_individual_names,
         email_anonymous_id=email_anonymous_id,
         mail_save_file=mail_save_file,
-        with_claude_insights=with_claude_insights,
-        claude_api_mode=claude_api_mode,
         no_visualization=no_visualization,
         incremental=incremental,
         skip_email=True,  # Skip email, send once at end
+        skip_ai_analysis=True,  # Skip AI in nested calls, do combined analysis later
     )
 
     # Check if aggregation config exists and run aggregation (optional)
@@ -1451,6 +1416,10 @@ def full_workflow(
     if aggregation_config.exists():
         agg_failures = _run_aggregation(aggregation_config, no_upload)
         failed_workflows.extend(agg_failures)
+
+    # AI Analysis (auto-detects combined JIRA + PR analysis)
+    # Pass config_path so it can read output_dir from config
+    _run_ai_analysis(no_ai_analysis, failed_workflows, config_path=config_path, no_upload=no_upload)
 
     # Send email notifications
     _send_email_notifications(

@@ -187,8 +187,8 @@ def generate_boxplot(
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # Save figure
-    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    # Save figure with high DPI for better quality in Google Sheets
+    plt.savefig(output_path, dpi=95, bbox_inches="tight")
     plt.close()
 
     print(f"Chart saved: {output_path}")
