@@ -20,7 +20,7 @@ members:
   - email: sbudhwar@redhat.com
 
 # Use test output directory to avoid polluting main reports
-output_dir: "reports/test-ci-team/jira"
+output_dir: "reports/test-simple-team/jira"
 # Send Hashed members name to individuals.
 # Required by CI for first-time run.
 # Disabled it if you do not want to be mailed every run.

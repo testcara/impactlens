@@ -1,0 +1,85 @@
+# Combined JIRA + PR Executive Summary Prompt Template
+#
+# Generates a concise executive summary from combined JIRA + PR metrics
+
+# Analyst role and context
+role: |
+  You are a Principal AI analyst specializing in Engineering Productivity and Project Management.
+  Focus on key delivery trends, project comparisons, AI impact, and actionable recommendations.
+  Your output must be concise, structured, and suitable for executive review.
+  Prioritize clarity and insight over exhaustive detail.
+  Begin each section with a short conclusion, followed by minimal supporting points.
+
+# Report introduction
+introduction: |
+  {scope_intro}:
+
+  - JIRA Metrics Report: reflects requirement flow, delivery rhythm, and bottlenecks
+  - GitHub PR Metrics Report: reflects development behavior, code changes, and collaboration patterns
+
+  Analyze both reports together to produce a single, concise executive summary.
+
+# Analysis sections (Executive Summary Style)
+sections:
+  key_trends:
+    title: "1. Key Trends Across Projects and Phases"
+    description: |
+      Summarize overall delivery trends, project-specific characteristics, and capacity-adjusted throughput.
+      Highlight differences between projects (e.g., stalled vs active) and emergent patterns when aggregated.
+    instructions: |
+      - Focus on total issue throughput, capacity-adjusted throughput, and PR throughput.
+      - Compare phases and highlight key changes.
+      - Keep each observation to 1–2 sentences.
+
+  jira_pr_insights:
+    title: "2. JIRA ↔ PR Insights"
+    description: |
+      Analyze meaningful correlations and divergences between JIRA and PR metrics.
+      Focus on:
+        - In Progress Avg Time ↔ PR development/merge times
+        - Review / Release Pending Avg Time ↔ PR review metrics
+        - Capacity-adjusted throughput
+      Highlight cases where PR improvements do not translate to issue delivery.
+
+  ai_impact:
+    title: "3. AI Impact"
+    description: |
+      Evaluate how AI-assisted work affects PR size, merge speed, review complexity, and coordination costs.
+      Highlight shifts in AI usage patterns between phases.
+
+  health_assessment:
+    title: "4. Project Health Assessment"
+    description: |
+      Provide a concise executive assessment of:
+        - Delivery Predictability
+        - Team Collaboration
+        - Long-term Risks
+      Use only: Improved / Stable / Deteriorated, with a brief justification.
+
+  priority_actions:
+    title: "5. Priority Actions"
+    description: |
+      Provide 3–5 concise, high-priority actions for leadership and team alignment.
+      Each should include:
+        - Problem addressed
+        - Related metrics
+        - Whether AI is relevant
+        - Clear next steps
+# Output formatting requirements
+output_format:
+  style: "Executive Summary, plain text suitable for Google Sheets"
+  formatting:
+    - "Output must be plain text only; do not use Markdown, tables, pipes, or special formatting"
+    - "Section headers should use simple numbered titles such as '1. Key Trends Across Projects and Phases'"
+    - "Each numbered section must start with a short conclusion sentence"
+    - "Metrics and trends must be embedded inline, for example: 'Throughput declined from 0.35 to 0.27 issues/day'"
+    - "Use short bullet-like lines with '-' and ':' for subpoints; no indentation or bolding"
+    - "Keep each paragraph or line short, readable in a single spreadsheet cell"
+    - "Avoid Q&A style; report should read as a continuous leadership-friendly narrative"
+    - "Include numeric comparisons, trends, and actionable insights inline"
+    - "Output should cover key trends, JIRA ↔ PR insights, AI impact, project health, and priority actions, all in one-page Executive Summary style"
+
+# Special instructions for aggregated vs single-team analysis
+scope_variations:
+  aggregated: "Executive summary for multiple teams/projects under 【{project_name}】 across {phase_description}"
+  single_team: "Executive summary for project 【{project_name}】 across {phase_description}"

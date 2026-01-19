@@ -28,7 +28,7 @@ for pattern in "combined_jira_report" "combined_pr_report"; do
       output_dir="$(dirname "$report")/prompts-test"
       mkdir -p "$output_dir"
 
-      if python -m impactlens.scripts.analyze_with_claude_code \
+      if python -m impactlens.scripts.generate_analysis_prompt \
         --reports-dir "$report" \
         --prompt-only \
         --output-dir "$output_dir" 2>&1; then

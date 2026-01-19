@@ -295,7 +295,9 @@ Tips:
                         {
                             "values": [
                                 {
-                                    "userEnteredValue": {"formulaValue": f'=IMAGE("{embed_url}")'},
+                                    "userEnteredValue": {
+                                        "formulaValue": f'=IMAGE("{embed_url}", 4, {chart_height}, {chart_width})'
+                                    },
                                 }
                             ]
                         }

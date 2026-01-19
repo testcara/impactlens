@@ -1,7 +1,7 @@
 name: Generate AI Impact Reports
 
 on:
-  # Trigger when config files or workflow itself are modified in PRs
+  # Trigger ONLY when user config files are modified in PRs (excludes test configs)
   # Using pull_request_target to allow fork PRs to access secrets
   # SECURITY: Workflow only reads config files and generates reports - no code execution from PR
   pull_request_target:
@@ -10,7 +10,8 @@ on:
       - "config/**/jira_report_config.yaml"
       - "config/**/pr_report_config.yaml"
       - "config/**/aggregation_config.yaml"
-      - ".github/workflows/generate-reports.yml"
+      # Exclude test configs - they are tested in ci.yml
+      - "!config/test-*/**"
 
   # Allow manual trigger with team selection
   workflow_dispatch:
@@ -55,7 +56,7 @@ jobs:
             echo "is_pr=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check if only test configs changed
+      - name: Check if only user configs changed (no code changes)
         if: steps.pr_context.outputs.is_pr == 'true'
         id: check_files
         run: |
@@ -66,21 +67,41 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
-          # Check if changes are only in config/test-* directories or only workflow files
-          # Exclude: config/test-*, .github/workflows/, .github/actions/
-          CONFIG_CHANGES=$(echo "$CHANGED_FILES" | grep -E '^config/' | grep -v -E '^config/test-' || true)
-          NON_CI_CHANGES=$(echo "$CHANGED_FILES" | grep -v -E '^\.github/' || true)
+          # Categorize changed files
+          # 1. User config files (non-test configs)
+          USER_CONFIG_CHANGES=$(echo "$CHANGED_FILES" | grep -E '^config/' | grep -v -E '^config/test-' | grep -E '\.(yaml|yml)$' || true)
 
-          if [ -n "$CONFIG_CHANGES" ] && echo "$CONFIG_CHANGES" | grep -E '\.(yaml|yml)$' > /dev/null; then
-            echo "skip=false" >> $GITHUB_OUTPUT
-            echo "✓ Non-test config files changed, will generate reports"
-            echo "Changed configs: $CONFIG_CHANGES"
-          elif [ -z "$NON_CI_CHANGES" ]; then
+          # 2. Code changes (Python files, non-config, non-docs)
+          CODE_CHANGES=$(echo "$CHANGED_FILES" | grep -vE '^(README\.md|docs/.*|config/.*|\.github/.*|LICENSE|\.gitignore)' || true)
+
+          # 3. CI/workflow changes
+          CI_CHANGES=$(echo "$CHANGED_FILES" | grep -E '^\.github/' || true)
+
+          echo ""
+          echo "Categorization:"
+          echo "  User configs: $(echo "$USER_CONFIG_CHANGES" | wc -l) files"
+          echo "  Code changes: $(echo "$CODE_CHANGES" | wc -l) files"
+          echo "  CI changes: $(echo "$CI_CHANGES" | wc -l) files"
+
+          # Decision logic:
+          # - Skip if ANY code changes detected (even if config also changed)
+          # - Skip if only CI/test configs changed
+          # - Run ONLY if user configs changed AND no code changes
+          if [ -n "$CODE_CHANGES" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "✗ Only CI/workflow files changed, skipping report generation"
+            echo ""
+            echo "✗ Code changes detected - skipping report generation"
+            echo "  (Mixed config + code PRs should use CI workflow)"
+          elif [ -n "$USER_CONFIG_CHANGES" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo ""
+            echo "✓ User config-only PR - will generate reports"
+            echo "Changed configs:"
+            echo "$USER_CONFIG_CHANGES"
           else
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "✗ Only test configs or non-config files changed, skipping report generation"
+            echo ""
+            echo "✗ No user config changes - skipping report generation"
           fi
 
       # Note: Config validation already ran in config-validation.yml
@@ -207,6 +228,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           AGGREGATION_CONFIG="${{ steps.config.outputs.config_dir }}/aggregation_config.yaml"
 
@@ -344,6 +366,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           SMTP_USER: ${{ secrets.MAIL_APP_USER }}
           SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
           GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
@@ -389,42 +412,7 @@ jobs:
           fi
 
           echo ""
-          echo "✓ Single team report generation completed"
-
-      - name: Generate Analysis Prompts
-        if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
-        run: |
-          echo "Generating AI analysis prompts for combined reports..."
-
-          # Enable recursive globbing
-          shopt -s globstar nullglob
-
-          # Generate prompts for both Jira and PR combined reports
-          PROMPT_GENERATED=0
-          for pattern in "combined_jira_report" "combined_pr_report"; do
-            for report in reports/**/${pattern}_*.tsv; do
-              if [ -f "$report" ]; then
-                echo "Generating prompt for: $report"
-
-                # Extract directory and determine output: reports/*/jira -> reports/*/prompts
-                output_dir="$(dirname "$report" | sed 's|/[^/]*$|/prompts|')"
-
-                echo "  Output directory: $output_dir"
-                python -m impactlens.scripts.analyze_with_claude_code \
-                  --reports-dir "$report" \
-                  --prompt-only \
-                  --output-dir "$output_dir" || echo "Warning: Failed to generate prompt for $report"
-
-                PROMPT_GENERATED=1
-              fi
-            done
-          done
-
-          if [ $PROMPT_GENERATED -eq 1 ]; then
-            echo "✓ Analysis prompts generated"
-          else
-            echo "⚠️  No combined reports found, skipping prompt generation"
-          fi
+          echo "✓ Single team report generation completed (includes AI analysis)"
 
       - name: Send Email Notifications (Aggregation Mode Only)
         id: email_notifications

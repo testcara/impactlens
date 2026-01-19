@@ -328,7 +328,7 @@ def extract_team_name_from_sheet(sheet_name):
 def get_tab_color_for_team(team_name):
     """
     Generate a consistent color for a team based on team name.
-    Uses hash function and HSL color space to dynamically generate distinct colors.
+    Uses predefined color palette with 12 distinct colors to ensure visual distinction.
 
     Args:
         team_name: Team name/prefix
@@ -336,9 +336,8 @@ def get_tab_color_for_team(team_name):
     Returns:
         dict: RGB color object for Google Sheets API
 
-    Color generation:
-        - Uses HSL color space for better color distribution
-        - Hue: derived from team name hash (0-360 degrees)
+    Color palette:
+        12 visually distinct colors evenly distributed across the color wheel (30° intervals)
         - Saturation: 65% (vibrant but not oversaturated)
         - Lightness: 55% (medium darkness for good visibility)
     """
@@ -347,16 +346,37 @@ def get_tab_color_for_team(team_name):
 
     import hashlib
 
+    # Predefined color palette (12 base hues, 30° apart on color wheel)
+    # Hue values in degrees: 0°, 30°, 60°, 90°, 120°, 150°, 180°, 210°, 240°, 270°, 300°, 330°
+    color_palette_hues = [
+        0,  # Red
+        30,  # Orange
+        60,  # Yellow
+        90,  # Yellow-Green
+        120,  # Green
+        150,  # Cyan-Green
+        180,  # Cyan
+        210,  # Light Blue
+        240,  # Blue
+        270,  # Purple
+        300,  # Magenta
+        330,  # Pink-Red
+    ]
+
+    # Lightness variations (for 40+ teams support)
+    # Using 3 lightness levels creates 36 distinct colors (12 hues × 3 lightness)
+    lightness_variants = [0.50, 0.60, 0.70]  # Darker, Medium, Lighter
+
     # Generate hash from team name
     hash_value = int(hashlib.md5(team_name.encode()).hexdigest(), 16)
 
-    # Use hash to determine hue (0-360 degrees)
-    # This gives us unlimited distinct colors
-    hue = (hash_value % 360) / 360.0
+    # Select hue and lightness variant
+    hue_index = hash_value % len(color_palette_hues)
+    lightness_index = (hash_value // len(color_palette_hues)) % len(lightness_variants)
 
-    # Fixed saturation and lightness for consistent appearance
+    hue = color_palette_hues[hue_index] / 360.0
     saturation = 0.65  # 65% - vibrant colors
-    lightness = 0.55  # 55% - medium darkness (darker than pastel)
+    lightness = lightness_variants[lightness_index]
 
     # Convert HSL to RGB
     def hsl_to_rgb(hue_val, sat_val, light_val):
@@ -528,7 +548,7 @@ def upload_data_to_sheet(
     return final_sheet_name, sheet_id
 
 
-def format_sheet(service, spreadsheet_id, sheet_id=0):
+def format_sheet(service, spreadsheet_id, sheet_id=0, is_ai_analysis=False):
     """
     Apply formatting to the sheet (header bold, freeze first row, etc).
 
@@ -536,41 +556,91 @@ def format_sheet(service, spreadsheet_id, sheet_id=0):
         service: Google Sheets API service
         spreadsheet_id: ID of the spreadsheet
         sheet_id: ID of the sheet tab (default 0)
+        is_ai_analysis: If True, apply special formatting for AI analysis reports (wrap text)
     """
-    requests = [
-        # Freeze first row
-        {
-            "updateSheetProperties": {
-                "properties": {"sheetId": sheet_id, "gridProperties": {"frozenRowCount": 1}},
-                "fields": "gridProperties.frozenRowCount",
-            }
-        },
-        # Bold header row
-        {
-            "repeatCell": {
-                "range": {"sheetId": sheet_id, "startRowIndex": 0, "endRowIndex": 1},
-                "cell": {"userEnteredFormat": {"textFormat": {"bold": True}}},
-                "fields": "userEnteredFormat.textFormat.bold",
-            }
-        },
-        # Auto-resize columns
-        {
-            "autoResizeDimensions": {
-                "dimensions": {
-                    "sheetId": sheet_id,
-                    "dimension": "COLUMNS",
-                    "startIndex": 0,
-                    "endIndex": 10,
-                }
-            }
-        },
-    ]
+    requests = []
+
+    if is_ai_analysis:
+        # For AI Analysis reports: Enable text wrapping and set column width
+        requests.extend(
+            [
+                # Enable text wrapping for all cells
+                {
+                    "repeatCell": {
+                        "range": {"sheetId": sheet_id},
+                        "cell": {"userEnteredFormat": {"wrapStrategy": "WRAP"}},
+                        "fields": "userEnteredFormat.wrapStrategy",
+                    }
+                },
+                # Set column A width to 1000 pixels for readability
+                {
+                    "updateDimensionProperties": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "dimension": "COLUMNS",
+                            "startIndex": 0,
+                            "endIndex": 1,
+                        },
+                        "properties": {"pixelSize": 1000},
+                        "fields": "pixelSize",
+                    }
+                },
+                # Set monospace font for better readability
+                {
+                    "repeatCell": {
+                        "range": {"sheetId": sheet_id},
+                        "cell": {
+                            "userEnteredFormat": {"textFormat": {"fontFamily": "Courier New"}}
+                        },
+                        "fields": "userEnteredFormat.textFormat.fontFamily",
+                    }
+                },
+            ]
+        )
+    else:
+        # Standard report formatting
+        requests.extend(
+            [
+                # Freeze first row
+                {
+                    "updateSheetProperties": {
+                        "properties": {
+                            "sheetId": sheet_id,
+                            "gridProperties": {"frozenRowCount": 1},
+                        },
+                        "fields": "gridProperties.frozenRowCount",
+                    }
+                },
+                # Bold header row
+                {
+                    "repeatCell": {
+                        "range": {"sheetId": sheet_id, "startRowIndex": 0, "endRowIndex": 1},
+                        "cell": {"userEnteredFormat": {"textFormat": {"bold": True}}},
+                        "fields": "userEnteredFormat.textFormat.bold",
+                    }
+                },
+                # Auto-resize columns
+                {
+                    "autoResizeDimensions": {
+                        "dimensions": {
+                            "sheetId": sheet_id,
+                            "dimension": "COLUMNS",
+                            "startIndex": 0,
+                            "endIndex": 10,
+                        }
+                    }
+                },
+            ]
+        )
 
     service.spreadsheets().batchUpdate(
         spreadsheetId=spreadsheet_id, body={"requests": requests}
     ).execute()
 
-    print("✓ Applied formatting (frozen header, bold text, auto-resize)")
+    if is_ai_analysis:
+        print("✓ Applied formatting (text wrapping, column width, monospace font)")
+    else:
+        print("✓ Applied formatting (frozen header, bold text, auto-resize)")
 
 
 def get_service_account_email(credentials_file=None):

@@ -386,30 +386,59 @@ def convert_markdown_to_plain_text(text):
 
 def read_ai_analysis_report(filepath):
     """
-    Read AI analysis report (plain text with Markdown) for Google Sheets upload.
+    Read AI analysis report and convert to plain text for Google Sheets.
 
-    Converts to single-column format with Markdown formatting removed.
+    Removes Markdown formatting and ensures content is readable in a single cell.
 
     Args:
         filepath: Path to AI analysis report file
 
     Returns:
-        List of rows, each row is a list with single cell containing the line text
+        Single row with complete report text in one cell [[full_text]]
     """
-    rows = []
-
     with open(filepath, "r", encoding="utf-8") as f:
-        for line in f:
-            # Remove trailing newline
-            line = line.rstrip("\n\r")
+        content = f.read()
 
-            # Convert Markdown to plain text
-            plain_line = convert_markdown_to_plain_text(line)
+    # Clean up content for Google Sheets readability
+    lines = content.split("\n")
+    cleaned_lines = []
 
-            # Each line becomes a single-cell row
-            rows.append([plain_line])
+    for line in lines:
+        # Replace tabs with spaces to prevent cell splitting
+        line = line.replace("\t", "    ")
 
-    return rows
+        stripped = line.strip()
+
+        # Skip separator lines (====== or ------)
+        # Check if line is only made of = or - characters (any length >= 3)
+        if (
+            stripped
+            and len(stripped) >= 3
+            and (all(c == "=" for c in stripped) or all(c == "-" for c in stripped))
+        ):
+            cleaned_lines.append("")  # Replace with blank line
+            continue
+
+        # Remove Markdown formatting for cleaner display
+        # Convert "## Title" to "Title" (remove heading markers)
+        if stripped.startswith("## "):
+            line = line.replace("## ", "", 1)
+        elif stripped.startswith("# "):
+            line = line.replace("# ", "", 1)
+
+        # Convert "- Item" to "• Item" (bullet points)
+        if stripped.startswith("- "):
+            line = line.replace("- ", "• ", 1)
+
+        # Keep numbered lists as-is (they're already plain text friendly)
+
+        cleaned_lines.append(line)
+
+    # Join everything into one cell - Google Sheets will handle wrapping
+    full_text = "\n".join(cleaned_lines)
+
+    # Return as single cell for maximum readability
+    return [[full_text]]
 
 
 def generate_sheet_name_from_report(report_path: str, config_path: str = None) -> str:
@@ -444,10 +473,14 @@ def generate_sheet_name_from_report(report_path: str, config_path: str = None) -
         sheet_name = "Jira Report - Aggregated"
     elif filename.startswith("aggregated_pr_report"):
         sheet_name = "PR Report - Aggregated"
-    # Check if it's an AI analysis report
-    elif filename.startswith("ai_analysis_pr"):
+    # Check if it's an AI analysis report (gemini_analysis_* or ai_analysis_*)
+    elif filename.startswith("gemini_analysis_combined") or filename.startswith(
+        "ai_analysis_combined"
+    ):
+        sheet_name = "AI Analysis - Combined"
+    elif filename.startswith("gemini_analysis_pr") or filename.startswith("ai_analysis_pr"):
         sheet_name = "AI Analysis - PR"
-    elif filename.startswith("ai_analysis_jira"):
+    elif filename.startswith("gemini_analysis_jira") or filename.startswith("ai_analysis_jira"):
         sheet_name = "AI Analysis - Jira"
     # Check if it's a combined PR report (may have project prefix)
     elif "combined_pr_report" in filename:
@@ -485,11 +518,13 @@ def generate_sheet_name_from_report(report_path: str, config_path: str = None) -
     is_aggregated = "aggregated" in sheet_name.lower()
 
     if not is_aggregated:
+        # Priority: Check Jira first (covers both "Jira Report" and "AI Analysis - Jira")
         if "jira" in sheet_name.lower():
             project_key = os.getenv("JIRA_PROJECT_KEY", "")
             if project_key:
                 sheet_name = f"{project_key} {sheet_name}"
-        elif "pr" in sheet_name.lower() or "ai analysis" in sheet_name.lower():
+        # Then check PR and AI Analysis - PR
+        elif "pr" in sheet_name.lower():
             repo_name = os.getenv("GITHUB_REPO_NAME", "")
             if repo_name:
                 sheet_name = f"{repo_name} {sheet_name}"

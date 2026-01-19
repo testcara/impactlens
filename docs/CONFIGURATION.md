@@ -313,6 +313,36 @@ output_dir: "reports/backend/jira"
 output_dir: "reports/platform-team-aggregated"
 ```
 
+### AI Analysis (Optional)
+
+Control whether AI-powered analysis is generated for your reports:
+
+```yaml
+# Disable AI analysis (enabled by default)
+no_ai_analysis: true
+```
+
+**Default behavior:** AI analysis is **enabled** and runs automatically when you generate reports.
+
+**When to disable:**
+- You don't have a Gemini API key
+- You prefer to use generated prompts manually with different AI platforms
+- You want to reduce API costs or processing time
+
+**What gets generated:**
+
+With AI analysis **enabled** (default):
+- Prompt files: `analysis_prompt_*.txt`, `combined_analysis_prompt_*.txt`
+- Analysis files: `gemini_analysis_*.txt` (if `GOOGLE_API_KEY` is configured)
+- Auto-upload to Google Sheets
+
+With AI analysis **disabled** (`no_ai_analysis: true`):
+- No prompts generated
+- No analysis files generated
+- Faster report generation
+
+**See also:** [AI-Powered Analysis](LOCAL_DEVELOPMENT.md#ai-powered-analysis) for detailed setup and usage.
+
 ---
 
 ## Understanding Report Types

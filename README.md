@@ -21,15 +21,14 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
 
 **Business Value:**
 
-- **Track AI Productivity Impact**: Compare development efficiency before and after AI tool adoption
-- **Performance Reviews**: Objective metrics for evaluating team and individual performance
-- **Data-Driven Insights**: Track closure time, merge time, throughput, and more to help making informed decisions
-- **Visual Distribution Analysis**: Auto-generated box plot charts showing team performance distribution for key metrics, stored in GitHub repository and embedded in Google Sheets for easy stakeholder review
-- **Privacy Protection**: Automatic anonymization in CI for sharing reports while protecting individual privacy. Optional email notifications send members their anonymous ID to find personal metrics
-- **CI-Driven Automation**: Submit config via PR → Reports auto-generated and posted as PR comments
-- **Multi-Repo Aggregation**: Combine reports from multiple repositories/projects into unified team-wide views
-- **Easy Sharing**: Auto-upload to Google Sheets with embedded chart visualizations for stakeholder visibility
-- **Flexible Deployment**: GitHub Actions CI (zero config) or local CLI for full data access
+- **Measure AI Productivity Impact**: Compare development efficiency before and after AI tool adoption with objective metrics
+- **Enable Objective Performance Reviews**: Data-driven evaluation for teams and individuals based on metrics, not opinions
+- **Make Informed Decisions**: Track closure time, merge time, throughput, and trends to identify bottlenecks and opportunities
+- **Visualize Team Performance**: Auto-generated box plot charts show distribution and outliers, embedded in Google Sheets for stakeholder review
+- **Support Multi-Team Analysis**: Aggregate reports across multiple repositories/projects for organization-wide insights
+- **Protect Privacy**: Automatic anonymization in CI environments with optional email notifications for members to find their metrics
+- **Enable Easy Sharing**: Auto-upload to Google Sheets with embedded visualizations for team and stakeholder visibility
+- **Deploy Flexibly**: GitHub Actions CI (zero setup) or local CLI for full control and data access
 
 **Use Cases:**
 
@@ -78,14 +77,14 @@ ImpactLens helps engineering leaders and teams measure the real-world impact of 
            ┌───────────────────┼─────────────────────────┐
            │                   │                         │
      ┌─────▼─────┐ ┌───────────▼──────────┐ ┌────────────▼──────────────┐
-     │ TSV Files │ │ PNG Charts(Optional) │ │ Claude Analysis(Optional) │
+     │ TSV Files │ │ PNG Charts(Optional) │ │ Gemini Analysis(Optional) │
      └─────┬─────┘ └───────────┬──────────┘ └────────────┬──────────────┘
            │                   │                         │
            └───────────────────┼─────────────────────────┘
                                │
-         ┌─────────────────────▼─────────────────────┐
-         │ Google Sheets Reports with embeded Charts │
-         └───────────────────────────────────────────┘
+┌──────────────────────────────▼─────────────────────────────────────┐
+│ Google Sheets Reports with optional embeded Charts and AI insights │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 **Key Components:**
@@ -115,7 +114,8 @@ impactlens/
 │   │   └── report_orchestrator.py
 │   ├── models/                   # Data models & config
 │   ├── scripts/                  # Script modules
-│   │   ├── analyze_with_claude_code.py
+│   │   ├── generate_analysis_prompt.py # Generate AI analysis prompts
+│   │   ├── analyze_with_gemini.py      # Gemini API analysis
 │   │   ├── get_jira_metrics.py
 │   │   ├── get_pr_metrics.py
 │   │   ├── generate_*_report.py
@@ -171,13 +171,11 @@ impactlens/
 
 **Perfect for:** Teams wanting automated reports with zero local setup and privacy protection.
 
-**How it works:** Create team config → Submit via PR → CI auto-generates reports → View in PR comments or Google Sheets
-
 > 🔒 **Privacy Protection**: CI automatically anonymizes individual data (names → Developer-A3F2, hides emails/leave_days/capacity).
 >
 > 📧 **Find Your Metrics**: Enable `email_anonymous_id: true` in config to receive your hash ID via email and locate your data in anonymized reports.
 
-➡️ **See [Configuration Guide](docs/CONFIGURATION.md)** for detailed setup instructions
+➡️ **See [Configuration Guide](docs/CONFIGURATION.md)** for complete setup instructions
 
 ---
 
@@ -185,9 +183,7 @@ impactlens/
 
 **Perfect for:** Developers who prefer local execution, need offline access, or want to customize workflows.
 
-**Quick setup:** Clone repo → Configure `.env` → Run via Docker or CLI
-
-➡️ **See [Local Development Guide](docs/LOCAL_DEVELOPMENT.md)** for detailed setup and usage
+➡️ **See [Local Development Guide](docs/LOCAL_DEVELOPMENT.md)** for setup and usage
 
 ## Configuration
 
@@ -198,80 +194,29 @@ ImpactLens supports two configuration scenarios:
 | **Simple**  | Single project/repo     | TEAM + COMBINED              |
 | **Complex** | Multiple projects/repos | TEAM + COMBINED + AGGREGATED |
 
-**Quick Setup (Simple Scenario):**
+**Configuration includes:**
 
-1. Create config directory: `mkdir -p config/my-team`
-2. Copy templates and edit with your team settings:
-   - `project`: Jira project key or GitHub/GitLab repo (owner/name format)
-   - `phases`: Analysis periods (e.g., before/after AI adoption)
-   - `team_members`: Team scope with optional leave_days and capacity
-3. Submit via PR → CI auto-generates reports
-
-**For complete configuration guide including:**
-
-- Detailed configuration examples for both scenarios
+- Jira/GitHub/GitLab project settings
+- Analysis periods (phases)
+- Team member definitions
+- Privacy & anonymization options
 - Multi-repo aggregation setup
-- Privacy & anonymization
-- Environment variables
-- Best practices & troubleshooting
+- Google Sheets integration
+- Email notification settings
 
-**➡️ See [Configuration Guide](docs/CONFIGURATION.md)**
+**➡️ See [Configuration Guide](docs/CONFIGURATION.md)** for complete setup instructions and examples
 
 ## AI-Powered Analysis (Optional)
 
-> **💡 OPTIONAL** - Get actionable insights from your metrics reports using AI
->
-> **⚠️ CURRENT LIMITATION**: AI analysis prompts currently support **simple scenarios only** (single project/repo). Aggregated reports from complex scenarios (multi-project/repos) are not yet supported.
+> **💡 OPTIONAL** - Get AI-powered insights from your metrics reports
 
-Use AI to analyze your generated reports and extract insights on trends, bottlenecks, and actionable recommendations.
+ImpactLens can automatically analyze your reports to extract insights on trends, bottlenecks, and actionable recommendations. AI analysis is **enabled by default** in CI workflows and can be disabled via `no_ai_analysis` config option.
 
-### What You Get
+**What you get:** Executive summary, key trends, bottlenecks & risks, actionable recommendations, and AI tool impact assessment.
 
-- **Executive Summary** - Overall AI impact assessment
-- **Key Trends** - 3-5 critical insights on metric changes
-- **Bottlenecks & Risks** - Issues and patterns requiring attention
-- **Actionable Recommendations** - Concrete steps with measurable goals
-- **AI Tool Impact** - Productivity assessment and effectiveness analysis
+**Usage:** Automatic with Gemini API key, or use generated prompts with ChatGPT/Claude/Gemini manually.
 
-### Usage Options (Pick One)
-
-**Option 1: Use Generated Prompts (Easiest - No Setup)**
-
-Reports are generated with ready-to-use AI analysis prompts:
-
-1. Download prompt files from PR artifacts or `reports/` folder:
-   - `ai_analysis_jira_prompt_*.txt` - Jira analysis prompt
-   - `ai_analysis_pr_prompt_*.txt` - PR analysis prompt
-2. Copy prompt content and paste into any AI:
-   - Claude (https://claude.ai)
-   - ChatGPT (https://chat.openai.com)
-   - Gemini (https://gemini.google.com)
-3. Get instant insights - no need to write your own prompts!
-
-**Option 2: Claude Code CLI (Interactive - Recommended for Deep Analysis)**
-
-```bash
-# Install Claude Code CLI (one-time)
-curl -fsSL https://claude.ai/install.sh | bash
-claude login
-
-# Generate reports with interactive AI analysis
-impactlens full --with-claude-insights
-```
-
-Benefits: Interactive discussion, iterative refinement, project-specific customization
-
-**Option 3: Anthropic API (Automated)**
-
-```bash
-# Configure API key in .env
-echo "ANTHROPIC_API_KEY=sk-ant-..." >> .env
-
-# Generate reports with automated AI analysis
-impactlens full --with-claude-insights --claude-api-mode
-```
-
-**➡️ For detailed setup and advanced options, see [Local Development Guide - AI Analysis](docs/LOCAL_DEVELOPMENT.md#ai-powered-analysis)**
+**➡️ For setup instructions and advanced options, see [Local Development Guide - AI Analysis](docs/LOCAL_DEVELOPMENT.md#ai-powered-analysis)**
 
 ## Understanding Metrics
 
@@ -281,7 +226,7 @@ impactlens full --with-claude-insights --claude-api-mode
 
 - **Total PRs** - Number of pull requests
 - **AI Adoption Rate** - Percentage of PRs with AI assistance (detected via commit messages)
-- **Claude PRs / Cursor PRs** - Count of PRs using each AI tool
+- **AI Tool Usage** - Count of PRs using different AI tools (Claude, Cursor, Copilot, etc.)
 - **Time to Merge** - Average time from PR creation to merge
 - **Time to First Review** - Average time until first review
 - **Changes Requested** - Average number of change requests per PR
@@ -323,8 +268,6 @@ impactlens full --with-claude-insights --claude-api-mode
 - **Validation & Testing**: Expand usage with diverse teams/organizations to validate product value
 - **Unified Data Platform**: Migrate to centralized data warehouse (e.g., Snowflake) to consolidate metrics from multiple sources (Jira, GitHub, GitLab, Slacks, etc.)
 - **Enhanced Metrics**: Add more metrics and industry benchmarks and percentile rankings for peer comparison
-- **AI-Powered Insights**: Expand beyond Claude to support multiple AI providers (OpenAI, Gemini, etc.), customizable analysis templates, and interactive analysis interface
-- **Visualization**: Build interactive dashboard for better insights and executive reporting
 
 ## Support
 

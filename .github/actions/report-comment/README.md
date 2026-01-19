@@ -57,7 +57,7 @@ A reusable composite action that collects report statistics and posts a detailed
 
 📥 **Access Reports**: [View in Google Sheets] | [Download All Files]
 
-> 💡 **Quick Tip**: Download prompt files from artifacts and paste into Claude/ChatGPT/Gemini for automated analysis!
+> 💡 **Quick Tip**: Download prompt files from artifacts and paste into ChatGPT/Gemini for automated analysis!
 
 ---
 

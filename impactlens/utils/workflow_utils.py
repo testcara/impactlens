@@ -535,25 +535,20 @@ def cleanup_old_reports(reports_dir: Path, identifier: str, report_type: str) ->
 
 def extract_sheet_prefix(config_path: Optional[Path]) -> str:
     """
-    Extract Google Sheets prefix from config path for complex scenarios.
+    Extract Google Sheets prefix from config path.
 
-    Returns the top-level directory name under config/ if it's a complex scenario
-    (has subdirectories). For simple scenarios, returns empty string.
+    Returns the first-level directory name under config/ for all scenarios.
 
     Examples:
-        Simple scenarios (return ""):
-            config/konfluxui/jira_report_config.yaml → ""
-
-        Complex scenarios (return top-level dir):
-            config/cue/cue-konfluxui/jira_report_config.yaml → "cue"
-            config/cue/cue-rhtapui/jira_report_config.yaml → "cue"
-            config/cue/aggregation_config.yaml → "cue"
+        config/simple-team/jira_report_config.yaml → "simple-team"
+        config/test-integration-ci/test-ci-team/jira_report_config.yaml → "test-integration-ci"
+        config/test-aggregation-ci/aggregation_config.yaml → "test-aggregation-ci"
 
     Args:
         config_path: Path to config file or directory
 
     Returns:
-        Sheet prefix string for complex scenarios, or empty string for simple scenarios
+        First-level directory name after config/, or empty string if not found
     """
     if not config_path:
         return ""
@@ -570,20 +565,12 @@ def extract_sheet_prefix(config_path: Optional[Path]) -> str:
     try:
         config_index = parts.index("config")
 
-        # Check if this is a complex scenario (has subdirectories or aggregation)
-        # Simple: config/{team}/file.yaml (config + 2 elements)
-        # Complex: config/{top-level}/{sub-project}/file.yaml (config + 3+ elements)
-        # Aggregation: config/{top-level}/aggregation_config.yaml (config + 2 elements, but has aggregation_config.yaml)
-
-        # Count elements after 'config'
-        elements_after_config = len(parts) - config_index - 1
-
-        # Check if it's an aggregation config
-        is_aggregation = parts[-1] == "aggregation_config.yaml"
-
-        # If there are 3+ elements after 'config', OR it's an aggregation config, it's complex
-        if elements_after_config >= 3 or (elements_after_config == 2 and is_aggregation):
-            # Return the top-level directory (first dir after config/)
+        # Always return the first directory after 'config/'
+        # Examples:
+        #   - config/simple-team/jira_report_config.yaml → return "simple-team"
+        #   - config/test-integration-ci/test-ci-team/ → return "test-integration-ci"
+        #   - config/test-aggregation-ci/aggregation_config.yaml → return "test-aggregation-ci"
+        if config_index + 1 < len(parts):
             return parts[config_index + 1]
 
     except (ValueError, IndexError):
@@ -654,7 +641,23 @@ def upload_to_google_sheets(
 
             # Check if replace_existing_reports is enabled in config
             try:
-                with open(config_path, "r") as f:
+                # Handle both file and directory config paths
+                config_file_to_read = config_path
+                if config_path.is_dir():
+                    # If it's a directory, try to find a config file
+                    # Try jira_report_config.yaml first, then pr_report_config.yaml
+                    for candidate in [
+                        "jira_report_config.yaml",
+                        "pr_report_config.yaml",
+                        "aggregation_config.yaml",
+                    ]:
+                        candidate_path = config_path / candidate
+                        if candidate_path.exists():
+                            config_file_to_read = candidate_path
+                            break
+
+                # Read config file
+                with open(config_file_to_read, "r") as f:
                     config = yaml.safe_load(f)
 
                 # Read replace_existing_reports from root level (consistent across all config types)

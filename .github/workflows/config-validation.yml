@@ -33,7 +33,9 @@ jobs:
           echo ""
 
           # Categorize changed files
-          CONFIG_FILES=$(echo "$CHANGED_FILES" | grep -E '^config/.*\.(yaml|yml)$' | grep -v -E '^config/test-' || true)
+          # Exclude: test configs, example files, and prompt template files
+          CONFIG_FILES=$(echo "$CHANGED_FILES" | grep -E '^config/.*\.(yaml|yml)$' | grep -v -E '^config/test-' | grep -v -E '_prompt_template\.ya?ml$' | grep -v -E '\.example$' || true)
+
           NON_CONFIG_FILES=$(echo "$CHANGED_FILES" | grep -v -E '^config/.*\.(yaml|yml)$' || true)
 
           echo "Config files changed:"
@@ -199,4 +201,3 @@ jobs:
           echo "This check intentionally fails to prevent accidental merging."
           echo "=========================================="
           exit 1
-
