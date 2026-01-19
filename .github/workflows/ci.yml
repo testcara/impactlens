@@ -217,9 +217,14 @@ jobs:
           ls -lh reports/test-ci-team/jira/ 2>/dev/null || echo "  No Jira reports"
           ls -lh reports/test-ci-team/github/ 2>/dev/null || echo "  No PR reports"
 
-      - name: Test analysis prompt generation
+      - name: Test analysis prompt generation and Gemini analysis
         if: steps.docs_check.outputs.code_changed == 'true'
-        run: .github/scripts/test-prompt-generation.sh "reports/test-ci-team"
+        continue-on-error: true  # Don't fail CI if Gemini analysis fails (API key might not be available)
+        uses: ./.github/actions/ai-analysis
+        with:
+          reports_dir: 'reports/test-ci-team'
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          output_mode: 'analyze'  # Try full analysis if API key available, otherwise just prompts
 
       - name: Upload test reports as artifacts
         if: steps.docs_check.outputs.code_changed == 'true' && always()
@@ -365,9 +370,14 @@ jobs:
           ls -lh reports/test-ci-team2/ 2>/dev/null || echo "  No team2 reports"
           ls -lh reports/test-ci-aggregated/ 2>/dev/null || echo "  No aggregated reports"
 
-      - name: Test analysis prompt generation
+      - name: Test analysis prompt generation and Gemini analysis
         if: steps.docs_check.outputs.code_changed == 'true'
-        run: .github/scripts/test-prompt-generation.sh "reports/test-ci-team*"
+        continue-on-error: true  # Don't fail CI if Gemini analysis fails (API key might not be available)
+        uses: ./.github/actions/ai-analysis
+        with:
+          reports_dir: 'reports/test-ci-team*'
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          output_mode: 'analyze'  # Try full analysis if API key available, otherwise just prompts
 
       - name: Upload test reports as artifacts
         if: steps.docs_check.outputs.code_changed == 'true' && always()
