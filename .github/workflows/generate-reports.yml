@@ -218,9 +218,9 @@ jobs:
           echo "Google Sheets ID: $([ -n "$GOOGLE_SPREADSHEET_ID" ] && echo '✓ Set' || echo '✗ Not set')"
           echo "=========================================="
 
-      - name: Generate Individual Team Reports (for Aggregation)
-        # NOTE: For aggregation mode, we do NOT send emails here to avoid duplicates
-        # Emails will be sent once after aggregation using send_email_notifications.py
+      - name: Generate Multi-Team Reports (Aggregation Mode)
+        # NOTE: Uses unified 'impactlens full' command that auto-detects aggregation mode
+        # Handles: Individual reports → Aggregation → AI Analysis → Email (deduplicated)
         if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation == 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
@@ -229,136 +229,62 @@ jobs:
           CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          SMTP_USER: ${{ secrets.MAIL_APP_USER }}
+          SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
+          GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          AGGREGATION_CONFIG="${{ steps.config.outputs.config_dir }}/aggregation_config.yaml"
+          CONFIG_DIR="${{ steps.config.outputs.config_dir }}"
+          REPORT_TYPE="${{ github.event.inputs.report_type }}"
 
-          if [ ! -f "$AGGREGATION_CONFIG" ]; then
-            echo "⚠️  Aggregation config not found at $AGGREGATION_CONFIG"
-            exit 1
+          echo "=========================================="
+          echo "Multi-Team Aggregation Mode"
+          echo "=========================================="
+          echo "Config directory: $CONFIG_DIR"
+          echo "Using impactlens full command with auto-detection"
+          echo ""
+
+          # Get upload args using shared script
+          UPLOAD_ARGS=$(.github/scripts/get-upload-args.sh)
+
+          if [ -n "$UPLOAD_ARGS" ]; then
+            echo "⚠️  Google Sheets not configured, skipping upload"
+          else
+            echo "✓ Google Sheets configured, will upload reports"
           fi
 
-          echo "=========================================="
-          echo "Step 1: Generate Individual Team Reports"
-          echo "=========================================="
-          echo "Aggregation config: $AGGREGATION_CONFIG"
-          echo ""
-
-          # Parse YAML to get subdirectories from projects list
-          # The aggregation config uses 'projects' which are subdirectory names
-          # We need to find the config files in those subdirectories
-          PROJECTS=$(python3 << 'PYTHON_SCRIPT'
-          import yaml
-          import sys
-          try:
-              with open('${{ steps.config.outputs.config_dir }}/aggregation_config.yaml', 'r') as f:
-                  config = yaml.safe_load(f)
-                  projects = config.get('aggregation', {}).get('projects', [])
-                  for proj in projects:
-                      print(proj)
-          except Exception as e:
-              sys.stderr.write(f"Error: {e}\n")
-          PYTHON_SCRIPT
-          )
-
-          if [ -z "$PROJECTS" ]; then
-            echo "⚠️  No projects found in aggregation config"
-            exit 1
-          fi
-
-          echo "Found projects:"
-          echo "$PROJECTS"
-          echo ""
-
-          REPORT_TYPE="${{ github.event.inputs.report_type }}"
-          CONFIG_BASE_DIR="${{ steps.config.outputs.config_dir }}"
-
-          # Generate reports for each project
-          while IFS= read -r project; do
-            if [ -z "$project" ]; then
-              continue
-            fi
-
-            echo "=========================================="
-            echo "Processing project: $project"
-            echo "=========================================="
-
-            # Generate Jira reports
-            if [ "$REPORT_TYPE" = "jira" ] || [ "$REPORT_TYPE" = "both" ] || [ -z "$REPORT_TYPE" ]; then
-              JIRA_CONFIG="$CONFIG_BASE_DIR/$project/jira_report_config.yaml"
-              if [ -f "$JIRA_CONFIG" ]; then
-                echo "Generating Jira report: $JIRA_CONFIG"
-                python -m impactlens.cli jira full \
-                  --config "$JIRA_CONFIG" \
-                  --hide-individual-names || echo "⚠️  Failed to generate Jira report (continuing)"
-              else
-                echo "⚠️  Jira config not found: $JIRA_CONFIG"
-              fi
-            fi
-
-            # Generate PR reports
-            if [ "$REPORT_TYPE" = "pr" ] || [ "$REPORT_TYPE" = "both" ] || [ -z "$REPORT_TYPE" ]; then
-              PR_CONFIG="$CONFIG_BASE_DIR/$project/pr_report_config.yaml"
-              if [ -f "$PR_CONFIG" ]; then
-                echo "Generating PR report: $PR_CONFIG"
-                python -m impactlens.cli pr full \
-                  --config "$PR_CONFIG" \
-                  --incremental \
-                  --hide-individual-names || echo "⚠️  Failed to generate PR report (continuing)"
-              else
-                echo "⚠️  PR config not found: $PR_CONFIG"
-              fi
-            fi
-
-            echo ""
-          done <<< "$PROJECTS"
-
-          echo "✓ Individual team reports generation completed"
-
-      - name: Generate Aggregated Reports
-        if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation == 'true'
-        env:
-          CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
-          GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
-        run: |
-          AGGREGATION_CONFIG="${{ steps.config.outputs.config_dir }}/aggregation_config.yaml"
-
-          echo "=========================================="
-          echo "Step 2: Aggregate Team Reports"
-          echo "=========================================="
-          echo "Config: $AGGREGATION_CONFIG"
-          echo ""
-
-          # Check if at least one combined report exists
-          echo "Available combined reports:"
-          ls -R reports/**/combined_*.tsv 2>/dev/null || echo "⚠️  No combined reports found yet"
-          echo ""
-
-          # Determine report type based on input or default to both
-          REPORT_TYPE="${{ github.event.inputs.report_type }}"
+          # The 'full' command will auto-detect aggregation_config.yaml and:
+          # 1. Process all sub-projects (Jira + PR reports)
+          # 2. Aggregate reports across projects
+          # 3. Generate AI analysis for aggregated reports
+          # 4. Send deduplicated email notifications once at the end
           if [ -z "$REPORT_TYPE" ] || [ "$REPORT_TYPE" = "both" ]; then
-            echo "Running: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\""
-            python -m impactlens.cli aggregate \
-              --config "$AGGREGATION_CONFIG"
+            echo "Running: impactlens full --config \"$CONFIG_DIR\" $UPLOAD_ARGS --hide-individual-names --incremental"
+            python -m impactlens.cli full \
+              --config "$CONFIG_DIR" \
+              $UPLOAD_ARGS \
+              --hide-individual-names \
+              --incremental
           elif [ "$REPORT_TYPE" = "jira" ]; then
-            echo "Running: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\" --jira-only"
-            python -m impactlens.cli aggregate \
-              --config "$AGGREGATION_CONFIG" \
-              --jira-only
+            echo "Running: impactlens jira full --config \"$CONFIG_DIR\" $UPLOAD_ARGS --hide-individual-names"
+            python -m impactlens.cli jira full \
+              --config "$CONFIG_DIR" \
+              $UPLOAD_ARGS \
+              --hide-individual-names
           elif [ "$REPORT_TYPE" = "pr" ]; then
-            echo "Running: python -m impactlens.cli aggregate --config \"$AGGREGATION_CONFIG\" --pr-only"
-            python -m impactlens.cli aggregate \
-              --config "$AGGREGATION_CONFIG" \
-              --pr-only
+            echo "Running: impactlens pr full --config \"$CONFIG_DIR\" $UPLOAD_ARGS --incremental --hide-individual-names"
+            python -m impactlens.cli pr full \
+              --config "$CONFIG_DIR" \
+              $UPLOAD_ARGS \
+              --incremental \
+              --hide-individual-names
           fi
 
           echo ""
-          echo "✓ Aggregation completed"
-          echo "Generated aggregated reports:"
-          ls -lh reports/**/aggregated_*.tsv 2>/dev/null || echo "No aggregated reports found"
+          echo "✓ Multi-team aggregation completed (includes AI analysis + emails)"
 
       - name: Generate Single Team Reports
-        # NOTE: For single team mode, we use --email-anonymous-id flag
-        # This sends emails immediately after report generation (only once)
+        # NOTE: Uses unified 'impactlens full' command for single team
+        # Handles: Jira + PR reports → AI Analysis → Email (if enabled in config)
         if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation != 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
@@ -414,38 +340,6 @@ jobs:
           echo ""
           echo "✓ Single team report generation completed (includes AI analysis)"
 
-      - name: Send Email Notifications (Aggregation Mode Only)
-        id: email_notifications
-        if: (steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false') && steps.config.outputs.is_aggregation == 'true'
-        continue-on-error: true # Don't fail the workflow if email sending fails
-        env:
-          SMTP_USER: ${{ secrets.MAIL_APP_USER }}
-          SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
-          GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
-        run: |
-          CONFIG_DIR="${{ steps.config.outputs.config_dir }}"
-
-          echo "=========================================="
-          echo "Sending Email Notifications (Aggregation Mode)"
-          echo "=========================================="
-          echo "Config directory: $CONFIG_DIR"
-          echo "Using send_email_notifications.py for multi-team deduplication"
-          echo ""
-
-          # For aggregation mode, use standalone script to send emails
-          # This handles deduplication across multiple teams automatically
-          # SMTP settings (host, port, from_email) are in config YAML files
-          # SMTP credentials (user, password) are from GitHub secrets
-          python -m impactlens.scripts.send_email_notifications \
-            --config-dir "$CONFIG_DIR" || {
-            echo "email_failed=true" >> $GITHUB_OUTPUT
-            exit 1
-          }
-
-          echo "email_failed=false" >> $GITHUB_OUTPUT
-          echo ""
-          echo "✓ Email notifications sent (deduplicated across all teams)"
-
       - name: Upload Reports as Artifacts
         if: steps.check_files.outputs.skip != 'true' || steps.pr_context.outputs.is_pr == 'false'
         uses: actions/upload-artifact@v4
@@ -465,7 +359,6 @@ jobs:
           reports_dir: "reports"
           google_spreadsheet_id: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          email_failed: ${{ steps.email_notifications.outputs.email_failed || 'false' }}
 
       - name: Comment on PR - Failure
         if: steps.pr_context.outputs.is_pr == 'true' && failure() && steps.check_files.outputs.skip != 'true'
