@@ -1,0 +1,59 @@
+# Project configuration (non-sensitive settings)
+# These settings can be safely version-controlled
+project:
+  # Jira project settings
+  jira_url: "https://issues.redhat.com" # Jira instance URL
+  jira_project_key: "Konflux Release" # Jira project name, Jira key reports 400 error
+
+  # Google Sheets settings (optional)
+  # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
+  # If you do not set, would upload to the default google-sheet.
+  # IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com
+
+# Output directory for reports (optional, for multi-team isolation)
+# If not specified, defaults to "reports/jira"
+# Example for team-specific isolation: "reports/team-a/jira"
+# output_dir: "reports/team-a/jira"
+
+phases:
+  - name: "No AI Period"
+    start: "2024-12-16"
+    end: "2025-06-20"
+  - name: "AI Period"
+    start: "2025-06-20" # This is the first time Cursor was mentioned in a commit in RSC (by shebert)
+    end: "2025-12-16"
+
+default_assignee: "" # "" represent team
+
+members:
+  - email: damoreno@redhat.com
+  - email: elgerman@redhat.com
+    capacity:
+      - 0
+      - 0.58
+  - email: fnikolov@redhat.com
+  - email: hbhati@redhat.com
+  - email: jluza@redhat.com
+    capacity:
+      - 0
+      - 0.33
+  - email: jinqi@redhat.com
+  - email: jbieren@redhat.com
+  - email: lmendes@redhat.com
+  - email: lgallovi@redhat.com
+    capacity:
+      - 0
+      - 0.33
+  - email: mmalina@redhat.com
+  - email: swickers@redhat.com
+    capacity:
+      - 0
+      - 0.33
+  - email: sconroy@redhat.com
+
+output_dir: "reports/release-service/jira"
+
+# Email notification settings (optional)
+# When enabled, team members receive their anonymous ID via email
+email_anonymous_id: false # Set to false to disable email notifications
+replace_existing_reports: true
