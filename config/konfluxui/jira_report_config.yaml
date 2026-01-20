@@ -1,0 +1,76 @@
+# Project configuration (non-sensitive settings)
+# These settings can be safely version-controlled
+project:
+  # Jira settings
+  jira_url: "https://issues.redhat.com"
+  jira_project_key: "Konflux UI"
+
+  # Google Sheets settings (optional)
+  # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
+  # If you do not set, would upload to the default google-sheet.
+  # IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com
+
+phases:
+  - name: "No AI Period"
+    start: "2025-01-01"
+    end: "2025-05-31"
+  - name: "Cursor Period"
+    start: "2025-06-01"
+    end: "2025-07-31"
+  - name: "Full AI Period"
+    start: "2025-08-01"
+    end: "2025-12-04"
+
+default_assignee: "" # "" represent team
+
+members:
+  # For consistent anonymization across Jira and PR reports:
+  # - Use the same email in both Jira and PR configs
+  # - This ensures the same person gets the same anonymous hash in both reports
+  #
+  # Optional fields for accurate Daily Throughput calculations:
+  # - leave_days: Days on leave during the phase (single value or per-phase list)
+  # - capacity: Work capacity 0.0-1.0 (1.0=full time, 0.5=half time, single value or per-phase list)
+
+  - email: sbudhwar@redhat.com
+    leave_days: 0 # Optional when it is 0
+    capacity: 1 # Optional when it is 1
+  - email: wlin@redhat.com
+    leave_days:
+      - 26
+      - 20
+      - 11.5
+    capacity: 0.8
+  - email: kkanova@redhat.com
+    leave_days: 0
+    capacity: 0.5
+  - email: djanaki@redhat.com
+    leave_days: 0
+    capacity: 1
+  - email: rakshett@redhat.com
+    leave_days: 0
+    capacity: 1
+  - email: abhindas@redhat.com
+    leave_days: 0
+    capacity:
+      - 1.0
+      - 0.5
+      - 0.0
+  - email: rgalvao@redhat.com
+    leave_days: 0
+    capacity: 1
+  - email: sjochman@redhat.com
+    leave_days: 0
+    capacity: 1
+  - email: mtakac@redhat.com
+    leave_days: 0
+    capacity: 1
+  - email: jpolonip@redhat.com
+    leave_days: 0
+    capacity: 1
+  - email: mmarcin@redhat.com
+    leave_days: 0
+    capacity: 1
+
+email_anonymous_id: false # Set to true at the first time to run the pr
+replace_existing_reports: true

@@ -1,0 +1,69 @@
+# Project configuration (non-sensitive settings)
+# These settings can be safely version-controlled
+project:
+  # GitHub repository settings
+  github_url: "https://github.com"
+  github_repo_owner: "konflux-ci"
+  github_repo_name: "konflux-ui"
+
+  # Google Sheets settings (optional)
+  # google_spreadsheet_id: ""  # Google Spreadsheet ID for report upload
+  # If you do not set, would upload to the default google-sheet.
+  # IMPORTANT: For custom sheets in CI, grant Editor access to: cara-google-sheet-sa@wlin-438107.iam.gserviceaccount.com
+
+phases:
+  - name: "No AI Period"
+    start: "2025-01-01"
+    end: "2025-05-31"
+  - name: "Cursor Period"
+    start: "2025-06-01"
+    end: "2025-07-31"
+  - name: "Full AI Period"
+    start: "2025-08-01"
+    end: "2025-12-04"
+
+default_author: "" # "" represent team
+
+members:
+  # For consistent anonymization across Jira and PR reports:
+  # - Add 'email' field with the same email used in Jira config
+  # - This ensures the same person gets the same anonymous hash in both reports
+  # - The 'github_username' field is the GitHub username
+  #
+  # Optional fields for accurate Daily Throughput calculations:
+  # - leave_days: Days on leave during the phase (single value or per-phase list)
+  # - capacity: Work capacity 0.0-1.0 (1.0=full time, 0.5=half time, single value or per-phase list)
+
+  - email: sbudhwar@redhat.com
+    github_username: sahil143
+    leave_days: 0 # Optional when it is 0
+    capacity: 1 # Optional when it is 1
+  - email: wlin@redhat.com
+    github_username: testcara
+    leave_days:
+      - 26
+      - 20
+      - 11.5
+    capacity: 0.8
+  - email: rgalvao@redhat.com
+    github_username: rrosatti
+  - email: mmarcin@redhat.com
+    github_username: marcin-michal
+  - email: sjochman@redhat.com
+    github_username: StanislavJochman
+  - email: jpolonip@redhat.com
+    github_username: JoaoPedroPP
+  - email: djanaki@redhat.com
+    github_username: janaki29
+  - email: rakshett@redhat.com
+    github_username: rakshett
+  - email: mtakac@redhat.com
+    github_username: milantaky
+  - email: abhindas@redhat.com
+    github_username: abhinandan13jan
+  - email: kkanova@redhat.com
+    github_username: Katka92
+
+
+email_anonymous_id: false # Set to true to enable
+replace_existing_reports: true
