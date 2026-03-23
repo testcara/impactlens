@@ -7,10 +7,10 @@ Extracted from cli/get_jira_metrics.py
 
 import os
 import json
-import requests
 from datetime import datetime
 from pathlib import Path
 
+from impactlens.clients.jira_client import JiraClient
 from impactlens.utils.logger import logger
 from impactlens.utils.report_utils import normalize_username
 from impactlens.utils.workflow_utils import load_members_emails
@@ -22,73 +22,20 @@ class JiraMetricsCalculator:
     state durations, and velocity.
     """
 
-    def __init__(self, jira_url=None, jira_token=None, project_key=None):
+    def __init__(self, jira_url=None, jira_token=None, jira_email=None, project_key=None):
         """
         Initialize the Jira metrics calculator.
 
         Args:
             jira_url: Jira instance URL (default: from JIRA_URL env var)
             jira_token: Jira API token (default: from JIRA_API_TOKEN env var)
+            jira_email: Jira email for Basic Auth (default: from JIRA_EMAIL env var)
             project_key: Project key (default: from JIRA_PROJECT_KEY env var)
         """
-        self.jira_url = jira_url or os.getenv("JIRA_URL", "https://issues.redhat.com")
-        self.jira_token = jira_token or os.getenv("JIRA_API_TOKEN")
         self.project_key = project_key or os.getenv("JIRA_PROJECT_KEY", "Konflux UI")
 
-        # Setup authentication headers
-        self.headers = {"Accept": "application/json", "authorization": f"Bearer {self.jira_token}"}
-
-    def fetch_jira_data(self, jql_query, start_at=0, max_results=50, expand=None):
-        """
-        Generic function for fetching Jira issue data with pagination.
-
-        Args:
-            jql_query: JQL query string
-            start_at: Pagination start index
-            max_results: Maximum results per page
-            expand: Fields to expand (e.g., "changelog")
-
-        Returns:
-            JSON response data or None on error
-        """
-        url = f"{self.jira_url}/rest/api/2/search"
-
-        params = {
-            "jql": jql_query,
-            "fields": "created,resolutiondate,status,issuetype,timeoriginalestimate,timetracking",
-            "startAt": start_at,
-            "maxResults": max_results,
-        }
-
-        if expand:
-            params["expand"] = expand
-
-        logger.debug("=== Jira API Request ===")
-        logger.debug(f"URL: {url}")
-        logger.debug(f"JQL Query: {jql_query}")
-        logger.debug("Parameters:")
-        for key, value in params.items():
-            logger.debug(f"  {key}: {value}")
-        logger.debug("=========================")
-
-        try:
-            response = requests.get(url, headers=self.headers, params=params)
-
-            logger.debug(f"Response Status Code: {response.status_code}")
-            logger.debug(f"Response URL: {response.url}")
-
-            if not response.ok:
-                logger.warning(f"Jira API request failed with status {response.status_code}")
-                logger.debug(f"Error Response: {response.text}")
-
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching Jira data: {e}")
-            logger.debug(f"Request failed with exception: {type(e).__name__}")
-            if hasattr(e, "response") and e.response is not None:
-                logger.debug(f"Response text: {e.response.text}")
-            return None
+        # Use JiraClient for all API interactions
+        self.jira_client = JiraClient(jira_url=jira_url, api_token=jira_token, email=jira_email)
 
     def calculate_state_durations(self, issue):
         """
@@ -290,6 +237,8 @@ class JiraMetricsCalculator:
         """
         Fetch all issues matching JQL query with pagination.
 
+        Uses JiraClient's token-based pagination (API v3).
+
         Args:
             jql_query: JQL query string
             batch_size: Results per page
@@ -297,29 +246,14 @@ class JiraMetricsCalculator:
         Returns:
             List of all issues with changelog data
         """
-        # Get total count
-        initial_data = self.fetch_jira_data(jql_query, max_results=1)
-        total_issues = initial_data.get("total", 0) if initial_data else 0
+        logger.info(f"Fetching all issues for JQL: {jql_query}")
 
-        logger.info(f"Total issues found for analysis: {total_issues}")
+        # Use JiraClient's fetch_all_issues with changelog expansion
+        all_issues = self.jira_client.fetch_all_issues(
+            jql_query, batch_size=batch_size, expand="changelog"
+        )
 
-        if total_issues == 0:
-            return []
-
-        all_issues = []
-        for start_at in range(0, total_issues, batch_size):
-            logger.debug(
-                f"Fetching issues {start_at} to {min(start_at + batch_size, total_issues)}..."
-            )
-            data = self.fetch_jira_data(
-                jql_query, start_at=start_at, max_results=batch_size, expand="changelog"
-            )
-            if data and "issues" in data:
-                all_issues.extend(data["issues"])
-            else:
-                logger.warning(f"Failed to fetch batch starting at {start_at}")
-                break
-
+        logger.info(f"Total issues fetched for analysis: {len(all_issues)}")
         return all_issues
 
     def calculate_metrics(self, issues):
@@ -426,8 +360,12 @@ class JiraMetricsCalculator:
 
         logger.debug(f"Story query JQL: {jql_stories}")
 
-        story_data = self.fetch_jira_data(jql_stories, max_results=1)
-        total_stories = story_data.get("total", 0) if story_data else 0
+        # Use JiraClient's fetch_all_issues for token-based pagination
+        all_stories = self.jira_client.fetch_all_issues(
+            jql_stories, batch_size=batch_size, expand="changelog"
+        )
+
+        total_stories = len(all_stories)
 
         if total_stories == 0:
             return {
@@ -436,14 +374,6 @@ class JiraMetricsCalculator:
                 "total_story_points": 0,
                 "avg_points_per_story": 0,
             }
-
-        all_stories = []
-        for start_at in range(0, total_stories, batch_size):
-            data = self.fetch_jira_data(
-                jql_stories, start_at=start_at, max_results=batch_size, expand="changelog"
-            )
-            if data and "issues" in data:
-                all_stories.extend(data["issues"])
 
         total_story_points = 0
         stories_with_points = 0

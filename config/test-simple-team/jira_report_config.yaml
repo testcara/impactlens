@@ -2,8 +2,8 @@
 # This config uses a small date range and minimal team members for fast testing
 
 project:
-  jira_url: "https://issues.redhat.com"
-  jira_project_key: "Konflux UI"
+  jira_url: "https://redhat.atlassian.net"
+  jira_project_key: "KFLUXUI"
 
 phases:
   - name: "Test Period 1"
@@ -27,3 +27,4 @@ output_dir: "reports/test-simple-team/jira"
 email_anonymous_id: true
 # Remove old reports when we rerun ci jobs
 replace_existing_reports: true
+no_ai_analysis: true

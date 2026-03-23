@@ -27,3 +27,4 @@ output_dir: "reports/test-ci-team2/github"
 email_anonymous_id: true
 # Remove old reports when we rerun ci jobs
 replace_existing_reports: true
+no_ai_analysis: true

@@ -544,6 +544,21 @@ def _generic_full_impl(
     # Resolve config path (directory or specific file)
     config_file_path = resolve_config_path(config, config_filename, color)
 
+    # Check if AI analysis should be skipped based on config file
+    # CLI parameter takes priority - only check config if CLI param is False (default)
+    if not skip_ai_analysis and config_file_path:
+        try:
+            from impactlens.utils.workflow_utils import load_config_file
+
+            _, root_configs = load_config_file(config_file_path)
+            config_no_ai = root_configs.get("no_ai_analysis", False)
+            if config_no_ai:
+                skip_ai_analysis = True
+                console.print("[yellow]ℹ️  AI analysis disabled in config file[/yellow]")
+        except Exception as e:
+            # If config read fails, keep CLI behavior
+            pass
+
     failed_steps = []
 
     # Step 1: Generate team + all members
@@ -1293,6 +1308,29 @@ def full_workflow(
     aggregation_config_path = config_path / "aggregation_config.yaml"
 
     is_aggregation_mode = aggregation_config_path.exists()
+
+    # Check if AI analysis should be skipped based on config file
+    # CLI parameter takes priority - only check config if CLI param is False (default)
+    if not no_ai_analysis:
+        # Try to read from PR config first, then Jira config, then aggregation config
+        for config_file in [
+            config_path / "pr_report_config.yaml",
+            config_path / "jira_report_config.yaml",
+            aggregation_config_path,
+        ]:
+            if config_file.exists():
+                try:
+                    with open(config_file, "r") as f:
+                        cfg = yaml.safe_load(f)
+                        config_no_ai = cfg.get("no_ai_analysis", False)
+                        if config_no_ai:
+                            no_ai_analysis = True
+                            console.print(
+                                f"[yellow]ℹ️  AI analysis disabled in {config_file.name}[/yellow]"
+                            )
+                            break
+                except Exception:
+                    pass  # If config read fails, keep CLI behavior
 
     if is_aggregation_mode:
         console.print("\n" + "=" * 60)

@@ -9,62 +9,84 @@ from impactlens.utils.logger import logger
 class JiraClient:
     """Client for interacting with Jira REST API."""
 
-    def __init__(self, jira_url=None, api_token=None):
+    def __init__(self, jira_url=None, api_token=None, email=None):
         """
         Initialize Jira client with URL and API token.
 
         Args:
             jira_url: Jira server URL
             api_token: API token for authentication
+            email: Email for Atlassian Cloud Basic Auth (required for Atlassian Cloud)
         """
         self.jira_url = jira_url or os.getenv("JIRA_URL", "https://issues.redhat.com")
         self.api_token = api_token or os.getenv("JIRA_API_TOKEN")
+        self.email = email or os.getenv("JIRA_EMAIL")
         # Debug logging is disabled by default to avoid leaking sensitive info in CI logs
 
-        self.headers = {"Accept": "application/json", "authorization": f"Bearer {self.api_token}"}
+        self.headers = {"Accept": "application/json"}
 
-    def fetch_jira_data(self, jql_query, start_at=0, max_results=50, expand=None):
+    def fetch_jira_data(self, jql_query, max_results=50, expand=None, next_page_token=None):
         """
         Fetch Jira Issue data with pagination support.
 
         Args:
             jql_query: JQL query string
-            start_at: Starting index for pagination
-            max_results: Maximum results per request
+            max_results: Maximum results per request (default 50, max 100)
             expand: Optional fields to expand (e.g., 'changelog')
+            next_page_token: Token for fetching next page (for pagination)
 
         Returns:
             JSON response from Jira API or None on error
         """
-        url = f"{self.jira_url}/rest/api/2/search"
+        url = f"{self.jira_url}/rest/api/3/search/jql"
 
-        params = {
+        # Prepare request body for POST request
+        body = {
             "jql": jql_query,
-            "fields": "created,resolutiondate,status,issuetype,timeoriginalestimate,timetracking",
-            "startAt": start_at,
+            "fields": [
+                "created",
+                "resolutiondate",
+                "status",
+                "issuetype",
+                "timeoriginalestimate",
+                "timetracking",
+            ],
             "maxResults": max_results,
         }
 
         if expand:
-            params["expand"] = expand
+            # expand should be a comma-separated string, not an array
+            if isinstance(expand, list):
+                body["expand"] = ",".join(expand)
+            else:
+                body["expand"] = expand
+
+        if next_page_token:
+            body["nextPageToken"] = next_page_token
+
+        # Add Content-Type header for JSON body
+        headers = {**self.headers, "Content-Type": "application/json"}
 
         logger.debug("=== Jira API Request ===")
         logger.debug(f"URL: {url}")
         logger.debug(f"JQL Query: {jql_query}")
-        logger.debug("Parameters:")
-        for key, value in params.items():
+        logger.debug("Request Body:")
+        for key, value in body.items():
             logger.debug(f"  {key}: {value}")
         logger.debug("=========================")
 
         try:
-            response = requests.get(url, headers=self.headers, params=params)
+            # Use Basic Auth for Atlassian Cloud API
+            auth = (self.email, self.api_token) if self.email else None
+            response = requests.post(url, headers=headers, json=body, auth=auth)
 
             logger.debug(f"Response Status Code: {response.status_code}")
             logger.debug(f"Response URL: {response.url}")
 
             if not response.ok:
                 logger.warning(f"Jira API request failed with status {response.status_code}")
-                logger.debug(f"Error Response: {response.text}")
+                logger.warning(f"Error Response: {response.text}")
+                logger.debug(f"Request Body: {body}")
 
             response.raise_for_status()
             return response.json()
@@ -79,32 +101,45 @@ class JiraClient:
         """
         Fetch all issues matching a JQL query with automatic pagination.
 
+        Note: Uses token-based pagination (nextPageToken) instead of offset-based (startAt).
+        The API no longer returns a 'total' count in most cases.
+
         Args:
             jql_query: JQL query string
-            batch_size: Number of issues per request
+            batch_size: Number of issues per request (max 100)
             expand: Optional fields to expand
 
         Returns:
             List of all issues matching the query
         """
-        initial_data = self.fetch_jira_data(jql_query, max_results=1)
-        total_issues = initial_data.get("total", 0) if initial_data else 0
-
-        logger.info(f"Total issues found: {total_issues}")
-
         all_issues = []
-        if total_issues > 0:
-            for start_at in range(0, total_issues, batch_size):
-                logger.debug(
-                    f"Fetching issues {start_at} to {min(start_at + batch_size, total_issues)}..."
-                )
-                data = self.fetch_jira_data(
-                    jql_query, start_at=start_at, max_results=batch_size, expand=expand
-                )
-                if data and "issues" in data:
-                    all_issues.extend(data["issues"])
-                else:
-                    logger.warning(f"Failed to fetch batch starting at {start_at}")
+        next_page_token = None
+        page_count = 0
+
+        while True:
+            page_count += 1
+            logger.debug(f"Fetching page {page_count}...")
+
+            data = self.fetch_jira_data(
+                jql_query, max_results=batch_size, expand=expand, next_page_token=next_page_token
+            )
+
+            if not data:
+                logger.warning(f"Failed to fetch page {page_count}")
+                break
+
+            if "issues" in data:
+                issues_in_page = len(data["issues"])
+                all_issues.extend(data["issues"])
+                logger.debug(f"Fetched {issues_in_page} issues (total so far: {len(all_issues)})")
+
+                # Check if there are more pages
+                next_page_token = data.get("nextPageToken")
+                if not next_page_token:
+                    logger.info(f"Completed fetching all issues. Total: {len(all_issues)}")
                     break
+            else:
+                logger.warning("No 'issues' field in response")
+                break
 
         return all_issues
