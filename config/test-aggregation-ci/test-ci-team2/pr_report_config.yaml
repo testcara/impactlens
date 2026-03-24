@@ -2,8 +2,8 @@
 # This config uses a small date range and minimal team members for fast testing
 
 project:
-  github_repo_owner: "redhat-appstudio"
-  github_repo_name: "tssc-test"
+  git_repo_owner: "redhat-appstudio"
+  git_repo_name: "tssc-test"
 
 phases:
   - name: "Test Period 1"

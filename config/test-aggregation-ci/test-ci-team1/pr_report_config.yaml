@@ -2,8 +2,8 @@
 # This config uses a small date range and minimal team members for fast testing
 
 project:
-  github_repo_owner: "konflux-ci"
-  github_repo_name: "konflux-ui"
+  git_repo_owner: "konflux-ci"
+  git_repo_name: "konflux-ui"
 
 phases:
   - name: "Test Period 1"

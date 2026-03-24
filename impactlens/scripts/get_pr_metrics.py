@@ -16,7 +16,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from impactlens.clients.github_client import GitHubClient
-from impactlens.clients.github_client_graphql import GitHubGraphQLClient
+from impactlens.clients.github_client_graphql import GitGraphQLClient
 from impactlens.core.pr_metrics_calculator import PRMetricsCalculator
 from impactlens.core.pr_report_generator import PRReportGenerator
 from impactlens.utils.logger import logger
@@ -103,7 +103,7 @@ Examples:
     # Initialize GitHub client
     try:
         if use_graphql:
-            client = GitHubGraphQLClient()
+            client = GitGraphQLClient()
 
             if args.clear_cache:
                 print("\n🗑️  Clearing cache...")
