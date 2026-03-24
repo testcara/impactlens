@@ -280,18 +280,25 @@ Examples:
                 project_prefix=project_prefix,
                 hide_individual_names=args.hide_individual_names,
             )
-            print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
-            print()
 
-            # Upload to Google Sheets if not disabled
-            upload_to_google_sheets(
-                output_file, skip_upload=args.no_upload, config_path=custom_config_file
-            )
+            if output_file is None:
+                print(
+                    f"{Colors.YELLOW}ℹ️  No comparison reports found (single phase mode), skipping combine step{Colors.NC}"
+                )
+                print()
+            else:
+                print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
+                print()
 
-            print()
-            print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
-            print(f"{Colors.GREEN}✓ Combined report completed successfully!{Colors.NC}")
-            print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
+                # Upload to Google Sheets if not disabled
+                upload_to_google_sheets(
+                    output_file, skip_upload=args.no_upload, config_path=custom_config_file
+                )
+
+                print()
+                print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
+                print(f"{Colors.GREEN}✓ Combined report completed successfully!{Colors.NC}")
+                print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
 
         except Exception as e:
             print(f"{Colors.RED}Error combining reports: {e}{Colors.NC}")
