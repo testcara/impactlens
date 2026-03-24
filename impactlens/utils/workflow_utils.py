@@ -23,25 +23,26 @@ def apply_project_settings_to_env(
     Apply project settings from config to environment variables.
 
     This allows config files to override .env settings for project-specific values
-    like jira_project_key, github_repo_name, etc.
+    like jira_project_key, git_repo_name, etc.
 
     Args:
         project_settings: Dict with project configuration from YAML config file
         root_config: Optional dict with root-level config (for google_spreadsheet_id)
 
     Example:
-        >>> project_settings = {"jira_project_key": "KFLUX", "github_repo_name": "konflux-ui"}
+        >>> project_settings = {"jira_project_key": "KFLUX", "git_repo_name": "konflux-ui"}
         >>> root_config = {"google_spreadsheet_id": "1ABC..."}
         >>> apply_project_settings_to_env(project_settings, root_config)
         # Now os.environ["JIRA_PROJECT_KEY"] == "KFLUX"
+        # Now os.environ["GIT_REPO_NAME"] == "konflux-ui"
         # Now os.environ["GOOGLE_SPREADSHEET_ID"] == "1ABC..."
     """
     env_mappings = {
         "jira_url": "JIRA_URL",
         "jira_project_key": "JIRA_PROJECT_KEY",
-        "github_url": "GITHUB_URL",
-        "github_repo_owner": "GITHUB_REPO_OWNER",
-        "github_repo_name": "GITHUB_REPO_NAME",
+        "git_url": "GIT_URL",
+        "git_repo_owner": "GIT_REPO_OWNER",
+        "git_repo_name": "GIT_REPO_NAME",
     }
 
     for config_key, env_var in env_mappings.items():

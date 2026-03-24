@@ -128,13 +128,14 @@ ImpactLens supports two configuration scenarios:
 
 **Configuration includes:**
 
-- Jira/GitHub/GitLab project settings
+- Jira/GitHub/GitLab project settings (unified environment variables)
 - Analysis periods (phases)
 - Team member definitions
 - Privacy & anonymization options
 - Multi-repo aggregation setup
 - Google Sheets integration
 - Email notification settings
+- SSL certificate verification (for self-signed certificates)
 
 **➡️ See [Configuration Guide](docs/CONFIGURATION.md)** for complete setup instructions and examples
 

@@ -1,16 +1,19 @@
 # Project configuration (non-sensitive settings)
 # These settings can be safely version-controlled
 project:
-  # GitHub/GitLab repository settings
-  # For GitHub (default):
-  github_url: "https://github.com"
-  github_repo_owner: "konflux-ci"  # Repository owner/organization
-  github_repo_name: "konflux-ui"   # Repository name
+  # Git repository settings (GitHub/GitLab)
+  git_url: "https://github.com"
+  git_repo_owner: "konflux-ci"  # Repository owner/organization
+  git_repo_name: "konflux-ui"   # Repository name
 
   # For GitLab:
-  # gitlab_url: "https://gitlab.com"  # Or your GitLab instance URL
-  # gitlab_repo_owner: "myorg"
-  # gitlab_repo_name: "myproject"
+  # git_url: "https://gitlab.com"  # Or your GitLab instance URL
+  # git_repo_owner: "myorg"
+  # git_repo_name: "myproject"
+
+  # Environment variables (override config values):
+  #   GIT_TOKEN: Git platform access token (or use GITHUB_TOKEN/GITLAB_TOKEN)
+  #   GIT_VERIFY_SSL: Verify SSL certificates (default: true, set to 'false' for self-signed certs)
 
 phases:
   - name: "No AI Period"

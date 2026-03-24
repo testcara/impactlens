@@ -46,9 +46,9 @@ config/my-team/
 See [Configuration Reference](#configuration-reference) for all available options. Key settings:
 
 - **project**: Jira project key or GitHub/GitLab repo (owner/name format)
-- **github_host** / **gitlab_host**: Optional, defaults to github.com or gitlab.com (for enterprise instances)
+- **git_url**: Optional, defaults to github.com (for enterprise instances)
 - **phases**: Analysis periods (e.g., before/after AI adoption)
-- **team_members**: Team scope with optional leave_days and capacity
+- **members**: Team scope with optional leave_days and capacity
 - **output_dir**: Where to save reports (e.g., `reports/my-team/jira`)
 
 **Submit via PR:**
@@ -196,11 +196,13 @@ Different sub-projects/repos often have **completely different characteristics**
 - **Mobile** may have platform-specific workflows, different metrics patterns
 
 **If you only see aggregated reports**, you would:
+
 - ❌ **Miss critical sub-project insights** - Backend bottlenecks hidden by frontend speed
 - ❌ **Get misleading averages** - High AI adoption in frontend masks low adoption in backend
 - ❌ **Lose actionable context** - Can't identify which team/project needs improvement
 
 **Each report type serves a purpose:**
+
 - **Per Sub-Project Reports** → Identify specific bottlenecks and patterns in each project/repo
 - **Aggregated Report** → Overall team performance and cross-project member contributions
 - **Combined View** → Both perspectives needed for accurate analysis and decision-making
@@ -229,9 +231,9 @@ project:
 
 ```yaml
 project:
-  github_url: "https://github.com"  # Optional: defaults to https://github.com
-  github_repo_owner: "your-org"
-  github_repo_name: "your-repo"
+  git_url: "https://github.com" # Optional: defaults to https://github.com
+  git_repo_owner: "your-org"
+  git_repo_name: "your-repo"
 ```
 
 ### Phases
@@ -282,7 +284,6 @@ members:
 **Leave Days & Capacity:**
 
 - **Leave Days**: Days on leave during the phase
-
   - Single value: `leave_days: 10` (applies to all phases)
   - Per-phase: `leave_days: [26, 20, 11.5]`
 
@@ -325,6 +326,7 @@ no_ai_analysis: true
 **Default behavior:** AI analysis is **enabled** and runs automatically when you generate reports.
 
 **When to disable:**
+
 - You don't have a Gemini API key
 - You prefer to use generated prompts manually with different AI platforms
 - You want to reduce API costs or processing time
@@ -332,11 +334,13 @@ no_ai_analysis: true
 **What gets generated:**
 
 With AI analysis **enabled** (default):
+
 - Prompt files: `analysis_prompt_*.txt`, `combined_analysis_prompt_*.txt`
 - Analysis files: `gemini_analysis_*.txt` (if `GOOGLE_API_KEY` is configured)
 - Auto-upload to Google Sheets
 
 With AI analysis **disabled** (`no_ai_analysis: true`):
+
 - No prompts generated
 - No analysis files generated
 - Faster report generation
@@ -411,14 +415,14 @@ When enabled, team members receive email notifications informing them of their *
 ```yaml
 # jira_report_config.yaml or pr_report_config.yaml
 email_anonymous_id:
-  enabled: true  # Set to false to disable email notifications
+  enabled: true # Set to false to disable email notifications
 ```
 
 **To Disable After Receiving Your ID:**
 
 ```yaml
 email_anonymous_id:
-  enabled: false  # Disable future email notifications
+  enabled: false # Disable future email notifications
 ```
 
 **SMTP Configuration (required in .env for sending emails):**
@@ -429,6 +433,7 @@ SMTP_PASSWORD=your-app-password  # Gmail App Password (not regular password)
 ```
 
 **Gmail App Password Setup:**
+
 1. Go to Google Account → Security → 2-Step Verification
 2. Scroll to "App passwords" → Generate new app password
 3. Select "Mail" and your device → Copy the 16-character password
@@ -442,6 +447,7 @@ SMTP_PASSWORD=your-app-password  # Gmail App Password (not regular password)
 **Workflow Examples:**
 
 **Single-team mode:**
+
 ```bash
 # Send actual emails
 impactlens full --hide-individual-names --email-anonymous-id
@@ -452,6 +458,7 @@ impactlens full --hide-individual-names --email-anonymous-id \
 ```
 
 **Multi-team mode:** Email notifications handled separately after aggregation to avoid duplicates
+
 ```bash
 # Generate reports (no email flag to avoid duplicates)
 impactlens jira full --hide-individual-names
@@ -490,14 +497,12 @@ Add `email` field to PR config using the **same email** as Jira:
 
 ```yaml
 # Jira config
-team_members:
-  - member: alice
-    email: alice@company.com
+members:
+  - email: alice@company.com
 
 # PR config
-team_members:
-  - name: alice-github
-    email: alice@company.com  # Same email → same hash ✅
+members:
+  - email: alice@company.com  # Same email → same hash ✅
 ```
 
 **Result:**

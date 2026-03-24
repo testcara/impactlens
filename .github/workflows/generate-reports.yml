@@ -31,8 +31,90 @@ on:
         default: "both"
 
 jobs:
-  generate-reports:
+  # Job 1: 检测配置中是否需要访问内部 GitLab
+  detect-gitlab:
     runs-on: ubuntu-latest
+    outputs:
+      needs_internal_access: ${{ steps.check_gitlab.outputs.needs_internal_access }}
+      config_dir: ${{ steps.detect_config.outputs.config_dir }}
+      is_aggregation: ${{ steps.detect_config.outputs.is_aggregation }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Detect config directory
+        id: detect_config
+        run: |
+          if [ -n "${{ github.event.inputs.team }}" ]; then
+            CONFIG_DIR="config/${{ github.event.inputs.team }}"
+          elif [ "${{ github.event_name }}" = "pull_request_target" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            CHANGED_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA)
+
+            AGGREGATION_CONFIG=$(echo "$CHANGED_FILES" | grep -E '^config/.*/aggregation_config\.yaml$' | head -1)
+            if [ -n "$AGGREGATION_CONFIG" ]; then
+              CONFIG_DIR=$(dirname "$AGGREGATION_CONFIG")
+              echo "is_aggregation=true" >> $GITHUB_OUTPUT
+            else
+              CHANGED_CONFIG=$(echo "$CHANGED_FILES" | grep -E '^config/.*\.(yaml|yml)$' | head -1)
+              if [ -n "$CHANGED_CONFIG" ]; then
+                CONFIG_DIR=$(dirname "$CHANGED_CONFIG")
+              else
+                CONFIG_DIR="config"
+              fi
+              echo "is_aggregation=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            CONFIG_DIR="config"
+            echo "is_aggregation=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "config_dir=$CONFIG_DIR" >> $GITHUB_OUTPUT
+          echo "Detected config directory: $CONFIG_DIR"
+
+      - name: Check if GitLab internal access needed
+        id: check_gitlab
+        run: |
+          CONFIG_DIR="${{ steps.detect_config.outputs.config_dir }}"
+
+          # 检查配置文件中是否包含内部 GitLab URL
+          NEEDS_INTERNAL=false
+
+          # 检查所有相关的 pr_report_config.yaml
+          if [ -f "$CONFIG_DIR/aggregation_config.yaml" ]; then
+            # Aggregation mode: 检查所有子项目
+            echo "Checking aggregation mode configs..."
+            for project_dir in "$CONFIG_DIR"/*/; do
+              if [ -f "$project_dir/pr_report_config.yaml" ]; then
+                if grep -q "gitlab.cee.redhat.com" "$project_dir/pr_report_config.yaml"; then
+                  echo "Found internal GitLab in $project_dir/pr_report_config.yaml"
+                  NEEDS_INTERNAL=true
+                  break
+                fi
+              fi
+            done
+          else
+            # Single team mode
+            if [ -f "$CONFIG_DIR/pr_report_config.yaml" ]; then
+              if grep -q "gitlab.cee.redhat.com" "$CONFIG_DIR/pr_report_config.yaml"; then
+                echo "Found internal GitLab in $CONFIG_DIR/pr_report_config.yaml"
+                NEEDS_INTERNAL=true
+              fi
+            fi
+          fi
+
+          echo "needs_internal_access=$NEEDS_INTERNAL" >> $GITHUB_OUTPUT
+          echo "Needs internal GitLab access: $NEEDS_INTERNAL"
+
+  # Job 2: Generate reports (自动选择 runner)
+  generate-reports:
+    needs: detect-gitlab
+    runs-on: ${{ needs.detect-gitlab.outputs.needs_internal_access == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     permissions:
       contents: read
       issues: write
@@ -197,8 +279,10 @@ jobs:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+          GIT_VERIFY_SSL: ${{ needs.detect-gitlab.outputs.needs_internal_access == 'true' && 'false' || 'true' }}
         run: |
           echo "=========================================="
           echo "Running setup verification..."
@@ -212,10 +296,13 @@ jobs:
           echo "Configuration Summary:"
           echo "=========================================="
           echo "Config directory: ${{ steps.config.outputs.config_dir }}"
+          echo "Runner type: ${{ needs.detect-gitlab.outputs.needs_internal_access == 'true' && 'self-hosted (internal GitLab)' || 'GitHub-hosted' }}"
           echo "Jira credentials: $([ -n "$JIRA_USERNAME" ] && echo '✓ Set' || echo '✗ Not set')"
           echo "GitHub token: $([ -n "$GITHUB_TOKEN" ] && echo '✓ Set' || echo '✗ Not set')"
+          echo "GitLab token: $([ -n "$GITLAB_TOKEN" ] && echo '✓ Set' || echo '✗ Not set')"
           echo "Google credentials: $([ -n "$GOOGLE_CREDENTIALS_FILE" ] && echo '✓ Set' || echo '✗ Not set')"
           echo "Google Sheets ID: $([ -n "$GOOGLE_SPREADSHEET_ID" ] && echo '✓ Set' || echo '✗ Not set')"
+          echo "SSL Verification: $GIT_VERIFY_SSL"
           echo "=========================================="
 
       - name: Generate Multi-Team Reports (Aggregation Mode)
@@ -226,12 +313,14 @@ jobs:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           SMTP_USER: ${{ secrets.MAIL_APP_USER }}
           SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
           GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
+          GIT_VERIFY_SSL: ${{ needs.detect-gitlab.outputs.needs_internal_access == 'true' && 'false' || 'true' }}
         run: |
           CONFIG_DIR="${{ steps.config.outputs.config_dir }}"
           REPORT_TYPE="${{ github.event.inputs.report_type }}"
@@ -290,12 +379,14 @@ jobs:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           SMTP_USER: ${{ secrets.MAIL_APP_USER }}
           SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
           GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
+          GIT_VERIFY_SSL: ${{ needs.detect-gitlab.outputs.needs_internal_access == 'true' && 'false' || 'true' }}
         run: |
           CONFIG_DIR="${{ steps.config.outputs.config_dir }}"
           REPORT_TYPE="${{ github.event.inputs.report_type }}"

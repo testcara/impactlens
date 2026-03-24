@@ -2,10 +2,10 @@
 
 from impactlens.clients.jira_client import JiraClient
 from impactlens.clients.github_client import GitHubClient
-from impactlens.clients.github_client_graphql import GitHubGraphQLClient
+from impactlens.clients.github_client_graphql import GitGraphQLClient
 
 __all__ = [
     "JiraClient",
     "GitHubClient",
-    "GitHubGraphQLClient",
+    "GitGraphQLClient",
 ]

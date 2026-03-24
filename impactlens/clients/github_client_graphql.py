@@ -18,9 +18,17 @@ from typing import Dict, List, Optional, Any, Set
 from impactlens.utils.logger import logger
 from impactlens.utils.pr_utils import extract_ai_info_from_commits
 
+# Suppress SSL warnings when verification is disabled
+import urllib3
 
-class GitHubGraphQLClient:
-    """Optimized GitHub client using GraphQL API with caching."""
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+class GitGraphQLClient:
+    """Optimized Git platform client using GraphQL API with caching.
+
+    Supports both GitHub and GitLab with unified configuration.
+    """
 
     # List of bot usernames to exclude from human metrics
     BOT_USERS = {
@@ -46,23 +54,47 @@ class GitHubGraphQLClient:
         github_url: Optional[str] = None,
     ):
         """
-        Initialize GitHub GraphQL API client.
+        Initialize GitHub/GitLab GraphQL API client.
 
         Args:
-            token: GitHub personal access token
+            token: GitHub/GitLab personal access token
             repo_owner: Repository owner/organization
             repo_name: Repository name
             cache_dir: Directory for caching PR data (default: .cache/github)
-            github_url: GitHub/GitLab base URL (or use GITHUB_URL env var, default: https://github.com)
+            github_url: GitHub/GitLab base URL (or use GIT_URL/GITHUB_URL env var, default: https://github.com)
+
+        Environment Variables (New, Recommended):
+            GIT_URL: Git platform base URL (default: https://github.com)
+            GIT_TOKEN: Git platform access token (auto-detected, or use platform-specific tokens below)
+            GIT_REPO_OWNER: Repository owner/organization
+            GIT_REPO_NAME: Repository name
+            GIT_VERIFY_SSL: Verify SSL certificates (default: true, set to 'false' to disable for self-signed certificates)
+            GITHUB_TOKEN: GitHub personal access token (used when platform is GitHub)
+            GITLAB_TOKEN: GitLab personal access token (used when platform is GitLab)
+
+        Legacy Environment Variables (Still Supported):
+            GITHUB_URL: Base URL (fallback if GIT_URL not set)
+            GITHUB_REPO_OWNER: Repository owner (fallback if GIT_REPO_OWNER not set)
+            GITHUB_REPO_NAME: Repository name (fallback if GIT_REPO_NAME not set)
         """
-        self.token = token or os.getenv("GITHUB_TOKEN")
-        self.repo_owner = repo_owner or os.getenv("GITHUB_REPO_OWNER")
-        self.repo_name = repo_name or os.getenv("GITHUB_REPO_NAME")
+        # Read repository info with new GIT_* variables, fallback to legacy GITHUB_* variables
+        self.repo_owner = (
+            repo_owner or os.getenv("GIT_REPO_OWNER") or os.getenv("GITHUB_REPO_OWNER")
+        )
+        self.repo_name = repo_name or os.getenv("GIT_REPO_NAME") or os.getenv("GITHUB_REPO_NAME")
+
+        # SSL verification control (useful for self-signed certificates)
+        # Read from GIT_VERIFY_SSL environment variable
+        env_verify_ssl = os.getenv("GIT_VERIFY_SSL", "true").lower()
+        self.verify_ssl = env_verify_ssl not in ("false", "0", "no")
 
         # Support both GitHub and GitLab (and self-hosted instances)
-        base_git_url = github_url or os.getenv("GITHUB_URL", "https://github.com")
+        # Prefer GIT_URL, fallback to GITHUB_URL for backward compatibility
+        base_git_url = (
+            github_url or os.getenv("GIT_URL") or os.getenv("GITHUB_URL", "https://github.com")
+        )
 
-        # Convert base URL to GraphQL endpoint
+        # Detect platform and set GraphQL endpoint
         # GitHub: https://github.com -> https://api.github.com/graphql
         # GitLab: https://gitlab.com -> https://gitlab.com/api/graphql
         # GitHub Enterprise: https://git.example.com -> https://git.example.com/api/graphql
@@ -79,12 +111,35 @@ class GitHubGraphQLClient:
             self.graphql_url = f"{base_git_url.rstrip('/')}/api/graphql"
             self.is_gitlab = False
 
+        # Get token with priority: explicit param > GIT_TOKEN > platform-specific token
+        # Platform-specific tokens:
+        #   - GitHub: GITHUB_TOKEN
+        #   - GitLab: GITLAB_TOKEN
+        if token:
+            # Explicit token parameter takes highest priority
+            self.token = token
+        elif os.getenv("GIT_TOKEN"):
+            # Generic GIT_TOKEN for unified configuration
+            self.token = os.getenv("GIT_TOKEN")
+        elif self.is_gitlab:
+            # GitLab: prefer GITLAB_TOKEN, fallback to GITHUB_TOKEN (legacy)
+            self.token = os.getenv("GITLAB_TOKEN") or os.getenv("GITHUB_TOKEN")
+        else:
+            # GitHub: use GITHUB_TOKEN
+            self.token = os.getenv("GITHUB_TOKEN")
+
         if not self.token:
-            raise ValueError("GitHub token is required. Set GITHUB_TOKEN environment variable.")
+            platform = "GitLab" if self.is_gitlab else "GitHub"
+            if self.is_gitlab:
+                token_var = "GIT_TOKEN, GITLAB_TOKEN, or GITHUB_TOKEN"
+            else:
+                token_var = "GIT_TOKEN or GITHUB_TOKEN"
+            raise ValueError(f"{platform} token is required. Set {token_var} environment variable.")
 
         if not self.repo_owner or not self.repo_name:
             raise ValueError(
-                "Repository owner and name are required. Set GITHUB_REPO_OWNER and GITHUB_REPO_NAME."
+                "Repository owner and name are required. Set GIT_REPO_OWNER and GIT_REPO_NAME "
+                "(or GITHUB_REPO_OWNER and GITHUB_REPO_NAME for backward compatibility)."
             )
 
         self.headers = {
@@ -95,6 +150,11 @@ class GitHubGraphQLClient:
         logger.info(
             f"Git GraphQL client initialized for {self.repo_owner}/{self.repo_name} (URL: {self.graphql_url})"
         )
+        if not self.verify_ssl:
+            logger.warning(
+                "SSL certificate verification is DISABLED. This should only be used for "
+                "internal instances with self-signed certificates."
+            )
 
         # Setup caching
         self.cache_dir = Path(cache_dir or ".cache/github")
@@ -110,9 +170,7 @@ class GitHubGraphQLClient:
         """Check if a username belongs to a bot."""
         if not username:
             return False
-        return username.lower() in GitHubGraphQLClient.BOT_USERS or username.lower().endswith(
-            "[bot]"
-        )
+        return username.lower() in GitGraphQLClient.BOT_USERS or username.lower().endswith("[bot]")
 
     def _load_cache_index(self) -> Dict[str, Any]:
         """Load cache index from disk."""
@@ -121,7 +179,7 @@ class GitHubGraphQLClient:
                 return json.load(f)
         return {"prs": {}, "last_fetch": {}}
 
-    def _save_cache_index(self):
+    def _save_cache_index(self) -> None:
         """Save cache index to disk."""
         with open(self.cache_index_file, "w") as f:
             json.dump(self.cache_index, f, indent=2)
@@ -143,7 +201,7 @@ class GitHubGraphQLClient:
                 logger.warning(f"Failed to load cache file {cache_file}: {e}")
         return None
 
-    def _save_to_cache(self, cache_file: Path, prs: List[Dict[str, Any]]):
+    def _save_to_cache(self, cache_file: Path, prs: List[Dict[str, Any]]) -> None:
         """Save PR data to cache file."""
         try:
             with open(cache_file, "w") as f:
@@ -240,15 +298,27 @@ class GitHubGraphQLClient:
         page = 1
         max_retries = 3
 
+        # Parse date range once (avoid repeated parsing in loop)
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+
         while has_next_page:
             logger.info(f"Fetching GraphQL page {page}...")
 
             query = self._build_graphql_query(cursor)
-            variables = {
-                "owner": self.repo_owner,
-                "name": self.repo_name,
-                "states": ["MERGED"],
-            }
+
+            # Build variables based on platform
+            if self.is_gitlab:
+                variables = {
+                    "fullPath": f"{self.repo_owner}/{self.repo_name}",
+                    "states": "merged",  # GitLab uses lowercase string, not array
+                }
+            else:
+                variables = {
+                    "owner": self.repo_owner,
+                    "name": self.repo_name,
+                    "states": ["MERGED"],  # GitHub uses array of enum values
+                }
 
             # Retry logic for timeouts
             for retry in range(max_retries):
@@ -258,6 +328,7 @@ class GitHubGraphQLClient:
                         headers=self.headers,
                         json={"query": query, "variables": variables},
                         timeout=60,  # 60 second timeout
+                        verify=self.verify_ssl,  # Allow disabling SSL verification for self-signed certs
                     )
                     response.raise_for_status()
                     break  # Success, exit retry loop
@@ -287,7 +358,12 @@ class GitHubGraphQLClient:
                 logger.error(f"GraphQL errors: {data['errors']}")
                 break
 
-            pr_data = data["data"]["repository"]["pullRequests"]
+            # Extract PR/MR data based on platform
+            if self.is_gitlab:
+                pr_data = data["data"]["project"]["mergeRequests"]
+            else:
+                pr_data = data["data"]["repository"]["pullRequests"]
+
             prs_in_page = pr_data["nodes"]
 
             logger.info(f"Processing {len(prs_in_page)} PRs from page {page}...")
@@ -305,7 +381,8 @@ class GitHubGraphQLClient:
 
             # Process and filter PRs
             for pr_node in prs_in_page:
-                pr_number = pr_node.get("number")
+                # Get PR/MR number (different field names)
+                pr_number = pr_node.get("iid") if self.is_gitlab else pr_node.get("number")
 
                 # Track merged dates
                 if pr_node.get("mergedAt"):
@@ -319,9 +396,17 @@ class GitHubGraphQLClient:
                     continue
 
                 # Check author (skip bots)
-                pr_author = (
-                    pr_node.get("author", {}).get("login", "") if pr_node.get("author") else ""
-                )
+                # GitLab uses 'username', GitHub uses 'login'
+                if self.is_gitlab:
+                    pr_author = (
+                        pr_node.get("author", {}).get("username", "")
+                        if pr_node.get("author")
+                        else ""
+                    )
+                else:
+                    pr_author = (
+                        pr_node.get("author", {}).get("login", "") if pr_node.get("author") else ""
+                    )
                 if not pr_author or self.is_bot_user(pr_author):
                     filtered_reasons["bot_author"] += 1
                     continue
@@ -337,18 +422,14 @@ class GitHubGraphQLClient:
                     continue
 
                 # Filter by date range
-                start = datetime.strptime(start_date, "%Y-%m-%d")
-                end = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
-
-                if not (start <= merged_at < end):
+                if not (start_dt <= merged_at < end_dt):
                     filtered_reasons["date_out_of_range"] += 1
                     continue
 
-                # This PR matches all criteria
-                pr_dict = self._process_pr_node(pr_node, start_date, end_date, author)
-                if pr_dict:
-                    all_prs.append(pr_dict)
-                    found_in_range += 1
+                # This PR matches all criteria - process it
+                pr_dict = self._process_pr_node(pr_node)
+                all_prs.append(pr_dict)
+                found_in_range += 1
 
             # Log summary
             logger.info(f"Page {page} summary:")
@@ -371,7 +452,6 @@ class GitHubGraphQLClient:
             # If we've checked 10 pages without finding anything, and
             # the oldest merged PR we've seen is still after our end_date, stop
             if page >= 10 and len(all_prs) == 0 and oldest_merged_in_page:
-                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
                 if oldest_merged_in_page > end_dt:
                     logger.info(
                         f"After {page} pages, oldest merged PR ({oldest_merged_in_page.date()}) is still after end date ({end_date})"
@@ -402,7 +482,14 @@ class GitHubGraphQLClient:
         return all_prs
 
     def _build_graphql_query(self, after_cursor: Optional[str] = None) -> str:
-        """Build GraphQL query for fetching PRs with all details in one request."""
+        """Build GraphQL query for fetching PRs/MRs with all details in one request."""
+        if self.is_gitlab:
+            return self._build_gitlab_query(after_cursor)
+        else:
+            return self._build_github_query(after_cursor)
+
+    def _build_github_query(self, after_cursor: Optional[str] = None) -> str:
+        """Build GitHub-specific GraphQL query."""
         cursor_arg = f', after: "{after_cursor}"' if after_cursor else ""
 
         # Reduced limits to avoid 504 Gateway Timeout:
@@ -474,57 +561,122 @@ class GitHubGraphQLClient:
         }}
         """
 
-    def _process_pr_node(
-        self, pr_node: Dict[str, Any], start_date: str, end_date: str, author: Optional[str]
-    ) -> Optional[Dict[str, Any]]:
+    def _build_gitlab_query(self, after_cursor: Optional[str] = None) -> str:
+        """Build GitLab-specific GraphQL query."""
+        cursor_arg = f', after: "{after_cursor}"' if after_cursor else ""
+
+        # GitLab uses different schema than GitHub
+        # fullPath format: "owner/repo"
+        return f"""
+        query($fullPath: ID!, $states: MergeRequestState!) {{
+          project(fullPath: $fullPath) {{
+            mergeRequests(
+              first: 25{cursor_arg}
+              state: $states
+              sort: UPDATED_DESC
+            ) {{
+              pageInfo {{
+                hasNextPage
+                endCursor
+              }}
+              nodes {{
+                iid
+                title
+                webUrl
+                createdAt
+                mergedAt
+                updatedAt
+                diffStatsSummary {{
+                  additions
+                  deletions
+                  fileCount
+                }}
+                author {{
+                  username
+                }}
+                commits {{
+                  nodes {{
+                    message
+                  }}
+                }}
+                approvedBy {{
+                  nodes {{
+                    username
+                  }}
+                }}
+                reviewers {{
+                  nodes {{
+                    username
+                  }}
+                }}
+                notes {{
+                  nodes {{
+                    author {{
+                      username
+                    }}
+                    body
+                    createdAt
+                  }}
+                }}
+                discussions {{
+                  nodes {{
+                    notes {{
+                      nodes {{
+                        author {{
+                          username
+                        }}
+                        body
+                        createdAt
+                      }}
+                    }}
+                  }}
+                }}
+              }}
+            }}
+          }}
+        }}
         """
-        Process a PR node from GraphQL response into metrics dictionary.
+
+    def _process_pr_node(self, pr_node: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process a PR/MR node from GraphQL response into metrics dictionary.
+
+        Note: Filtering (merged, author, date range) is done in the main loop.
+        This method only transforms the data structure.
+
+        Supports both GitHub and GitLab formats.
 
         Args:
-            pr_node: PR node from GraphQL
-            start_date: Filter start date
-            end_date: Filter end date
-            author: Optional author filter
+            pr_node: PR/MR node from GraphQL (already filtered)
 
         Returns:
-            PR metrics dictionary or None if filtered out
+            PR metrics dictionary
         """
+        if self.is_gitlab:
+            return self._process_gitlab_mr(pr_node)
+        else:
+            return self._process_github_pr(pr_node)
+
+    def _process_github_pr(self, pr_node: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Transform GitHub PR node into standardized metrics dictionary.
+
+        Note: Assumes pr_node is already filtered (merged, author, date range).
+        """
+        # Extract basic info
         pr_number = pr_node.get("number")
-
-        # Check if merged
-        if not pr_node.get("mergedAt"):
-            logger.debug(f"PR #{pr_number}: Not merged, skipping")
-            return None
-
-        # Check author (skip bots)
         pr_author = pr_node.get("author", {}).get("login", "") if pr_node.get("author") else ""
-        if not pr_author or self.is_bot_user(pr_author):
-            logger.debug(f"PR #{pr_number}: Bot author ({pr_author}), skipping")
-            return None
 
-        # Filter by author if specified
-        if author and pr_author != author:
-            logger.debug(f"PR #{pr_number}: Author mismatch ({pr_author} != {author}), skipping")
-            return None
-
-        # Filter by date range
+        # Parse timestamps
+        created_at = datetime.strptime(pr_node["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
         merged_at = datetime.strptime(pr_node["mergedAt"], "%Y-%m-%dT%H:%M:%SZ")
-        start = datetime.strptime(start_date, "%Y-%m-%d")
-        end = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
 
-        if not (start <= merged_at < end):
-            logger.debug(
-                f"PR #{pr_number}: Merged date {merged_at.date()} outside range ({start_date} to {end_date}), skipping"
-            )
-            return None
-
-        logger.debug(f"PR #{pr_number}: Matched! Author={pr_author}, Merged={merged_at.date()}")
+        logger.debug(f"Processing PR #{pr_number}: {pr_author} merged {merged_at.date()}")
 
         # Extract AI assistance info from commits
         ai_info = self._extract_ai_info(pr_node.get("commits", {}).get("nodes", []))
 
         # Calculate time metrics
-        created_at = datetime.strptime(pr_node["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
         time_to_merge_hours = (merged_at - created_at).total_seconds() / 3600
 
         # Process reviews
@@ -572,6 +724,146 @@ class GitHubGraphQLClient:
             "additions": pr_node.get("additions", 0),
             "deletions": pr_node.get("deletions", 0),
             "changed_files": pr_node.get("changedFiles", 0),
+        }
+
+    def _process_gitlab_mr(self, mr_node: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Transform GitLab MR node into standardized metrics dictionary.
+
+        Note: Assumes mr_node is already filtered (merged, author, date range).
+        """
+        # Extract basic info
+        mr_number = mr_node.get("iid")
+        mr_author = mr_node.get("author", {}).get("username", "") if mr_node.get("author") else ""
+
+        # Parse timestamps
+        created_at = datetime.strptime(mr_node["createdAt"], "%Y-%m-%dT%H:%M:%SZ")
+        merged_at = datetime.strptime(mr_node["mergedAt"], "%Y-%m-%dT%H:%M:%SZ")
+
+        logger.debug(f"Processing MR !{mr_number}: {mr_author} merged {merged_at.date()}")
+
+        # Extract AI assistance info from commits
+        commits = mr_node.get("commits", {}).get("nodes", [])
+        ai_info = extract_ai_info_from_commits(commits)
+
+        # Calculate time metrics
+        time_to_merge_hours = (merged_at - created_at).total_seconds() / 3600
+
+        # Process reviewers
+        review_metrics = self._process_gitlab_reviewers(mr_node)
+
+        # Process comments
+        comment_metrics = self._process_gitlab_comments(mr_node)
+
+        # Extract size metrics from diffStatsSummary
+        diff_stats = mr_node.get("diffStatsSummary", {})
+        additions = diff_stats.get("additions", 0)
+        deletions = diff_stats.get("deletions", 0)
+        changed_files = diff_stats.get("fileCount", 0)
+
+        return {
+            "pr_number": mr_number,
+            "title": mr_node.get("title", ""),
+            "author": mr_author,
+            "created_at": mr_node.get("createdAt"),
+            "merged_at": mr_node.get("mergedAt"),
+            "url": mr_node.get("webUrl"),
+            # AI metrics
+            "has_ai_assistance": ai_info["has_ai_assistance"],
+            "ai_tools": ai_info["ai_tools"],
+            "ai_commits_count": ai_info["ai_commits_count"],
+            "total_commits": len(commits),
+            "ai_percentage": ai_info["ai_percentage"],
+            # Time metrics
+            "time_to_merge_hours": time_to_merge_hours,
+            "time_to_merge_days": time_to_merge_hours / 24,
+            "time_to_first_review_hours": None,  # Not easily available in GitLab
+            # Review metrics
+            "changes_requested_count": 0,  # GitLab doesn't have explicit "changes requested" state
+            "approvals_count": review_metrics["approvals"],
+            "reviewers_count": len(review_metrics["reviewers"]),
+            "reviewers": list(review_metrics["reviewers"]),
+            "human_reviewers_count": len(review_metrics["human_reviewers"]),
+            "human_reviewers": list(review_metrics["human_reviewers"]),
+            # Comment metrics
+            "review_comments_count": comment_metrics["review_comments"],
+            "issue_comments_count": comment_metrics["issue_comments"],
+            "total_comments_count": comment_metrics["total_comments"],
+            "substantive_comments_count": comment_metrics["substantive_comments"],
+            "human_total_comments_count": comment_metrics["human_comments"],
+            "human_substantive_comments_count": comment_metrics["human_comments"],
+            "human_review_comments_count": 0,
+            "human_issue_comments_count": comment_metrics["human_comments"],
+            # Size metrics
+            "additions": additions,
+            "deletions": deletions,
+            "changed_files": changed_files,
+        }
+
+    def _process_gitlab_reviewers(self, mr_node: Dict[str, Any]) -> Dict[str, Any]:
+        """Process GitLab reviewer data to extract metrics."""
+        approvers = mr_node.get("approvedBy", {}).get("nodes", [])
+        reviewers = mr_node.get("reviewers", {}).get("nodes", [])
+
+        reviewer_usernames: Set[str] = set()
+        human_reviewers: Set[str] = set()
+
+        for reviewer in reviewers:
+            username = reviewer.get("username")
+            if username:
+                reviewer_usernames.add(username)
+                if not self.is_bot_user(username):
+                    human_reviewers.add(username)
+
+        for approver in approvers:
+            username = approver.get("username")
+            if username:
+                reviewer_usernames.add(username)
+                if not self.is_bot_user(username):
+                    human_reviewers.add(username)
+
+        return {
+            "reviewers": reviewer_usernames,
+            "human_reviewers": human_reviewers,
+            "approvals": len(approvers),
+        }
+
+    def _process_gitlab_comments(self, mr_node: Dict[str, Any]) -> Dict[str, Any]:
+        """Process GitLab comment data to extract metrics."""
+        notes = mr_node.get("notes", {}).get("nodes", [])
+        discussions = mr_node.get("discussions", {}).get("nodes", [])
+
+        total_comments = len(notes)
+        human_comments = 0
+        substantive_comments = 0
+
+        for note in notes:
+            username = note.get("author", {}).get("username") if note.get("author") else None
+            body = note.get("body", "").strip()
+
+            if body:
+                substantive_comments += 1
+                if username and not self.is_bot_user(username):
+                    human_comments += 1
+
+        # Count discussion comments
+        for discussion in discussions:
+            disc_notes = discussion.get("notes", {}).get("nodes", [])
+            total_comments += len(disc_notes)
+            for note in disc_notes:
+                username = note.get("author", {}).get("username") if note.get("author") else None
+                body = note.get("body", "").strip()
+                if body:
+                    substantive_comments += 1
+                    if username and not self.is_bot_user(username):
+                        human_comments += 1
+
+        return {
+            "total_comments": total_comments,
+            "substantive_comments": substantive_comments,
+            "human_comments": human_comments,
+            "review_comments": len(discussions),
+            "issue_comments": len(notes),
         }
 
     def _extract_ai_info(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -672,7 +964,7 @@ class GitHubGraphQLClient:
             "human_issue_comments": human_issue_comments,
         }
 
-    def clear_cache(self, cache_key: Optional[str] = None):
+    def clear_cache(self, cache_key: Optional[str] = None) -> None:
         """
         Clear cache data.
 
