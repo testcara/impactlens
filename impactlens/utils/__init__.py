@@ -17,6 +17,7 @@ from impactlens.utils.workflow_utils import (
     find_latest_comparison_report,
     find_latest_phase_report,
     should_generate_comparison,
+    handle_comparison_report_generation,
 )
 from impactlens.utils.anonymization import (
     NameAnonymizer,
@@ -41,6 +42,7 @@ __all__ = [
     "find_latest_comparison_report",
     "find_latest_phase_report",
     "should_generate_comparison",
+    "handle_comparison_report_generation",
     "NameAnonymizer",
     "anonymize_names_in_list",
     "anonymize_member_data",

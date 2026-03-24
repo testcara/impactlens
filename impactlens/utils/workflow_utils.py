@@ -802,6 +802,102 @@ def should_generate_comparison(phases: List) -> bool:
     return len(phases) >= MIN_PHASES_FOR_COMPARISON
 
 
+def handle_comparison_report_generation(
+    phases: List,
+    step_num: int,
+    report_type: str,
+    reports_dir: Path,
+    identifier: str,
+    config_file: Path,
+    hide_individual_names: bool,
+    no_upload: bool,
+    custom_config_file: Optional[Path],
+    generate_comparison_func,
+    user_param_name: str = "assignee",
+    user_param_value: Optional[str] = None,
+) -> int:
+    """
+    Handle comparison report generation, upload, and single-phase detection.
+
+    This function centralizes the logic for:
+    1. Checking if comparison should be generated (single vs multi-phase)
+    2. Generating the comparison report
+    3. Finding and uploading the report to Google Sheets
+
+    Args:
+        phases: List of phases (each phase is a tuple of (name, start, end))
+        step_num: Current step number for logging
+        report_type: "jira" or "pr"
+        reports_dir: Directory containing reports
+        identifier: User identifier or "general"
+        config_file: Path to config file
+        hide_individual_names: Whether to hide individual names
+        no_upload: Skip upload if True
+        custom_config_file: Optional custom config file path
+        generate_comparison_func: Callable function to generate comparison report
+        user_param_name: Parameter name for user filter ("assignee" for Jira, "author" for PR)
+        user_param_value: Optional user value (assignee for Jira, author for PR)
+
+    Returns:
+        0 if successful, 1 if failed
+
+    Example:
+        >>> # For Jira
+        >>> result = handle_comparison_report_generation(
+        ...     phases, 3, "jira", reports_dir, "general",
+        ...     config_file, False, False, None,
+        ...     generate_jira_comparison_report,
+        ...     user_param_name="assignee", user_param_value="john@example.com"
+        ... )
+        >>> # For PR
+        >>> result = handle_comparison_report_generation(
+        ...     phases, 3, "pr", reports_dir, "general",
+        ...     config_file, False, False, None,
+        ...     generate_pr_comparison_report,
+        ...     user_param_name="author", user_param_value="johndoe"
+        ... )
+    """
+    # Check if comparison should be generated (single vs multi-phase)
+    if not should_generate_comparison(phases):
+        phase_name = phases[0][0] if phases else "Unknown"
+        print(
+            f"{Colors.YELLOW}ℹ️  Single phase detected ('{phase_name}') - "
+            f"skipping comparison report{Colors.NC}"
+        )
+        print()
+        return 0
+
+    # Generate comparison report for multi-phase
+    print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
+
+    # Build kwargs with the appropriate parameter name
+    kwargs = {
+        "output_dir": str(reports_dir),
+        "config_file": config_file,
+        "hide_individual_names": hide_individual_names,
+    }
+    if user_param_value is not None:
+        kwargs[user_param_name] = user_param_value
+
+    if not generate_comparison_func(**kwargs):
+        print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")
+        return 1
+    print()
+
+    # Find and upload the latest comparison report
+    comparison_file = find_latest_comparison_report(reports_dir, identifier, report_type)
+    if comparison_file:
+        print(f"{Colors.GREEN}✓ Report generated: {comparison_file.name}{Colors.NC}")
+        print()
+        upload_to_google_sheets(
+            comparison_file, skip_upload=no_upload, config_path=custom_config_file
+        )
+    else:
+        print(f"{Colors.YELLOW}⚠️  No comparison file found{Colors.NC}")
+
+    return 0
+
+
 def load_members_emails(members_file: Path) -> List[str]:
     """
     Load team members from YAML configuration file.

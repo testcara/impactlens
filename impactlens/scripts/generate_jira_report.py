@@ -22,8 +22,7 @@ from impactlens.utils.workflow_utils import (
     get_project_root,
     cleanup_old_reports,
     upload_to_google_sheets,
-    find_latest_comparison_report,
-    should_generate_comparison,
+    handle_comparison_report_generation,
     load_members_emails,
     load_and_resolve_config,
     load_members_from_yaml,
@@ -388,35 +387,22 @@ Examples:
         step_num += 1
 
     # Generate comparison report (only if multiple phases)
-    if not should_generate_comparison(phases):
-        phase_name = phases[0][0] if phases else "Unknown"
-        print(
-            f"{Colors.YELLOW}ℹ️  Single phase detected ('{phase_name}') - "
-            f"skipping comparison report{Colors.NC}"
-        )
-        print()
-    else:
-        print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
-        if not generate_comparison_report(
-            assignee=assignee,
-            output_dir=str(reports_dir),
-            config_file=config_file,
-            hide_individual_names=args.hide_individual_names,
-        ):
-            print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")
-            return 1
-        print()
-
-        # Find and upload the latest comparison report
-        comparison_file = find_latest_comparison_report(reports_dir, identifier, "jira")
-        if comparison_file:
-            print(f"{Colors.GREEN}✓ Report generated: {comparison_file.name}{Colors.NC}")
-            print()
-            upload_to_google_sheets(
-                comparison_file, skip_upload=args.no_upload, config_path=custom_config_file
-            )
-        else:
-            print(f"No comparison file found!")
+    result = handle_comparison_report_generation(
+        phases=phases,
+        step_num=step_num,
+        report_type="jira",
+        reports_dir=reports_dir,
+        identifier=identifier,
+        config_file=config_file,
+        hide_individual_names=args.hide_individual_names,
+        no_upload=args.no_upload,
+        custom_config_file=custom_config_file,
+        generate_comparison_func=generate_comparison_report,
+        user_param_name="assignee",
+        user_param_value=assignee,
+    )
+    if result != 0:
+        return result
 
     print(f"{Colors.GREEN}Done!{Colors.NC}")
     return 0

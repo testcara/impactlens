@@ -113,16 +113,16 @@ jobs:
             cache-enabled: false
             pr-comment: false
           - test-name: "Single Period (Jira)"
-            config-dir: "test-one-single-period"
-            reports-dir: "test-single-period"
-            command: "jira full --config config/test-one-single-period/jira_report_config.yaml"
+            config-dir: "test-one-single-period-jira"
+            reports-dir: "test-single-period-jira"
+            command: "jira full --config config/test-one-single-period-jira/jira_report_config.yaml"
             extra-args: ""
             cache-enabled: false
             pr-comment: false
           - test-name: "Single Period (PR)"
-            config-dir: "test-one-single-period"
-            reports-dir: "test-single-period"
-            command: "pr full --config config/test-one-single-period/pr_report_config.yaml"
+            config-dir: "test-one-single-period-pr"
+            reports-dir: "test-single-period-pr"
+            command: "pr full --config config/test-one-single-period-pr/pr_report_config.yaml"
             extra-args: "--incremental"
             cache-enabled: false
             pr-comment: false
