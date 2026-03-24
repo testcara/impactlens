@@ -1,8 +1,7 @@
 name: CI
 
 on:
-  # Only run on PRs - merge to master doesn't need to re-run tests
-  # (tests already passed during PR review)
+  # Run only on PRs to master
   pull_request:
     branches: [master]
 
@@ -18,96 +17,73 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if only docs/config changed
-        id: docs_check
+      - name: Detect code vs docs/config changes
+        id: change_check
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
-            echo "Changed files:"
-            echo "$FILES"
+          FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} || true)
+          echo "Changed files: $FILES"
 
-            # Categorize changed files
-            TEST_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/test-(integration|aggregation)-ci/.*\.(yaml|yml)$' || true)
-            USER_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/.*\.(yaml|yml)$' | grep -v -E '^config/test-' | grep -v -E '\.example$' || true)
-            NON_CONFIG_NON_DOC_FILES=$(echo "$FILES" | grep -vE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore|config/.*\.(yaml|yml)$)' || true)
+          TEST_CONFIG=$(echo "$FILES" | grep -E '^config/test-(integration|aggregation)-ci/.*\.(ya?ml)$' || true)
+          USER_CONFIG=$(echo "$FILES" | grep -E '^config/.*\.(ya?ml)$' | grep -v -E '^config/test-' | grep -v -E '\.example$' || true)
+          NON_CONFIG_NON_DOC=$(echo "$FILES" | grep -vE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore|config/.*\.(ya?ml)$)' || true)
 
-            # Skip tests if:
-            # 1. Only docs/examples changed
-            # 2. Only USER config files changed (not test configs)
-            if [ -n "$TEST_CONFIG_FILES" ]; then
-              # Test configs changed - must run integration tests
-              echo "code_changed=true" >> $GITHUB_OUTPUT
-              echo "✅ Test config files changed - running integration tests"
-            elif [ -z "$NON_CONFIG_NON_DOC_FILES" ]; then
-              echo "code_changed=false" >> $GITHUB_OUTPUT
-              if [ -n "$USER_CONFIG_FILES" ]; then
-                echo "✅ User config-only PR - skipping CI tests"
-                echo "   (Config validation runs in separate workflow)"
-              else
-                echo "✅ Documentation-only PR - skipping tests"
-              fi
+          if [ -n "$TEST_CONFIG" ]; then
+            echo "code_changed=true" >> $GITHUB_OUTPUT
+            echo "✅ Test config changed - running tests"
+          elif [ -z "$NON_CONFIG_NON_DOC" ]; then
+            echo "code_changed=false" >> $GITHUB_OUTPUT
+            if [ -n "$USER_CONFIG" ]; then
+              echo "✅ User config-only PR - skipping CI tests"
             else
-              echo "code_changed=true" >> $GITHUB_OUTPUT
+              echo "✅ Docs-only PR - skipping CI tests"
             fi
           else
             echo "code_changed=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Skip tests (docs/config only)
-        if: steps.docs_check.outputs.code_changed == 'false'
+      - name: Skip CI if only docs/config changed
+        if: steps.change_check.outputs.code_changed == 'false'
         run: |
-          echo "✓ Skipping tests - only documentation or config files changed"
-          echo "  Config-only PRs are validated in the 'Config-Only PR Enforcement' workflow"
+          echo "⏭️ Skipping tests - only docs or config files changed"
           exit 0
 
       - name: Set up Python ${{ matrix.python-version }}
-        if: steps.docs_check.outputs.code_changed == 'true'
+        if: steps.change_check.outputs.code_changed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install tox
-        if: steps.docs_check.outputs.code_changed == 'true'
+      - name: Install dependencies
+        if: steps.change_check.outputs.code_changed == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install tox tox-gh-actions
 
-      - name: Run tests with tox (Python ${{ matrix.python-version }})
-        if: steps.docs_check.outputs.code_changed == 'true'
+      - name: Run tests via tox
+        if: steps.change_check.outputs.code_changed == 'true'
         run: |
           echo "=========================================="
           echo "Running tests on Python ${{ matrix.python-version }}"
           echo "=========================================="
           tox -e py$(echo "${{ matrix.python-version }}" | tr -d '.')
 
-      - name: Run lint checks (Python 3.11 only)
-        if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
-        run: |
-          echo "Running lint checks..."
-          tox -e lint
-
-      - name: Skip lint checks (Python ${{ matrix.python-version }})
-        if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version != '3.11'
-        run: |
-          echo "⏭️  Skipping lint checks (only runs on Python 3.11)"
+      - name: Run lint (Python 3.11 only)
+        if: steps.change_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
+        run: tox -e lint
 
       - name: Run type checking (Python 3.11 only)
-        if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
+        if: steps.change_check.outputs.code_changed == 'true' && matrix.python-version == '3.11'
         continue-on-error: true
-        run: |
-          echo "Running type checks..."
-          tox -e type
+        run: tox -e type
 
-      - name: Skip type checking (Python ${{ matrix.python-version }})
-        if: steps.docs_check.outputs.code_changed == 'true' && matrix.python-version != '3.11'
-        run: |
-          echo "⏭️  Skipping type checks (only runs on Python 3.11)"
+      - name: Skip lint/type for other Python versions
+        if: steps.change_check.outputs.code_changed == 'true' && matrix.python-version != '3.11'
+        run: echo "⏭️ Skipping lint/type for Python ${{ matrix.python-version }}"
 
-  integration-test-basic:
-    name: Integration Test (Basic)
+  integration-tests:
+    name: Integration Test - ${{ matrix.test-name }}
     runs-on: ubuntu-latest
     needs: test
-    # Only run if credentials are available
     if: |
       github.event_name == 'push' ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
@@ -115,73 +91,88 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - test-name: "Basic"
+            config-dir: "test-simple-team"
+            reports-dir: "test-simple-team"
+            command: "full --config config/test-simple-team"
+            extra-args: "--incremental"
+            cache-enabled: true
+            pr-comment: true
+          - test-name: "Multi-Team Aggregation"
+            config-dir: "test-aggregation-ci"
+            reports-dir: "test-ci-aggregated"
+            command: "full --config config/test-aggregation-ci"
+            extra-args: ""
+            cache-enabled: false
+            pr-comment: false
+          - test-name: "Single Period"
+            config-dir: "test-one-single-period"
+            reports-dir: "test-single-period"
+            command: "jira full --config config/test-one-single-period/jira_report_config.yaml"
+            extra-args: ""
+            cache-enabled: false
+            pr-comment: false
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check if code or test configs changed
-        id: docs_check
+      - name: Check if integration test should run
+        id: change_check
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} || true)
+          CONFIG_DIR="${{ matrix.config-dir }}"
+          TEST_CONFIG=$(echo "$FILES" | grep -E "^config/${CONFIG_DIR}/.*\.(ya?ml)$" || true)
+          CODE_CHANGED=$(echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore|config/[^/]+/.*\.(ya?ml)$)' && echo "true" || echo "false")
 
-            # Check for test config changes
-            TEST_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/test-simple-team/.*\.(yaml|yml)$' || true)
-
-            # Check for code/non-doc changes
-            CODE_CHANGED=$(echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore|config/[^/]+/.*\.(yaml|yml)$)' && echo "true" || echo "false")
-
-            if [ -n "$TEST_CONFIG_FILES" ] || [ "$CODE_CHANGED" = "true" ]; then
-              echo "code_changed=true" >> $GITHUB_OUTPUT
-              if [ -n "$TEST_CONFIG_FILES" ]; then
-                echo "✅ Test config files changed - running integration tests"
-              fi
-            else
-              echo "code_changed=false" >> $GITHUB_OUTPUT
-              echo "⏭️ Only docs/user configs changed - skipping integration tests"
-            fi
-          else
+          if [ -n "$TEST_CONFIG" ] || [ "$CODE_CHANGED" = "true" ]; then
             echo "code_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "code_changed=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Skip integration tests (docs only)
-        if: steps.docs_check.outputs.code_changed == 'false'
-        run: |
-          echo "✓ Skipping integration tests - only documentation files changed"
-          exit 0
+      - name: Skip test if no relevant changes
+        if: steps.change_check.outputs.code_changed == 'false'
+        run: echo "⏭️ Skipping integration test - only docs/user configs changed"
 
-      - name: Set up Python
-        if: steps.docs_check.outputs.code_changed == 'true'
+      - name: Setup Python & dependencies
+        if: steps.change_check.outputs.code_changed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        if: steps.docs_check.outputs.code_changed == 'true'
+      - name: Install project
+        if: steps.change_check.outputs.code_changed == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -e .
 
-      - name: Setup Google Sheets credentials
-        if: steps.docs_check.outputs.code_changed == 'true'
+      - name: Setup credentials
+        if: steps.change_check.outputs.code_changed == 'true'
         env:
           GOOGLE_CREDENTIALS_BASE64: ${{ secrets.GOOGLE_CREDENTIALS_BASE64 }}
         run: bash .github/scripts/setup-google-credentials.sh
 
-      - name: Restore GitHub PR cache
-        if: steps.docs_check.outputs.code_changed == 'true'
+      - name: Restore cache
+        if: steps.change_check.outputs.code_changed == 'true' && matrix.cache-enabled
         uses: actions/cache@v4
         with:
           path: .cache/github
-          key: integration-test-basic-pr-cache-${{ hashFiles('config/test-simple-team/pr_report_config.yaml') }}-${{ github.run_id }}
+          key: integration-${{ matrix.config-dir }}-cache-${{ hashFiles('config/${{ matrix.config-dir }}/**/*.yaml') }}-${{ github.run_id }}
           restore-keys: |
-            integration-test-basic-pr-cache-${{ hashFiles('config/test-simple-team/pr_report_config.yaml') }}-
-            integration-test-basic-pr-cache-
+            integration-${{ matrix.config-dir }}-cache-
 
-      - name: Run integration test - Full workflow (Jira + PR + Email)
-        if: steps.docs_check.outputs.code_changed == 'true'
+      - name: Clear cache if disabled
+        if: steps.change_check.outputs.code_changed == 'true' && !matrix.cache-enabled
+        run: rm -rf .cache/github/
+
+      - name: Run integration test
+        if: steps.change_check.outputs.code_changed == 'true'
         env:
           JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
@@ -194,212 +185,34 @@ jobs:
           GITHUB_PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           echo "=========================================="
-          echo "Running Basic Integration Test"
+          echo "Running ${{ matrix.test-name }} integration test"
           echo "=========================================="
-          echo "Testing: Jira + PR + Email Notification (test mode)"
-          echo ""
 
-          # Get upload args using shared script
           UPLOAD_ARGS=$(.github/scripts/get-upload-args.sh)
-
-          if [ -n "$UPLOAD_ARGS" ]; then
-            echo "⚠️  Google Sheets not configured, skipping upload"
-          else
-            echo "✓ Google Sheets configured, will upload reports"
-          fi
-
-          # Run full workflow with mail-save-file mode (emails saved to files)
-          python -m impactlens.cli full \
-            --config config/test-simple-team \
-            $UPLOAD_ARGS \
-            --incremental \
+          python -m impactlens.cli ${{ matrix.command }} $UPLOAD_ARGS ${{ matrix.extra-args }} \
             --hide-individual-names \
-            --mail-save-file reports/test-simple-team/emails
+            --mail-save-file reports/${{ matrix.reports-dir }}/emails
 
-          echo ""
-          echo "✓ Basic integration test completed (Jira + PR + Email + AI Analysis)"
-          echo "Reports:"
-          ls -lh reports/test-simple-team/jira/ 2>/dev/null || echo "  No Jira reports"
-          ls -lh reports/test-simple-team/github/ 2>/dev/null || echo "  No PR reports"
-
-      - name: Upload test reports as artifacts
-        if: steps.docs_check.outputs.code_changed == 'true' && always()
+      - name: Upload reports
+        if: steps.change_check.outputs.code_changed == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-basic-reports
-          path: |
-            reports/test-simple-team/
+          name: integration-${{ matrix.config-dir }}-reports
+          path: reports/
           retention-days: 7
 
-      - name: Report Statistics and PR Comment
-        if: steps.docs_check.outputs.code_changed == 'true' && always()
+      - name: PR Comment
+        if: steps.change_check.outputs.code_changed == 'true' && matrix.pr-comment
         uses: ./.github/actions/report-comment
         with:
-          reports_dir: "reports/test-simple-team"
+          reports_dir: reports/${{ matrix.reports-dir }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Integration test summary
-        if: steps.docs_check.outputs.code_changed == 'true' && always()
+      - name: Test summary
+        if: steps.change_check.outputs.code_changed == 'true'
         run: |
           echo "=========================================="
-          echo "Basic Integration Test Summary"
+          echo "${{ matrix.test-name }} Test Summary"
           echo "=========================================="
-          echo ""
-          echo "Test Scenario:"
-          echo "  - Config: config/test-simple-team/"
-          echo "  - Reports: reports/test-simple-team/"
-          echo ""
-          echo "✅ Basic integration test completed successfully"
-
-  integration-test-aggregation:
-    name: Integration Test (Multi-Team Aggregation)
-    runs-on: ubuntu-latest
-    needs: test
-    # Only run if credentials are available
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check if code or test configs changed
-        id: docs_check
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
-
-            # Check for test config changes
-            TEST_CONFIG_FILES=$(echo "$FILES" | grep -E '^config/test-aggregation-ci/.*\.(yaml|yml)$' || true)
-
-            # Check for code/non-doc changes
-            CODE_CHANGED=$(echo "$FILES" | grep -qvE '^(README\.md|docs/.*|config/.*\.example|LICENSE|\.gitignore|config/[^/]+/.*\.(yaml|yml)$)' && echo "true" || echo "false")
-
-            if [ -n "$TEST_CONFIG_FILES" ] || [ "$CODE_CHANGED" = "true" ]; then
-              echo "code_changed=true" >> $GITHUB_OUTPUT
-              if [ -n "$TEST_CONFIG_FILES" ]; then
-                echo "✅ Test config files changed - running aggregation tests"
-              fi
-            else
-              echo "code_changed=false" >> $GITHUB_OUTPUT
-              echo "⏭️ Only docs/user configs changed - skipping aggregation tests"
-            fi
-          else
-            echo "code_changed=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Skip aggregation tests (docs only)
-        if: steps.docs_check.outputs.code_changed == 'false'
-        run: |
-          echo "✓ Skipping aggregation tests - only documentation files changed"
-          exit 0
-
-      - name: Set up Python
-        if: steps.docs_check.outputs.code_changed == 'true'
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        if: steps.docs_check.outputs.code_changed == 'true'
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-
-      - name: Setup Google Sheets credentials
-        if: steps.docs_check.outputs.code_changed == 'true'
-        env:
-          GOOGLE_CREDENTIALS_BASE64: ${{ secrets.GOOGLE_CREDENTIALS_BASE64 }}
-        run: bash .github/scripts/setup-google-credentials.sh
-
-      - name: Clear cache before aggregation test
-        if: steps.docs_check.outputs.code_changed == 'true'
-        run: |
-          echo "Clearing GitHub PR cache to ensure fresh data..."
-          rm -rf .cache/github/
-          echo "✓ Cache cleared"
-
-      - name: Run integration test - Multi-team aggregation (using full command)
-        if: steps.docs_check.outputs.code_changed == 'true'
-        env:
-          JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
-          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CHARTS_UPLOAD_TOKEN: ${{ secrets.CHARTS_UPLOAD_TOKEN }}
-          GOOGLE_SPREADSHEET_ID: ${{ secrets.TEST_CI_GOOGLE_SPREADSHEET_ID }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          SMTP_USER: ${{ secrets.MAIL_APP_USER }}
-          SMTP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
-        run: |
-          echo "=========================================="
-          echo "Multi-Team Aggregation Test"
-          echo "=========================================="
-          echo "Using impactlens full command with auto-detection"
-          echo ""
-
-          # Get upload args using shared script
-          UPLOAD_ARGS=$(.github/scripts/get-upload-args.sh)
-
-          if [ -n "$UPLOAD_ARGS" ]; then
-            echo "⚠️  Google Sheets not configured, skipping upload"
-          else
-            echo "✓ Google Sheets configured, will upload reports"
-          fi
-
-          # The 'full' command will:
-          # 1. Detect aggregation_config.yaml in config/test-aggregation-ci/
-          # 2. Process test-ci-team1 and test-ci-team2 (skip individual emails)
-          # 3. Aggregate reports
-          # 4. Send deduplicated email notifications once at the end
-          echo "Running: impactlens full --config config/test-aggregation-ci"
-          python -m impactlens.cli full \
-            --config config/test-aggregation-ci \
-            $UPLOAD_ARGS \
-            --hide-individual-names \
-            --mail-save-file reports/test-ci-aggregated/emails
-
-          echo ""
-          echo "✓ Multi-team aggregation test completed"
-          echo "Generated reports:"
-          ls -lh reports/test-ci-team1/ 2>/dev/null || echo "  No team1 reports"
-          ls -lh reports/test-ci-team2/ 2>/dev/null || echo "  No team2 reports"
-          ls -lh reports/test-ci-aggregated/ 2>/dev/null || echo "  No aggregated reports"
-
-      - name: Upload test reports as artifacts
-        if: steps.docs_check.outputs.code_changed == 'true' && always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: integration-test-aggregation-reports
-          path: |
-            reports/test-ci-team1/
-            reports/test-ci-team2/
-            reports/test-ci-aggregated/
-          retention-days: 7
-
-      - name: Integration test summary
-        if: steps.docs_check.outputs.code_changed == 'true' && always()
-        run: |
-          echo "=========================================="
-          echo "Multi-Team Aggregation Test Summary"
-          echo "=========================================="
-          echo ""
-          echo "Test Scenarios:"
-          echo "  - Team 1: config/test-aggregation-ci/test-ci-team1/"
-          echo "  - Team 2: config/test-aggregation-ci/test-ci-team2/"
-          echo "  - Aggregation: config/test-aggregation-ci/aggregation_config.yaml"
-          echo "  - Team 1 Reports: reports/test-ci-team1/"
-          echo "  - Team 2 Reports: reports/test-ci-team2/"
-          echo "  - Aggregated Reports: reports/test-ci-aggregated/"
-          echo ""
-          if [ -d "reports/test-ci-aggregated" ]; then
-            echo "📊 Aggregated report files:"
-            ls -1 reports/test-ci-aggregated/ 2>/dev/null | sed 's/^/     /' || echo "     (none generated)"
-            echo ""
-          fi
-          echo "✅ Multi-team aggregation test completed successfully"
+          echo "Config: config/${{ matrix.config-dir }}/"
+          echo "Reports: reports/${{ matrix.reports-dir }}/"

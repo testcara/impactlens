@@ -796,7 +796,9 @@ def combine_comparison_reports(
     report_files = all_files
 
     if not report_files:
-        raise ValueError(f"No {report_type} comparison reports found in {reports_dir}")
+        # Return None instead of raising error - caller will handle gracefully
+        # This happens when there's only 1 phase (no comparison reports generated)
+        return None
 
     print(f"Found {len(report_files)} reports to combine")
 
