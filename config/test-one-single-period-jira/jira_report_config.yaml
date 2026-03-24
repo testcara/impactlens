@@ -1,0 +1,27 @@
+# Test configuration for CI integration testing
+# This config uses a small date range and minimal team members for fast testing
+
+project:
+  jira_url: "https://redhat.atlassian.net"
+  jira_project_key: "KFLUXUI"
+
+phases:
+  - name: "Test Period 1"
+    start: "2025-10-01"
+    end: "2025-10-31"
+
+default_assignee: "" # "" represent team
+
+members:
+  - email: wlin@redhat.com
+  - email: sbudhwar@redhat.com
+
+# Use test output directory to avoid polluting main reports
+output_dir: "reports/test-single-period-jira/jira"
+# Send Hashed members name to individuals.
+# Required by CI for first-time run.
+# Disabled it if you do not want to be mailed every run.
+email_anonymous_id: true
+# Remove old reports when we rerun ci jobs
+replace_existing_reports: true
+no_ai_analysis: true

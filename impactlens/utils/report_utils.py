@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import List, Optional, Any, Tuple, Dict
 
 from impactlens.utils.anonymization import anonymize_name
+from impactlens.utils.workflow_utils import MIN_PHASES_FOR_COMPARISON
 
 # Documentation URL constant
 METRICS_GUIDE_URL = "https://github.com/testcara/impactlens/blob/master/docs/METRICS_GUIDE.md"
@@ -442,9 +443,10 @@ def validate_report_files(
             print(f"  {reports_dir}/{file_prefix}general_*.json")
         return 1
 
-    if len(report_files) < 2:
-        print(f"Warning: Found only {len(report_files)} report(s), need at least 2 for comparison")
-        print(f"Found: {', '.join(report_files)}")
+    # Changed from 2 to 1: Comparison reports are needed even for single phase
+    # because they provide the TSV format that combines team + individual members horizontally
+    if len(report_files) < MIN_PHASES_FOR_COMPARISON:
+        print(f"Warning: No report files found")
         return 1
 
     return 0
@@ -796,7 +798,9 @@ def combine_comparison_reports(
     report_files = all_files
 
     if not report_files:
-        raise ValueError(f"No {report_type} comparison reports found in {reports_dir}")
+        # Return None instead of raising error - caller will handle gracefully
+        # This happens when there's only 1 phase (no comparison reports generated)
+        return None
 
     print(f"Found {len(report_files)} reports to combine")
 

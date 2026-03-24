@@ -130,11 +130,21 @@ def upload_file_to_github(
         "Accept": "application/vnd.github.v3+json",
     }
 
+    # Check if file already exists to get its SHA
+    existing_sha = None
+    get_response = requests.get(url, headers=headers, params={"ref": branch})
+    if get_response.status_code == 200:
+        existing_sha = get_response.json()["sha"]
+
     data = {
         "message": commit_message,
         "content": content,
         "branch": branch,
     }
+
+    # Include SHA if file already exists
+    if existing_sha:
+        data["sha"] = existing_sha
 
     response = requests.put(url, headers=headers, json=data)
     if response.status_code in [201, 200]:
