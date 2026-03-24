@@ -15,6 +15,8 @@ from impactlens.utils import (
     Colors,
     cleanup_old_reports,
     find_latest_comparison_report,
+    find_latest_phase_report,
+    should_generate_comparison,
     normalize_username,
 )
 
@@ -101,7 +103,23 @@ class ReportOrchestrator:
             print()
             step_num += 1
 
-        # Final step: Generate comparison
+        # Final step: Generate comparison (only if multiple phases)
+        if not should_generate_comparison(self.config.phases):
+            phase_name = self.config.phases[0].name if self.config.phases else "Unknown"
+            print(
+                f"{Colors.YELLOW}ℹ️  Single phase detected ('{phase_name}') - "
+                f"skipping comparison report{Colors.NC}"
+            )
+            print()
+            # Return the single phase report instead
+            latest_report = find_latest_phase_report(
+                self.reports_dir, identifier, self.config.report_type
+            )
+            if latest_report is None:
+                print(f"{Colors.RED}  ✗ Failed to find phase report{Colors.NC}")
+                return None
+            return latest_report
+
         print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
         if not self.generate_comparison_report(assignee=assignee):
             print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")

@@ -15,6 +15,9 @@ from datetime import datetime
 
 from impactlens.utils.logger import Colors, set_log_level
 
+# Constants
+MIN_PHASES_FOR_COMPARISON = 2
+
 
 def apply_project_settings_to_env(
     project_settings: Dict[str, Any], root_config: Optional[Dict[str, Any]] = None
@@ -746,6 +749,57 @@ def find_latest_comparison_report(
     # Sort by modification time, newest first
     files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return files[0]
+
+
+def find_latest_phase_report(
+    reports_dir: Path, identifier: str, report_type: str
+) -> Optional[Path]:
+    """
+    Find the most recent phase report (for single-phase mode).
+
+    Args:
+        reports_dir: Directory containing reports
+        identifier: User identifier or "general"
+        report_type: "jira" or "pr"
+
+    Returns:
+        Path to latest report or None
+    """
+    if report_type == "jira":
+        pattern = f"jira_metrics_{identifier}_*.json"
+    elif report_type == "pr":
+        pattern = f"pr_metrics_{identifier}_*.json"
+    else:
+        return None
+
+    files = list(reports_dir.glob(pattern))
+    if not files:
+        return None
+
+    # Sort by modification time, newest first
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return files[0]
+
+
+def should_generate_comparison(phases: List) -> bool:
+    """
+    Check if comparison report should be generated.
+
+    Comparison reports require at least 2 phases to compare metrics between periods.
+
+    Args:
+        phases: List of phases (each phase is a tuple of (name, start, end))
+
+    Returns:
+        True if comparison should be generated (2+ phases), False otherwise
+
+    Examples:
+        >>> should_generate_comparison([("Phase 1", "2025-01-01", "2025-01-31")])
+        False
+        >>> should_generate_comparison([("P1", "2025-01-01", "2025-01-31"), ("P2", "2025-02-01", "2025-02-28")])
+        True
+    """
+    return len(phases) >= MIN_PHASES_FOR_COMPARISON
 
 
 def load_members_emails(members_file: Path) -> List[str]:

@@ -23,6 +23,7 @@ from impactlens.utils.workflow_utils import (
     cleanup_old_reports,
     upload_to_google_sheets,
     find_latest_comparison_report,
+    should_generate_comparison,
     load_members_from_yaml,
     load_and_resolve_config,
     aggregate_member_values_for_phases,
@@ -280,18 +281,25 @@ Examples:
                 project_prefix=project_prefix,
                 hide_individual_names=args.hide_individual_names,
             )
-            print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
-            print()
 
-            # Upload to Google Sheets if not disabled
-            upload_to_google_sheets(
-                output_file, skip_upload=args.no_upload, config_path=custom_config_file
-            )
+            if output_file is None:
+                print(
+                    f"{Colors.YELLOW}ℹ️  No comparison reports found (single phase mode), skipping combine step{Colors.NC}"
+                )
+                print()
+            else:
+                print(f"{Colors.GREEN}✓ Combined report generated: {output_file.name}{Colors.NC}")
+                print()
 
-            print()
-            print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
-            print(f"{Colors.GREEN}✓ Combined report completed successfully!{Colors.NC}")
-            print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
+                # Upload to Google Sheets if not disabled
+                upload_to_google_sheets(
+                    output_file, skip_upload=args.no_upload, config_path=custom_config_file
+                )
+
+                print()
+                print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
+                print(f"{Colors.GREEN}✓ Combined report completed successfully!{Colors.NC}")
+                print(f"{Colors.GREEN}{'=' * 40}{Colors.NC}")
 
         except Exception as e:
             print(f"{Colors.RED}Error combining reports: {e}{Colors.NC}")
@@ -418,26 +426,36 @@ Examples:
         print()
         step_num += 1
 
-    # Generate comparison report
-    print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
-    if not generate_comparison_report(
-        author=author,
-        output_dir=str(reports_dir),
-        config_file=config_file,
-        hide_individual_names=args.hide_individual_names,
-    ):
-        print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")
-        return 1
-    print()
-
-    # Find and upload the latest comparison report
-    comparison_file = find_latest_comparison_report(reports_dir, identifier, "pr")
-    if comparison_file:
-        print(f"{Colors.GREEN}✓ Report generated: {comparison_file.name}{Colors.NC}")
-        print()
-        upload_to_google_sheets(
-            comparison_file, skip_upload=args.no_upload, config_path=custom_config_file
+    # Generate comparison report (only if multiple phases)
+    if not should_generate_comparison(phases):
+        phase_name = phases[0][0] if phases else "Unknown"
+        print(
+            f"{Colors.YELLOW}ℹ️  Single phase detected ('{phase_name}') - "
+            f"skipping comparison report{Colors.NC}"
         )
+        print()
+    else:
+        print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
+        if not generate_comparison_report(
+            author=author,
+            output_dir=str(reports_dir),
+            config_file=config_file,
+            hide_individual_names=args.hide_individual_names,
+        ):
+            print(f"{Colors.RED}  ✗ Failed to generate comparison report{Colors.NC}")
+            return 1
+        print()
+
+        # Find and upload the latest comparison report
+        comparison_file = find_latest_comparison_report(reports_dir, identifier, "pr")
+        if comparison_file:
+            print(f"{Colors.GREEN}✓ Report generated: {comparison_file.name}{Colors.NC}")
+            print()
+            upload_to_google_sheets(
+                comparison_file, skip_upload=args.no_upload, config_path=custom_config_file
+            )
+        else:
+            print(f"No comparison file found!")
 
     print(f"{Colors.GREEN}Done!{Colors.NC}")
     return 0

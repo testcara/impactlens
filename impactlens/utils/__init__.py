@@ -9,11 +9,14 @@ from impactlens.utils.report_utils import (
 )
 from impactlens.utils.workflow_utils import (
     Colors,
+    MIN_PHASES_FOR_COMPARISON,
     get_project_root,
     load_config_file,
     cleanup_old_reports,
     upload_to_google_sheets,
     find_latest_comparison_report,
+    find_latest_phase_report,
+    should_generate_comparison,
 )
 from impactlens.utils.anonymization import (
     NameAnonymizer,
@@ -30,11 +33,14 @@ __all__ = [
     "format_metric_changes",
     "add_metric_change",
     "Colors",
+    "MIN_PHASES_FOR_COMPARISON",
     "get_project_root",
     "load_config_file",
     "cleanup_old_reports",
     "upload_to_google_sheets",
     "find_latest_comparison_report",
+    "find_latest_phase_report",
+    "should_generate_comparison",
     "NameAnonymizer",
     "anonymize_names_in_list",
     "anonymize_member_data",
