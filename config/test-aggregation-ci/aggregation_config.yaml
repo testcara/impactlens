@@ -9,3 +9,4 @@ aggregation:
 output_dir: "reports/test-ci-aggregated"
 # Remove old reports when we rerun ci jobs
 replace_existing_reports: true
+no_ai_analysis: true
