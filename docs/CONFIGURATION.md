@@ -120,7 +120,7 @@ project: myorg/frontend-app
 output_dir: reports/frontend/github  # Must specify for aggregation!
 members:
   - email: charlie@company.com
-    github_username: charlie-gh
+    git_username: charlie-gh
     capacity: 0.5
 
 # frontend/jira_report_config.yaml
@@ -135,7 +135,7 @@ project: myorg/backend-service
 output_dir: reports/backend/github  # Must specify for aggregation!
 members:
   - email: charlie@company.com  # Same email across all projects
-    github_username: charlie-gh
+    git_username: charlie-gh
     capacity: 0.5
 ```
 
@@ -276,9 +276,9 @@ members:
 ```yaml
 members:
   - email: alice@company.com # Same email as Jira for consistent anonymization
-    github_username: alice-github # GitHub username
+    git_username: alice-github # GitHub username
   - email: bob@company.com
-    github_username: bob-github
+    git_username: bob-github
 ```
 
 **Leave Days & Capacity:**

@@ -62,7 +62,7 @@ def main():
         if config_file.exists():
             members_detailed = load_members_from_yaml(config_file)
             for member_id, member_info in members_detailed.items():
-                if member_info.get("github_username") == args.author:
+                if member_info.get("git_username") == args.author:
                     # Found the member, use email for anonymization if available
                     if member_info.get("email"):
                         anonymization_identifier = member_info.get("email")

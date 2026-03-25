@@ -15,9 +15,9 @@ default_author: "" # "" represent team
 
 members:
   - email: wlin@redhat.com
-    github_username: testcara
+    git_username: testcara
   - email: sbudhwar@redhat.com
-    github_username: sahil143
+    git_username: sahil143
 
 # Use test output directory to avoid polluting main reports
 output_dir: "reports/test-single-period-pr/github"

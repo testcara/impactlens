@@ -452,7 +452,7 @@ def load_members_from_yaml(config_path: Path):
 
     Supports both formats:
     - members with 'email' field (for Jira)
-    - members with 'github_username' field (for GitHub)
+    - members with 'git_username' field (for GitHub)
 
     Args:
         config_path: Path to YAML configuration file
@@ -463,7 +463,7 @@ def load_members_from_yaml(config_path: Path):
             {
                 'wlin@redhat.com': {
                     'email': 'wlin@redhat.com',
-                    'github_username': 'testcara',
+                    'git_username': 'testcara',
                     'leave_days': [...],
                     'capacity': 0.8
                 },
@@ -488,11 +488,11 @@ def load_members_from_yaml(config_path: Path):
     members_details = {}
     for member in config["members"]:
         if isinstance(member, dict):
-            identifier = member.get("email") or member.get("github_username")
+            identifier = member.get("email") or member.get("git_username")
             if identifier:
                 members_details[identifier] = {
                     "email": member.get("email"),
-                    "github_username": member.get("github_username"),
+                    "git_username": member.get("git_username"),
                     "leave_days": member.get("leave_days") or [],
                     "capacity": member.get("capacity", 1.0),
                 }

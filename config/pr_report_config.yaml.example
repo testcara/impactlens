@@ -39,34 +39,17 @@ members:
   # - capacity: Work capacity 0.0-1.0 (1.0=full time, 0.5=half time, single value or per-phase list)
 
   - email: sbudhwar@redhat.com  # Same email as in Jira config
-    github_username: sahil143
+    git_username: sahil143
     leave_days: 0 # Optional when it is 0
     capacity: 1 # Optional when it is 1
   - email: wlin@redhat.com
-    github_username: testcara
+    git_username: testcara
     leave_days:
       - 26
       - 20
       - 11.5
     capacity: 0.8
-  - email: rgalvao@redhat.com
-    github_username: rrosatti
-  - email: mmarcin@redhat.com
-    github_username: marcin-michal
-  - email: sjochman@redhat.com
-    github_username: StanislavJochman
-  - email: jpolonip@redhat.com
-    github_username: JoaoPedroPP
-  - email: djanaki@redhat.com
-    github_username: janaki29
-  - email: rakshett@redhat.com
-    github_username: rakshett
-  - email: mtakac@redhat.com
-    github_username: milantaky
-  - email: abhindas@redhat.com
-    github_username: abhinandan13jan
-  - email: kkanova@redhat.com
-    github_username: Katka92
+
 
 # Send Hashed Develop ID to individuals.
 # Required by CI for first-time run.

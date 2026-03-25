@@ -179,18 +179,18 @@ def generate_all_members_reports(
     for member_id, member_info in members_detailed.items():
         # Use 'name' (GitHub username) for API query
         # The script will automatically look up email from config for anonymization
-        github_username = member_info.get("github_username") or member_id
+        git_username = member_info.get("git_username") or member_id
         member_email = member_info.get("email")
 
         # Get display identifier for member (use email for anonymization if available)
-        display_identifier = member_email if member_email else github_username
+        display_identifier = member_email if member_email else git_username
         display_member = get_identifier_for_display(display_identifier, hide_individual_names)
         print(f"{Colors.BLUE}>>> Generating Report for: {display_member}{Colors.NC}")
         print()
 
         # Pass GitHub username for API query
         # The script will find the corresponding email from config automatically
-        cmd = [sys.executable, "-m", script_name, github_username]
+        cmd = [sys.executable, "-m", script_name, git_username]
         if config_file:
             cmd.extend(["--config", str(config_file)])
         # Skip upload for member reports unless --upload-members is specified
@@ -200,7 +200,7 @@ def generate_all_members_reports(
             cmd.append("--hide-individual-names")
         result = subprocess.run(cmd)
         if result.returncode != 0:
-            failed_members.append(github_username)
+            failed_members.append(git_username)
         print()
         print()
 
@@ -354,7 +354,7 @@ Examples:
         # Try to find email for this author from config
         members_detailed = load_members_from_yaml(config_file)
         for member_id, member_info in members_detailed.items():
-            if member_info.get("github_username") == author:
+            if member_info.get("git_username") == author:
                 # Found the member, use email for anonymization if available
                 if member_info.get("email"):
                     anonymization_identifier = member_info.get("email")

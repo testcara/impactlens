@@ -322,8 +322,8 @@ def notify_members(
         >>> # Anonymize using email prefix (normalized)
         >>> anonymizer.anonymize(normalize_username("alice@example.com"))
         >>> members = [
-        ...     {"email": "alice@example.com", "github_username": "alice"},
-        ...     {"email": "bob@example.com", "github_username": "bob"}
+        ...     {"email": "alice@example.com", "git_username": "alice"},
+        ...     {"email": "bob@example.com", "git_username": "bob"}
         ... ]
         >>> results = notify_members(
         ...     anonymizer,

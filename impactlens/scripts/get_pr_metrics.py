@@ -55,9 +55,9 @@ Examples:
     )
     args = parser.parse_args()
 
-    # Handle legacy github_username parameter (if it exists)
-    if hasattr(args, "github_username") and args.github_username:
-        args.author = args.github_username
+    # Handle legacy git_username parameter (if it exists)
+    if hasattr(args, "git_username") and args.git_username:
+        args.author = args.git_username
 
     # Validate date format
     validate_date_range(args.start, args.end)
@@ -70,7 +70,7 @@ Examples:
         if config_path.exists():
             members_detailed = load_members_from_yaml(config_path)
             for member_id, member_info in members_detailed.items():
-                if member_info.get("github_username") == args.author:
+                if member_info.get("git_username") == args.author:
                     email = member_info.get("email")
                     if not email:
                         raise ValueError(
@@ -128,9 +128,9 @@ Examples:
                 # Extract GitHub usernames from team members
                 team_members = []
                 for member_id, member_info in members_detailed.items():
-                    github_username = member_info.get("github_username") or member_id
-                    if github_username:
-                        team_members.append(github_username)
+                    git_username = member_info.get("git_username") or member_id
+                    if git_username:
+                        team_members.append(git_username)
                 if team_members:
                     print(f"📋 Loaded {len(team_members)} team members from config")
                     print(f"   Team report will only include PRs from these members")
