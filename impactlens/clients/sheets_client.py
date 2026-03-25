@@ -701,15 +701,47 @@ def build_service(credentials, timeout=60):
     """
     import httplib2
     import socket
+    import os
+    import sys
     from google_auth_httplib2 import AuthorizedHttp
 
     # Set global socket timeout as fallback
     # This ensures all socket operations have a timeout, not just httplib2
     socket.setdefaulttimeout(timeout)
 
-    # Create HTTP client with timeout
-    # httplib2 automatically uses HTTP_PROXY/HTTPS_PROXY environment variables
-    http = httplib2.Http(timeout=timeout)
+    # Explicitly configure proxy for httplib2
+    # httplib2 doesn't always respect HTTP_PROXY environment variables reliably
+    proxy_info = None
+    http_proxy = (
+        os.environ.get("HTTPS_PROXY")
+        or os.environ.get("HTTP_PROXY")
+        or os.environ.get("https_proxy")
+        or os.environ.get("http_proxy")
+    )
+
+    if http_proxy:
+        try:
+            import socks
+
+            # Parse proxy URL (format: http://host:port)
+            proxy_url = http_proxy.replace("http://", "").replace("https://", "")
+            if ":" in proxy_url:
+                proxy_host, proxy_port = proxy_url.rsplit(":", 1)
+                proxy_port = int(proxy_port)
+            else:
+                proxy_host = proxy_url
+                proxy_port = 8080
+
+            proxy_info = httplib2.ProxyInfo(
+                proxy_type=socks.PROXY_TYPE_HTTP, proxy_host=proxy_host, proxy_port=proxy_port
+            )
+            print(f"   🔧 Using proxy: {proxy_host}:{proxy_port}", file=sys.stderr, flush=True)
+        except Exception as e:
+            print(f"   ⚠️  Failed to configure proxy: {e}", file=sys.stderr, flush=True)
+            print(f"   Will try without explicit proxy configuration", file=sys.stderr, flush=True)
+
+    # Create HTTP client with timeout and proxy
+    http = httplib2.Http(timeout=timeout, proxy_info=proxy_info)
 
     # Create authorized HTTP client with credentials and proxy support
     authorized_http = AuthorizedHttp(credentials, http=http)
