@@ -525,7 +525,8 @@ def generate_sheet_name_from_report(report_path: str, config_path: str = None) -
                 sheet_name = f"{project_key} {sheet_name}"
         # Then check PR and AI Analysis - PR
         elif "pr" in sheet_name.lower():
-            repo_name = os.getenv("GITHUB_REPO_NAME", "")
+            # Support both GitHub and GitLab/generic naming conventions
+            repo_name = os.getenv("GITHUB_REPO_NAME", "") or os.getenv("GIT_REPO_NAME", "")
             if repo_name:
                 sheet_name = f"{repo_name} {sheet_name}"
 
