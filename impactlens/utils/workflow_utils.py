@@ -16,7 +16,10 @@ from datetime import datetime
 from impactlens.utils.logger import Colors, set_log_level
 
 # Constants
-MIN_PHASES_FOR_COMPARISON = 2
+# Changed from 2 to 1: Comparison reports are needed even for single phase
+# because they provide the TSV format that combines team + individual members horizontally,
+# which is required for Google Sheets upload
+MIN_PHASES_FOR_COMPARISON = 1
 
 
 def apply_project_settings_to_env(
@@ -785,19 +788,22 @@ def should_generate_comparison(phases: List) -> bool:
     """
     Check if comparison report should be generated.
 
-    Comparison reports require at least 2 phases to compare metrics between periods.
+    Comparison reports provide TSV format that combines team + individual members horizontally,
+    which is required for Google Sheets upload. They are generated even for single phase.
 
     Args:
         phases: List of phases (each phase is a tuple of (name, start, end))
 
     Returns:
-        True if comparison should be generated (2+ phases), False otherwise
+        True if comparison should be generated (1+ phases), False only if no phases
 
     Examples:
         >>> should_generate_comparison([("Phase 1", "2025-01-01", "2025-01-31")])
-        False
+        True
         >>> should_generate_comparison([("P1", "2025-01-01", "2025-01-31"), ("P2", "2025-02-01", "2025-02-28")])
         True
+        >>> should_generate_comparison([])
+        False
     """
     return len(phases) >= MIN_PHASES_FOR_COMPARISON
 
@@ -817,11 +823,11 @@ def handle_comparison_report_generation(
     user_param_value: Optional[str] = None,
 ) -> int:
     """
-    Handle comparison report generation, upload, and single-phase detection.
+    Handle comparison report generation and upload.
 
     This function centralizes the logic for:
-    1. Checking if comparison should be generated (single vs multi-phase)
-    2. Generating the comparison report
+    1. Checking if comparison should be generated (requires at least 1 phase)
+    2. Generating the comparison report (TSV format combining team + individuals)
     3. Finding and uploading the report to Google Sheets
 
     Args:
@@ -857,17 +863,15 @@ def handle_comparison_report_generation(
         ...     user_param_name="author", user_param_value="johndoe"
         ... )
     """
-    # Check if comparison should be generated (single vs multi-phase)
+    # Check if comparison should be generated
     if not should_generate_comparison(phases):
-        phase_name = phases[0][0] if phases else "Unknown"
         print(
-            f"{Colors.YELLOW}ℹ️  Single phase detected ('{phase_name}') - "
-            f"skipping comparison report{Colors.NC}"
+            f"{Colors.YELLOW}ℹ️  No phases configured - " f"skipping comparison report{Colors.NC}"
         )
         print()
         return 0
 
-    # Generate comparison report for multi-phase
+    # Generate comparison report (combines team + individual members in TSV format)
     print(f"{Colors.YELLOW}Step {step_num}: Generating comparison report...{Colors.NC}")
 
     # Build kwargs with the appropriate parameter name

@@ -320,7 +320,7 @@ class GitGraphQLClient:
                     "states": ["MERGED"],  # GitHub uses array of enum values
                 }
 
-            # Retry logic for timeouts
+            # Retry logic for timeouts and network errors
             for retry in range(max_retries):
                 try:
                     response = requests.post(
@@ -338,6 +338,18 @@ class GitGraphQLClient:
                         time.sleep(2**retry)  # Exponential backoff: 1s, 2s, 4s
                     else:
                         logger.error("Max retries reached, request failed")
+                        raise
+                except (
+                    requests.exceptions.ChunkedEncodingError,
+                    requests.exceptions.ConnectionError,
+                ) as e:
+                    if retry < max_retries - 1:
+                        logger.warning(
+                            f"Network error ({type(e).__name__}), retrying ({retry + 1}/{max_retries})..."
+                        )
+                        time.sleep(2**retry)  # Exponential backoff: 1s, 2s, 4s
+                    else:
+                        logger.error("Max retries reached after network errors")
                         raise
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code == 504:  # Gateway timeout

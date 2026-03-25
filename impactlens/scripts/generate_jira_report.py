@@ -386,7 +386,7 @@ Examples:
         print()
         step_num += 1
 
-    # Generate comparison report (only if multiple phases)
+    # Generate comparison report (TSV format combining team + individuals for Google Sheets)
     result = handle_comparison_report_generation(
         phases=phases,
         step_num=step_num,

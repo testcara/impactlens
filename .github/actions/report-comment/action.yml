@@ -99,7 +99,7 @@ runs:
         PROMPT_COUNT=$(find "$REPORTS_DIR" -name "analysis_prompt_*.txt" -type f 2>/dev/null | wc -l)
 
         # AI analysis reports (gemini_analysis_*.txt or ai_analysis_*.txt)
-        AI_ANALYSIS_COUNT=$(find "$REPORTS_DIR" -name "gemini_analysis_*.txt" -o -name "ai_analysis_*.txt" -type f 2>/dev/null | wc -l)
+        AI_ANALYSIS_COUNT=$(find "$REPORTS_DIR" \( -name "gemini_analysis_*.txt" -o -name "ai_analysis_*.txt" \) -type f 2>/dev/null | wc -l)
 
         # Detailed phase reports (all .txt files excluding analysis prompts and AI analysis)
         PHASE_REPORT_COUNT=$(find "$REPORTS_DIR" -name "*.txt" -type f 2>/dev/null | grep -v "analysis_prompt" | grep -v "gemini_analysis" | grep -v "ai_analysis" | wc -l)
