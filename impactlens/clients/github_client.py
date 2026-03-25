@@ -40,13 +40,16 @@ class GitHubClient:
 
         Args:
             token: GitHub personal access token (or use GITHUB_TOKEN env var)
-            repo_owner: Repository owner/organization (or use GITHUB_REPO_OWNER env var)
-            repo_name: Repository name (or use GITHUB_REPO_NAME env var)
+            repo_owner: Repository owner/organization (or use GITHUB_REPO_OWNER/GIT_REPO_OWNER env var)
+            repo_name: Repository name (or use GITHUB_REPO_NAME/GIT_REPO_NAME env var)
             github_url: GitHub/GitLab base URL (or use GITHUB_URL env var, default: https://github.com)
         """
         self.token = token or os.getenv("GITHUB_TOKEN")
-        self.repo_owner = repo_owner or os.getenv("GITHUB_REPO_OWNER")
-        self.repo_name = repo_name or os.getenv("GITHUB_REPO_NAME")
+        # Support both GitHub and GitLab/generic naming conventions
+        self.repo_owner = (
+            repo_owner or os.getenv("GITHUB_REPO_OWNER") or os.getenv("GIT_REPO_OWNER")
+        )
+        self.repo_name = repo_name or os.getenv("GITHUB_REPO_NAME") or os.getenv("GIT_REPO_NAME")
 
         # Support both GitHub and GitLab (and self-hosted instances)
         base_git_url = github_url or os.getenv("GITHUB_URL", "https://github.com")

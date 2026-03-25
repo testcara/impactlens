@@ -178,8 +178,9 @@ def check_jira_config() -> bool:
 def check_github_config() -> bool:
     """Check GitHub configuration and test connection."""
     token_set = check_env_var("GITHUB_TOKEN")
-    owner_set = check_env_var("GITHUB_REPO_OWNER")
-    repo_set = check_env_var("GITHUB_REPO_NAME")
+    # Support both GitHub and GitLab/generic naming conventions
+    owner_set = check_env_var("GITHUB_REPO_OWNER") or check_env_var("GIT_REPO_OWNER")
+    repo_set = check_env_var("GITHUB_REPO_NAME") or check_env_var("GIT_REPO_NAME")
 
     if not (token_set and owner_set and repo_set):
         return False
@@ -189,8 +190,9 @@ def check_github_config() -> bool:
         import requests
 
         token = os.getenv("GITHUB_TOKEN")
-        repo_owner = os.getenv("GITHUB_REPO_OWNER")
-        repo_name = os.getenv("GITHUB_REPO_NAME")
+        # Support both GitHub and GitLab/generic naming conventions
+        repo_owner = os.getenv("GITHUB_REPO_OWNER") or os.getenv("GIT_REPO_OWNER")
+        repo_name = os.getenv("GITHUB_REPO_NAME") or os.getenv("GIT_REPO_NAME")
 
         # Try to get repository info
         url = f"https://api.github.com/repos/{repo_owner}/{repo_name}"
