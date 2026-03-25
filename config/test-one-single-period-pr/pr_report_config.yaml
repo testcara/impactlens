@@ -1,0 +1,30 @@
+# Test configuration for CI integration testing - Single Period
+# This config uses a single phase to test single-period mode
+
+project:
+  git_url: "https://github.com"
+  git_repo_owner: "konflux-ci"
+  git_repo_name: "konflux-ui"
+
+phases:
+  - name: "Test Period 1"
+    start: "2025-10-01"
+    end: "2025-10-31"
+
+default_author: "" # "" represent team
+
+members:
+  - email: wlin@redhat.com
+    github_username: testcara
+  - email: sbudhwar@redhat.com
+    github_username: sahil143
+
+# Use test output directory to avoid polluting main reports
+output_dir: "reports/test-single-period-pr/github"
+# Send Hashed members name to individuals.
+# Required by CI for first-time run.
+# Disabled it if you do not want to be mailed every run.
+email_anonymous_id: true
+# Remove old reports when we rerun ci jobs
+replace_existing_reports: true
+no_ai_analysis: true
