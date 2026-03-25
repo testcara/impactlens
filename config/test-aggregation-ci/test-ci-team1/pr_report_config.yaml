@@ -17,11 +17,11 @@ default_author: "" # "" represent team
 
 members:
   - email: wlin@redhat.com
-    github_username: testcara
+    gith_username: testcara
   - email: sbudhwar@redhat.com
-    github_username: sahil143
+    git_username: sahil143
   - email: kkanova@redhat.com
-    github_username: Katka92
+    git_username: Katka92
     capacity: 0.5
 
 # Required for multiple scenario

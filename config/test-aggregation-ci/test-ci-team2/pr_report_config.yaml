@@ -17,7 +17,7 @@ default_author: "" # "" represent team
 
 members:
   - email: kkanova@redhat.com
-    github_username: Katka92
+    git_username: Katka92
 
 # Use test output directory to avoid polluting main reports
 output_dir: "reports/test-ci-team2/github"
