@@ -146,9 +146,11 @@ Note:
         print(f"Error getting credentials: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Build service
+    # Build service with extended timeout for corporate networks
     try:
-        service = build_service(creds)
+        # Increase timeout from default 60s to 300s (5 minutes) for slow/proxy networks
+        service = build_service(creds, timeout=300)
+        print("⏱️  Using extended timeout (300s) for API requests")
     except Exception as e:
         print(f"Error building Google Sheets service: {e}", file=sys.stderr)
         sys.exit(1)
