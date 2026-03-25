@@ -163,7 +163,11 @@ def get_existing_sheets(service, spreadsheet_id):
         HttpError: If the spreadsheet doesn't exist or the service account lacks permission
     """
     try:
+        import sys
+
+        print("   🔍 Fetching spreadsheet metadata...", file=sys.stderr, flush=True)
         spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        print("   ✓ Metadata fetched successfully", file=sys.stderr, flush=True)
 
         sheets = spreadsheet.get("sheets", [])
         return [sheet["properties"]["title"] for sheet in sheets]
@@ -696,7 +700,12 @@ def build_service(credentials, timeout=60):
         Google Sheets API service object
     """
     import httplib2
+    import socket
     from google_auth_httplib2 import AuthorizedHttp
+
+    # Set global socket timeout as fallback
+    # This ensures all socket operations have a timeout, not just httplib2
+    socket.setdefaulttimeout(timeout)
 
     # Create HTTP client with timeout
     # httplib2 automatically uses HTTP_PROXY/HTTPS_PROXY environment variables
