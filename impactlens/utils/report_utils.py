@@ -157,6 +157,10 @@ def build_pr_project_prefix(project_settings: Optional[Dict]) -> Optional[str]:
     """
     Build project prefix for PR reports from project settings.
 
+    Supports both GitHub and GitLab/generic naming conventions:
+    - github_repo_owner / github_repo_name (GitHub)
+    - git_repo_owner / git_repo_name (GitLab/generic)
+
     Args:
         project_settings: Dictionary containing project configuration
 
@@ -167,6 +171,8 @@ def build_pr_project_prefix(project_settings: Optional[Dict]) -> Optional[str]:
     Examples:
         >>> build_pr_project_prefix({"github_repo_owner": "konflux-ci", "github_repo_name": "konflux-ui"})
         'konflux-ci/konflux-ui'
+        >>> build_pr_project_prefix({"git_repo_owner": "metadata/comet", "git_repo_name": "comet"})
+        'metadata/comet/comet'
         >>> build_pr_project_prefix({"github_repo_name": "konflux-ui"})
         'konflux-ui'
         >>> build_pr_project_prefix({})
@@ -175,8 +181,9 @@ def build_pr_project_prefix(project_settings: Optional[Dict]) -> Optional[str]:
     if not project_settings:
         return None
 
-    repo_owner = project_settings.get("github_repo_owner")
-    repo_name = project_settings.get("github_repo_name")
+    # Support both GitHub and GitLab/generic naming conventions
+    repo_owner = project_settings.get("github_repo_owner") or project_settings.get("git_repo_owner")
+    repo_name = project_settings.get("github_repo_name") or project_settings.get("git_repo_name")
 
     if repo_owner and repo_name:
         return f"{repo_owner}/{repo_name}"

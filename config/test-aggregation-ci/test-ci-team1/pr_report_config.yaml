@@ -17,7 +17,7 @@ default_author: "" # "" represent team
 
 members:
   - email: wlin@redhat.com
-    gith_username: testcara
+    git_username: testcara
   - email: sbudhwar@redhat.com
     git_username: sahil143
   - email: kkanova@redhat.com
