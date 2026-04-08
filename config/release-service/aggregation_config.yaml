@@ -1,0 +1,16 @@
+aggregation:
+  # Name for the aggregated report
+  name: "Release Service Team"
+
+  # Output directory for aggregated reports
+
+  projects:
+    - "release-service"
+    - "release-service-catalog"
+    - "release-service-utils"
+    - "internal-services"
+
+
+output_dir: "reports/release-service-aggregated"
+replace_existing_reports: true
+email_anonymous_id: false # Set to false to disable email notifications
